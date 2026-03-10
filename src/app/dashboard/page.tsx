@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -17,10 +16,18 @@ import {
   Loader2,
   Sparkles,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  HelpCircle
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+import { TutorialDialog } from "@/components/TutorialDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 const SpendingChart = dynamic(() => import("@/components/dashboard/SpendingChart").then(mod => mod.SpendingChart), {
   loading: () => <Card className="h-[250px] animate-pulse bg-muted/20" />
@@ -33,6 +40,7 @@ const CategoryPieChart = dynamic(() => import("@/components/dashboard/CategoryPi
 export default function DashboardPage() {
   const { expenses, currency, viewMonth, viewYear, setViewDate, rolloverRecurring, insights } = useFynWealthStore();
   const [mounted, setMounted] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -75,6 +83,12 @@ export default function DashboardPage() {
     });
   };
 
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setViewDate(date.getMonth(), date.getFullYear());
+    }
+  };
+
   const ExpenseRow = ({ expense }: { expense: Expense }) => (
     <div key={expense.id} className="flex items-center justify-between p-3.5 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -99,36 +113,72 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between gap-4 px-1">
+      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
+      
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
         <div className="flex flex-col gap-0.5">
           <h1 className="text-xl md:text-2xl font-bold font-headline text-primary tracking-tight">Dashboard</h1>
-          <p className="text-xs text-muted-foreground">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
+          <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold tracking-wider">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Select value={viewMonth.toString()} onValueChange={(v) => setViewDate(parseInt(v), viewYear)}>
-            <SelectTrigger className="w-32 md:w-40 h-10 text-xs md:text-sm rounded-lg">
-              <CalendarIcon className="w-4 h-4 mr-2 text-primary" />
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map(m => (
-                <SelectItem key={m} value={m.toString()} className="text-xs md:text-sm">
-                  {format(new Date(0, m), 'MMMM')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={viewYear.toString()} onValueChange={(v) => setViewDate(viewMonth, parseInt(v))}>
-            <SelectTrigger className="w-24 md:w-28 h-10 text-xs md:text-sm rounded-lg">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(y => (
-                <SelectItem key={y} value={y.toString()} className="text-xs md:text-sm">{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 mr-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary"
+              onClick={() => setShowTutorial(true)}
+              title="Show Tutorial"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary"
+                  title="Select Date"
+                >
+                  <CalendarIcon className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl" align="end">
+                <Calendar
+                  mode="single"
+                  selected={new Date(viewYear, viewMonth)}
+                  onSelect={handleCalendarSelect}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={viewMonth.toString()} onValueChange={(v) => setViewDate(parseInt(v), viewYear)}>
+              <SelectTrigger className="w-32 md:w-40 h-10 text-xs md:text-sm rounded-lg font-bold">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {months.map(m => (
+                  <SelectItem key={m} value={m.toString()} className="text-xs md:text-sm">
+                    {format(new Date(0, m), 'MMMM')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={viewYear.toString()} onValueChange={(v) => setViewDate(viewMonth, parseInt(v))}>
+              <SelectTrigger className="w-24 md:w-28 h-10 text-xs md:text-sm rounded-lg font-bold">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {years.map(y => (
+                  <SelectItem key={y} value={y.toString()} className="text-xs md:text-sm">{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -150,7 +200,7 @@ export default function DashboardPage() {
               <FileText className="w-4 h-4 text-primary" />
               <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider">Recent</CardTitle>
             </div>
-            <Link href="/expenses" className="text-xs font-bold text-primary hover:underline">
+            <Link href="/expenses" className="text-xs font-bold text-primary hover:underline uppercase tracking-tight">
               All
             </Link>
           </CardHeader>
@@ -174,7 +224,7 @@ export default function DashboardPage() {
               <CalendarRange className="w-4 h-4 text-accent" />
               <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider">Upcoming</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] md:text-xs font-bold text-accent" onClick={handleRollover}>
+            <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] md:text-xs font-bold text-accent uppercase tracking-tight" onClick={handleRollover}>
               <RefreshCcw className="w-3 h-3 mr-1.5" />
               Rollover
             </Button>
@@ -199,7 +249,7 @@ export default function DashboardPage() {
               <Sparkles className="w-4 h-4 text-primary" />
               <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider text-primary">AI Insights</CardTitle>
             </div>
-            <Link href="/insights" className="text-xs font-bold text-primary hover:underline">
+            <Link href="/insights" className="text-xs font-bold text-primary hover:underline uppercase tracking-tight">
               More
             </Link>
           </CardHeader>
@@ -209,7 +259,7 @@ export default function DashboardPage() {
                 <div className="p-3 bg-card rounded-xl border border-primary/5">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4 text-primary" />
-                    <span className="text-[10px] md:text-xs font-bold text-primary uppercase">Forecast</span>
+                    <span className="text-[10px] md:text-xs font-bold text-primary uppercase tracking-tight">Forecast</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Expect heavy spend in {insights.predictions.predictions[0].month} due to {insights.predictions.predictions[0].reason}.
@@ -225,7 +275,7 @@ export default function DashboardPage() {
                 <div className="p-3 bg-accent/5 rounded-xl border border-accent/10">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="w-4 h-4 text-accent" />
-                    <span className="text-[10px] md:text-xs font-bold text-accent uppercase">Saving Tip</span>
+                    <span className="text-[10px] md:text-xs font-bold text-accent uppercase tracking-tight">Saving Tip</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Review {insights.unnecessary.unnecessaryExpenses[0].description}: {insights.unnecessary.unnecessaryExpenses[0].reason}
