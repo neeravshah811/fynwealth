@@ -11,10 +11,11 @@ import {
   Trash2, 
   LogOut, 
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Coins
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFynWealthStore } from "@/lib/store";
+import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
 import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -51,7 +53,9 @@ export function SideDrawer() {
     togglePrivacyMode, 
     profile, 
     viewMonth, 
-    viewYear 
+    viewYear,
+    currency,
+    setCurrency
   } = useFynWealthStore();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -107,23 +111,54 @@ export function SideDrawer() {
 
             <div className="flex flex-col flex-1 justify-between p-4 overflow-y-auto">
               <div className="space-y-4">
-                <div className="bg-muted/30 rounded-xl p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={cn("p-1.5 rounded-lg", privacyMode ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary")}>
-                        {privacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {/* Preferences Section */}
+                <div className="space-y-3">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1">Preferences</p>
+                  
+                  <div className="bg-muted/30 rounded-xl p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("p-1.5 rounded-lg", privacyMode ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary")}>
+                          {privacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <Label htmlFor="privacy-toggle-drawer" className="font-bold text-[11px] block">Privacy Mode</Label>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Hide Figures</p>
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="privacy-toggle-drawer" className="font-bold text-[11px] block">Privacy Mode</Label>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Hide Figures</p>
-                      </div>
+                      <Switch 
+                        id="privacy-toggle-drawer"
+                        checked={privacyMode}
+                        onCheckedChange={togglePrivacyMode}
+                        className="scale-75"
+                      />
                     </div>
-                    <Switch 
-                      id="privacy-toggle-drawer"
-                      checked={privacyMode}
-                      onCheckedChange={togglePrivacyMode}
-                      className="scale-75"
-                    />
+                  </div>
+
+                  <div className="bg-muted/30 rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600">
+                          <Coins className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <Label className="font-bold text-[11px] block">Currency</Label>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight truncate">Display Settings</p>
+                        </div>
+                      </div>
+                      <Select value={currency.code} onValueChange={(v) => setCurrency(v)}>
+                        <SelectTrigger className="w-20 h-8 text-[10px] rounded-lg border-none bg-background shadow-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {SUPPORTED_CURRENCIES.map(c => (
+                            <SelectItem key={c.code} value={c.code} className="text-[10px]">
+                              {c.code} ({c.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
 
@@ -133,7 +168,7 @@ export function SideDrawer() {
                   <AlertDialog>
                     <button onClick={(e) => e.stopPropagation()} className="w-full">
                       <SheetTrigger asChild>
-                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
+                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
                           <div className="flex items-center gap-2.5 text-amber-600">
                             <Eraser className="w-4 h-4" />
                             <span className="text-[11px] font-bold">Clear {monthName} Data</span>
@@ -161,7 +196,7 @@ export function SideDrawer() {
                   <AlertDialog>
                     <button onClick={(e) => e.stopPropagation()} className="w-full">
                       <SheetTrigger asChild>
-                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
+                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
                           <div className="flex items-center gap-2.5 text-destructive">
                             <Trash2 className="w-4 h-4" />
                             <span className="text-[11px] font-bold">Reset App Data</span>
