@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,7 +14,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { BarChart3, TrendingUp, Users, Activity, Globe } from 'lucide-react';
+import { Activity, TrendingUp, Globe } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const dailyActiveData = [
@@ -26,15 +25,6 @@ export default function AnalyticsPage() {
     { date: '2024-03-05', users: 750, entries: 2100 },
     { date: '2024-03-06', users: 820, entries: 2400 },
     { date: '2024-03-07', users: 900, entries: 2800 },
-  ];
-
-  const categoryDistribution = [
-    { name: 'Food', value: 400 },
-    { name: 'Rent', value: 300 },
-    { name: 'Transport', value: 300 },
-    { name: 'Shopping', value: 200 },
-    { name: 'Entertainment', value: 278 },
-    { name: 'Others', value: 189 },
   ];
 
   return (
@@ -133,7 +123,7 @@ export default function AnalyticsPage() {
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
                 <Line type="stepAfter" dataKey="entries" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
