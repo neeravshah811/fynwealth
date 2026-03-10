@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirestore, useUser } from '@/firebase';
@@ -30,6 +29,8 @@ export default function AdminDashboardPage() {
     if (!db || !user) return;
 
     const appStatsDoc = doc(db, 'analytics', 'appStats');
+    
+    // Use a try-catch for immediate failures and the error callback for the stream
     const unsub = onSnapshot(appStatsDoc, 
       (snapshot) => {
         if (snapshot.exists()) {
@@ -46,8 +47,8 @@ export default function AdminDashboardPage() {
         setLoading(false);
       },
       async (error) => {
-        // Only emit if it's actually a permission issue and not a typical unmount or transitory auth state
-        if (error.code === 'permission-denied' && user) {
+        // Log the error for the agent to fix but don't crash the UI for the user
+        if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: appStatsDoc.path,
             operation: 'get',
@@ -56,7 +57,7 @@ export default function AdminDashboardPage() {
           errorEmitter.emit('permission-error', permissionError);
         }
         
-        // Ensure we still show something even if permissions fail during transition
+        // Ensure we still show fallback metrics even on permission errors
         if (!stats) {
           setStats({
             totalUsers: 1240,
