@@ -333,7 +333,7 @@ export function SideDrawer() {
             </DialogTitle>
           </DialogHeader>
           
-          <ScrollArea className="flex-1 min-h-0 w-full">
+          <div className="flex-1 overflow-y-auto min-h-0 w-full scrollbar-thin scrollbar-thumb-muted-foreground/20">
             <div className="p-8 space-y-8 text-sm text-muted-foreground leading-relaxed">
               {legalDialog === "terms" && (
                 <>
@@ -407,7 +407,7 @@ export function SideDrawer() {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
           
           <DialogFooter className="p-6 border-t bg-muted/10 shrink-0">
             <Button variant="outline" onClick={() => setLegalDialog(null)} className="w-full h-12 text-sm font-bold rounded-xl">

@@ -133,7 +133,7 @@ export function ProfileDialog() {
           </button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden gap-0 border-none shadow-2xl">
-          <DialogHeader className="p-8 bg-primary/5 border-b">
+          <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-3xl font-bold shadow-lg shadow-primary/20">
                 {initial ? initial.toUpperCase() : <User className="w-8 h-8" />}
@@ -153,7 +153,7 @@ export function ProfileDialog() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto max-h-[60vh] scrollbar-thin scrollbar-thumb-muted-foreground/20">
             <div className="p-8 space-y-8">
               <div className="space-y-4">
                 <div className="flex items-center justify-between px-1">
@@ -236,9 +236,9 @@ export function ProfileDialog() {
                 <MenuButton icon={LogOut} label="Reset All Data" variant="destructive" onClick={handleResetData} />
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="p-6 bg-muted/20 border-t sm:justify-between flex-row items-center gap-4">
+          <DialogFooter className="p-6 bg-muted/20 border-t sm:justify-between flex-row items-center gap-4 shrink-0">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
@@ -282,7 +282,7 @@ export function ProfileDialog() {
             </DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="flex-1 min-h-0 w-full">
+          <div className="flex-1 overflow-y-auto min-h-0 w-full scrollbar-thin scrollbar-thumb-muted-foreground/20">
             <div className="p-8 space-y-8 text-sm text-muted-foreground leading-relaxed">
               {activeLegal === "terms" && (
                 <>
@@ -364,7 +364,7 @@ export function ProfileDialog() {
                 </>
               )}
             </div>
-          </ScrollArea>
+          </div>
           
           <DialogFooter className="p-6 border-t bg-muted/10 shrink-0">
             <Button onClick={() => setActiveLegal(null)} className="w-full h-12 text-sm font-bold rounded-xl">Got it, Close</Button>
