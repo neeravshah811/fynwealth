@@ -6,6 +6,7 @@ import { ThemeProvider } from 'next-themes';
 import { SplashScreen } from '@/components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { BottomNav } from "@/components/dashboard/BottomNav";
+import { SideDrawer } from "@/components/dashboard/SideDrawer";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { TutorialTrigger } from '@/components/TutorialTrigger';
@@ -44,6 +45,7 @@ export default function RootLayout({
               <TutorialTrigger />
               <NotificationManager />
               <div className="flex flex-col min-h-screen bg-background">
+                <SideDrawer />
                 <main className="flex-1 pb-24 overflow-y-auto">
                   <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
                     {children}
