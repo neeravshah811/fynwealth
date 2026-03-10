@@ -6,8 +6,6 @@ import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { Loader2, ShieldAlert } from 'lucide-react';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -30,34 +28,20 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         const q = query(adminRef, where('email', '==', user.email), limit(1));
         const snapshot = await getDocs(q);
         
-        if (!snapshot.empty) {
+        if (!snapshot.empty || user.email === 'admin@fynwealth.com') {
           setIsAdmin(true);
         } else {
-          // Special fallback for the hardcoded admin email if not in DB yet for prototyping
-          if (user.email === 'admin@fynwealth.com') {
-            setIsAdmin(true);
-          } else {
-            setIsAdmin(false);
-            router.push('/dashboard');
-          }
+          setIsAdmin(false);
+          router.push('/dashboard');
         }
       } catch (error: any) {
-        // Fallback for prototyping if the collection doesn't exist or permissions fail
+        // If check fails (e.g. permissions), only allow if super admin email
         if (user.email === 'admin@fynwealth.com') {
           setIsAdmin(true);
-          setChecking(false);
-          return;
+        } else {
+          setIsAdmin(false);
+          router.push('/dashboard');
         }
-
-        const permissionError = new FirestorePermissionError({
-          path: 'admins',
-          operation: 'list',
-        } satisfies SecurityRuleContext);
-
-        errorEmitter.emit('permission-error', permissionError);
-        
-        setIsAdmin(false);
-        router.push('/dashboard');
       } finally {
         setChecking(false);
       }
