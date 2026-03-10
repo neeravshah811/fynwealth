@@ -13,16 +13,16 @@ service cloud.firestore {
       );
     }
 
-    // Core application metrics - readable by all registered users for dashboard summaries
+    // Core application metrics - readable by all, writable by admins
     match /analytics/appStats {
       allow read: if isSignedIn();
-      allow write: if false; 
+      allow write: if isAdmin();
     }
 
-    // Admins registry - users can read to verify their own role
+    // Admins registry - users can read to verify their own role, admins can write
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow write: if isAdmin();
     }
     
     match /admins {
