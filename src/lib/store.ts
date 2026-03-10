@@ -134,9 +134,7 @@ export const useFynWealthStore = create<FynWealthState>()(
           ]
         }));
 
-        // If recurring, automatically add a future bill/reminder
         if (expense.isRecurring && expense.frequency) {
-          // Calculate next due date based on frequency from the expense date
           const date = new Date(expense.date);
           if (expense.frequency === 'Monthly') date.setMonth(date.getMonth() + 1);
           else if (expense.frequency === 'Weekly') date.setDate(date.getDate() + 7);
@@ -147,7 +145,7 @@ export const useFynWealthStore = create<FynWealthState>()(
           const nextDateStr = date.toISOString().split('T')[0];
 
           get().addBill({
-            name: expense.description,
+            name: expense.description || `${expense.category} Recurring`,
             amount: expense.amount,
             dueDate: nextDateStr,
             dueTime: expense.reminderTime || "09:00",
@@ -168,9 +166,27 @@ export const useFynWealthStore = create<FynWealthState>()(
           }))
         ]
       })),
-      updateExpense: (id, updatedFields) => set((state) => ({
-        expenses: state.expenses.map((e) => e.id === id ? { ...e, ...updatedFields } : e)
-      })),
+      updateExpense: (id, updatedFields) => set((state) => {
+        const expense = state.expenses.find(e => e.id === id);
+        const newExpenses = state.expenses.map((e) => e.id === id ? { ...e, ...updatedFields } : e);
+        
+        let newBills = state.bills;
+        if (expense?.billId) {
+          newBills = state.bills.map(b => b.id === expense.billId ? { 
+            ...b, 
+            amount: updatedFields.amount !== undefined ? updatedFields.amount : b.amount,
+            name: updatedFields.description !== undefined ? updatedFields.description : b.name,
+            dueDate: updatedFields.date !== undefined ? updatedFields.date : b.dueDate,
+            category: updatedFields.category !== undefined ? updatedFields.category : b.category,
+            subCategory: updatedFields.subCategory !== undefined ? updatedFields.subCategory : b.subCategory,
+          } : b);
+        }
+
+        return { 
+          expenses: newExpenses,
+          bills: newBills
+        };
+      }),
       deleteExpense: (id) => set((state) => ({
         expenses: state.expenses.filter((e) => e.id !== id)
       })),
@@ -194,7 +210,6 @@ export const useFynWealthStore = create<FynWealthState>()(
               createdAt: new Date().toISOString()
             }
           ],
-          // Also reflect in expenses as an unpaid transaction
           expenses: [
             ...state.expenses,
             {
@@ -214,14 +229,12 @@ export const useFynWealthStore = create<FynWealthState>()(
       },
       deleteBill: (id) => set((state) => ({
         bills: state.bills.filter((b) => b.id !== id),
-        // Remove associated expense
         expenses: state.expenses.filter((e) => e.billId !== id)
       })),
       markBillPaid: (id) => set((state) => ({
         bills: state.bills.map((b) => 
           b.id === id ? { ...b, status: 'paid' } : b
         ),
-        // Update associated expense to paid
         expenses: state.expenses.map((e) => 
           e.billId === id ? { ...e, status: 'paid' } : e
         )

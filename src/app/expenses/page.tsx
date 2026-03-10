@@ -59,7 +59,7 @@ export default function ExpensesPage() {
   }, [expenses, searchTerm, statusFilter, categoryFilter]);
 
   const handleEditClick = (expense: Expense) => {
-    setEditingExpense(expense);
+    setEditingExpense({ ...expense });
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -70,6 +70,10 @@ export default function ExpensesPage() {
         amount: Math.abs(editingExpense.amount)
       });
       setEditingExpense(null);
+      toast({ 
+        title: "Transaction Updated", 
+        description: "Changes have been saved across the application." 
+      });
     }
   };
 
@@ -415,7 +419,7 @@ export default function ExpensesPage() {
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Category</Label>
                   <Select value={editingExpense.category} onValueChange={(v) => setEditingExpense({...editingExpense, category: v})}>
-                    <SelectTrigger className="h-11 text-sm rounded-xl text-sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-11 text-sm rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-[300px] rounded-xl">{categoriesList.map(cat => <SelectItem key={cat} value={cat} className="text-sm">{cat}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -425,7 +429,7 @@ export default function ExpensesPage() {
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Date</Label>
                   <Input 
                     type="date" 
-                    className="h-11 text-sm rounded-xl text-sm" 
+                    className="h-11 text-sm rounded-xl" 
                     value={editingExpense.date} 
                     onChange={(e) => setEditingExpense({...editingExpense, date: e.target.value})} 
                     required 
@@ -434,7 +438,7 @@ export default function ExpensesPage() {
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Sub-Category</Label>
                   <Input 
-                    className="h-11 text-sm rounded-xl text-sm" 
+                    className="h-11 text-sm rounded-xl" 
                     value={editingExpense.subCategory || ""} 
                     onChange={(e) => setEditingExpense({...editingExpense, subCategory: e.target.value})} 
                   />
@@ -442,7 +446,12 @@ export default function ExpensesPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Description</Label>
-                <Input className="h-11 text-sm rounded-xl text-sm" value={editingExpense.description} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} required />
+                <Input 
+                  className="h-11 text-sm rounded-xl" 
+                  value={editingExpense.description} 
+                  onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} 
+                  required 
+                />
               </div>
               
               <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted">
@@ -463,7 +472,7 @@ export default function ExpensesPage() {
               </div>
 
               <DialogFooter className="pt-2">
-                <Button type="submit" className="w-full h-12 text-sm font-bold rounded-xl" onClick={() => setEditingExpense(null)}>Save Changes</Button>
+                <Button type="submit" className="w-full h-12 text-sm font-bold rounded-xl">Save Changes</Button>
               </DialogFooter>
             </form>
           </DialogContent>
