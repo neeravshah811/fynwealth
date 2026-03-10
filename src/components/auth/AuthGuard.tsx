@@ -1,57 +1,77 @@
 
 'use client';
 
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 interface AuthGuardProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, isUserLoading } = useUser();
+  const db = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isVerifyingRole, setIsVerifyingRole] = useState(true);
 
   useEffect(() => {
-    if (!isUserLoading) {
-      if (!user && pathname !== '/login') {
-        router.push('/login');
-      } else if (user && pathname === '/login') {
-        router.push('/dashboard');
+    async function verifyRole() {
+      if (isUserLoading) return;
+
+      if (!user) {
+        setIsVerifyingRole(false);
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
+        return;
+      }
+
+      // Check if user is an admin
+      try {
+        const adminRef = collection(db, 'admins');
+        const q = query(adminRef, where('email', '==', user.email), limit(1));
+        const snapshot = await getDocs(q);
+        const adminExists = !snapshot.empty || user.email === 'admin@fynwealth.com';
+        
+        setIsAdmin(adminExists);
+
+        if (pathname === '/login') {
+          if (adminExists) {
+            router.push('/admin-dashboard');
+          } else {
+            router.push('/dashboard');
+          }
+        }
+      } catch (error) {
+        console.error("Role verification failed", error);
+        if (pathname === '/login') router.push('/dashboard');
+      } finally {
+        setIsVerifyingRole(false);
       }
     }
-  }, [user, isUserLoading, pathname, router]);
 
-  if (isUserLoading) {
+    verifyRole();
+  }, [user, isUserLoading, pathname, router, db]);
+
+  if (isUserLoading || isVerifyingRole) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-sm font-medium text-muted-foreground animate-pulse">Authenticating...</p>
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Checking Permissions...</p>
         </div>
       </div>
     );
   }
 
-  // If we're on the login page, we don't want to show the sidebar/header layout from RootLayout
-  // So if we're on /login, we just render the children directly (which is the login page)
-  // and we handle the layout redirection in RootLayout if needed, but for simplicity here:
-  if (!user && pathname === '/login') {
-    return <>{children}</>;
-  }
-
-  // If we are authenticated but on the login page, we're about to redirect
-  if (user && pathname === '/login') {
-    return null;
-  }
-
-  // If we are not authenticated and not on login, we're about to redirect
-  if (!user && pathname !== '/login') {
-    return null;
-  }
+  // Handle standard auth redirects
+  if (!user && pathname !== '/login') return null;
+  if (user && pathname === '/login') return null;
 
   return <>{children}</>;
 }

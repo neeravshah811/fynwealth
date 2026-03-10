@@ -1,158 +1,46 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * CORE PHILOSOPHY
-     * This ruleset enforces a strict user-ownership model where all private financial data 
-     * is nested under a top-level /users/{userId} path. This path-based ownership 
-     * ensures high performance and security by using the user's authenticated UID 
-     * as the primary access key.
-     *
-     * DATA STRUCTURE
-     * - /users/{userId}: The root document for a user profile.
-     * - /users/{userId}/[subcollection]: Private data (bills, expenses, budgets, insights).
-     * - /default_expense_categories: Read-only system data available to all users.
-     *
-     * KEY SECURITY DECISIONS
-     * 1. Authorization Independence: Every user-owned document contains a `userId` field 
-     *    denormalized onto it. This allows rules to verify ownership without additional 
-     *    collection lookups (get() calls), ensuring atomic and efficient checks.
-     * 2. Strict Scoping: Users can only list or get documents within their own path. 
-     *    Listing of the top-level /users collection is strictly forbidden.
-     * 3. Immutability: Critical relational fields (like userId) are enforced as 
-     *    immutable during updates to prevent data from being "orphaned" or reassigned.
-     */
-
-    // --- Global Helper Functions ---
-
-    /** Checks if the request is from an authenticated user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** Checks if the authenticated user's UID matches the provided userId. */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
+             (isSignedIn() && get(/databases/$(database)/documents/admins/admin_list).data.emails.hasAny([request.auth.token.email]));
     }
 
-    /** 
-     * Checks if the user is the owner and the document exists. 
-     * Used for update and delete operations.
-     */
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
+    // Admins can read everything for monitoring
+    match /{document=**} {
+      allow read: if isAdmin();
     }
 
-    /** Validates that the userId in the document data matches the path userId. */
-    function isValidUserLink(userId) {
-      return request.resource.data.userId == userId;
+    // Admin email list
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Managed via Firebase Console for security
     }
 
-    /** Validates that the id in the document data matches the document ID in the path. */
-    function isValidIdLink(idFromPath) {
-      return request.resource.data.id == idFromPath;
-    }
-
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for the UserProfile entity. Users manage their own profile.
-     * @path /users/{userId}
-     * @allow (create) if auth.uid == userId
-     * @deny (get) if auth.uid != userId
-     * @principle Ownership: Restricted access to a user's own root profile document.
-     */
+    // User data rules
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // Users cannot list other users
-      allow create: if isOwner(userId) && isValidIdLink(userId);
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow get, write: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isAdmin();
 
-      /**
-       * @description Rules for user-specific Bills.
-       * @path /users/{userId}/bills/{billId}
-       * @allow (list) if auth.uid == userId
-       * @deny (update) if userId field is changed
-       * @principle Relational Integrity: Ensures bill documents stay linked to the correct user path.
-       */
-      match /bills/{billId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidUserLink(userId);
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
-      }
-
-      /**
-       * @description Rules for custom Expense Categories created by users.
-       * @path /users/{userId}/expense_categories/{categoryId}
-       * @allow (create) if auth.uid == userId and userId field matches
-       * @deny (delete) if auth.uid != userId
-       * @principle Ownership: Only the creator can manage their custom categories.
-       */
-      match /expense_categories/{categoryId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && (request.resource.data.userId == userId || request.resource.data.userId == null);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
-      }
-
-      /**
-       * @description Rules for individual user Expenses.
-       * @path /users/{userId}/expenses/{expenseId}
-       * @allow (create) if userId in data matches path
-       * @deny (list) if auth.uid != userId
-       * @principle Path-Based Ownership: Secures the private expense subcollection.
-       */
       match /expenses/{expenseId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidUserLink(userId);
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
-
-      /**
-       * @description Rules for user Budgets.
-       * @path /users/{userId}/budgets/{budgetId}
-       * @allow (update) if owner matches
-       * @deny (get) if owner mismatches
-       * @principle Ownership: Protects financial planning data.
-       */
-      match /budgets/{budgetId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidUserLink(userId);
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
-      }
-
-      /**
-       * @description Rules for AI-generated Insights.
-       * @path /users/{userId}/insights/{insightId}
-       * @allow (get) if auth.uid == userId
-       * @deny (create) if requested by client (Insights are system-generated)
-       * @principle Ownership: Users can only see insights generated for them.
-       */
-      match /insights/{insightId} {
-        allow get, list: if isOwner(userId);
-        // Note: Logic allows for prototyping client-side creation if needed, 
-        // but typically insights are pushed by a backend service.
-        allow create: if isOwner(userId) && isValidUserLink(userId);
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
+      
+      match /bills/{billId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
-    /**
-     * @description System-provided default expense categories.
-     * @path /default_expense_categories/{categoryId}
-     * @allow (get, list) if isSignedIn()
-     * @deny (write) always (read-only for clients)
-     * @principle Public Read with Admin-Only Writes: Accessible to all users, modifiable by none via client SDK.
-     */
-    match /default_expense_categories/{categoryId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+    // App Stats
+    match /analytics/appStats {
+      allow read: if isSignedIn();
+      allow write: if false; // Updated via Cloud Functions (simulated via triggers)
     }
   }
 }
