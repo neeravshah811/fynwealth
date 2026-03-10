@@ -202,11 +202,11 @@ export default function ExpensesPage() {
   const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || categoryFilter !== "all";
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-10 animate-in fade-in duration-500 max-w-7xl mx-auto pb-24">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div>
-          <h1 className="text-3xl font-bold font-headline mb-2 text-primary">Expenses</h1>
-          <p className="text-sm text-muted-foreground">Track and manage every cent you spend.</p>
+          <h1 className="text-2xl md:text-3xl font-bold font-headline mb-2 text-primary">Expenses</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Track and manage every cent you spend.</p>
         </div>
         <div className="flex gap-3">
           <input 
@@ -218,7 +218,7 @@ export default function ExpensesPage() {
           />
           <Button 
             variant="outline" 
-            className="h-11 px-5 rounded-xl text-sm" 
+            className="h-12 px-6 rounded-xl text-sm md:text-base font-bold shadow-sm" 
             onClick={() => importInputRef.current?.click()}
           >
             <Upload className="w-5 h-5 mr-2" />
@@ -226,7 +226,7 @@ export default function ExpensesPage() {
           </Button>
           <Button 
             variant="outline" 
-            className="h-11 px-5 rounded-xl text-sm" 
+            className="h-12 px-6 rounded-xl text-sm md:text-base font-bold shadow-sm" 
             onClick={exportToCSV}
           >
             <Download className="w-5 h-5 mr-2" />
@@ -241,13 +241,13 @@ export default function ExpensesPage() {
         </div>
         
         <div className="lg:col-span-2 space-y-10">
-          <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5">
+          <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5 bg-card">
             <CardHeader className="pb-6 bg-muted/20">
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-headline">Transaction History</CardTitle>
+                  <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
                   {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={resetFilters} className="text-sm h-9 text-muted-foreground">
+                    <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs md:text-sm h-9 text-muted-foreground font-bold">
                       <X className="w-4 h-4 mr-2" />
                       Clear Filters
                     </Button>
@@ -259,32 +259,32 @@ export default function ExpensesPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input 
                       placeholder="Search description..." 
-                      className="pl-10 h-11 bg-background border-muted text-sm rounded-xl"
+                      className="pl-10 h-12 bg-background border-muted text-sm md:text-base rounded-xl"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                   <div className="md:col-span-3">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-11 bg-background border-muted text-sm rounded-xl">
+                      <SelectTrigger className="h-12 bg-background border-muted text-sm md:text-base rounded-xl">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="all" className="text-sm md:text-base">All Statuses</SelectItem>
+                        <SelectItem value="paid" className="text-sm md:text-base">Paid</SelectItem>
+                        <SelectItem value="unpaid" className="text-sm md:text-base">Unpaid</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="md:col-span-4">
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="h-11 bg-background border-muted text-sm rounded-xl">
+                      <SelectTrigger className="h-12 bg-background border-muted text-sm md:text-base rounded-xl">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="all">All Categories</SelectItem>
+                      <SelectContent className="rounded-xl max-h-[300px]">
+                        <SelectItem value="all" className="text-sm md:text-base">All Categories</SelectItem>
                         {categoriesList.map(cat => (
-                          <SelectItem key={cat} value={cat} className="text-sm">{cat}</SelectItem>
+                          <SelectItem key={cat} value={cat} className="text-sm md:text-base">{cat}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -293,106 +293,108 @@ export default function ExpensesPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10 border-none">
-                    <TableHead className="w-[120px] text-xs uppercase font-bold text-muted-foreground">Status</TableHead>
-                    <TableHead className="w-[140px] text-xs uppercase font-bold text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-muted-foreground">Description</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-muted-foreground">Category</TableHead>
-                    <TableHead className="text-right text-xs uppercase font-bold text-muted-foreground">Amount</TableHead>
-                    <TableHead className="text-right w-[120px] text-xs uppercase font-bold text-muted-foreground">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredExpenses.map((expense) => (
-                    <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-muted/50">
-                      <TableCell>
-                        <button 
-                          onClick={() => toggleExpenseStatus(expense.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                            expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
-                          }`}
-                        >
-                          {expense.status.toUpperCase()}
-                        </button>
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {format(new Date(expense.date), 'MMM dd, yyyy')}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-bold truncate max-w-[200px] text-foreground">{expense.description}</span>
-                          <div className="flex flex-wrap gap-2">
-                            {expense.category === 'Warranties' && (
-                              <Badge variant="outline" className="flex items-center gap-1 text-primary border-primary/20 text-[10px] h-5 px-1.5 font-bold uppercase">
-                                <ShieldCheck className="w-3 h-3" /> WARRANTY
-                              </Badge>
-                            )}
-                            {expense.isRecurring && (
-                              <Badge variant="outline" className="flex items-center gap-1 text-accent border-accent/20 text-[10px] h-5 px-1.5 font-bold uppercase">
-                                <Repeat className="w-3 h-3" /> RECURRING
-                              </Badge>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/10 border-none">
+                      <TableHead className="w-[120px] text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Status</TableHead>
+                      <TableHead className="w-[140px] text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Date</TableHead>
+                      <TableHead className="text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Description</TableHead>
+                      <TableHead className="text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Category</TableHead>
+                      <TableHead className="text-right text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Amount</TableHead>
+                      <TableHead className="text-right w-[120px] text-[10px] md:text-xs uppercase font-bold text-muted-foreground tracking-widest">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses.map((expense) => (
+                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-muted/50">
+                        <TableCell>
+                          <button 
+                            onClick={() => toggleExpenseStatus(expense.id)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold border transition-all ${
+                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
+                            }`}
+                          >
+                            {expense.status.toUpperCase()}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-xs md:text-sm font-medium">
+                          {format(new Date(expense.date), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-xs md:text-sm">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="font-bold truncate max-w-[200px] text-foreground">{expense.description}</span>
+                            <div className="flex flex-wrap gap-2">
+                              {expense.category === 'Warranties' && (
+                                <Badge variant="outline" className="flex items-center gap-1 text-primary border-primary/20 text-[9px] md:text-[10px] h-5 px-1.5 font-bold uppercase">
+                                  <ShieldCheck className="w-3 h-3" /> WARRANTY
+                                </Badge>
+                              )}
+                              {expense.isRecurring && (
+                                <Badge variant="outline" className="flex items-center gap-1 text-accent border-accent/20 text-[9px] md:text-[10px] h-5 px-1.5 font-bold uppercase">
+                                  <Repeat className="w-3 h-3" /> RECURRING
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px] md:text-xs py-0.5 px-2 w-fit font-bold">
+                              {expense.category}
+                            </Badge>
+                            {expense.subCategory && (
+                              <span className="text-[10px] md:text-xs text-muted-foreground italic ml-1">{expense.subCategory}</span>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="secondary" className="bg-primary/5 text-primary text-[11px] py-0.5 px-2 w-fit">
-                            {expense.category}
-                          </Badge>
-                          {expense.subCategory && (
-                            <span className="text-xs text-muted-foreground italic ml-1">{expense.subCategory}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-base text-foreground">
-                        {currency.symbol}{formatAmount(expense.amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" className="w-9 h-9" onClick={() => handleEditClick(expense)}>
-                            <Edit2 className="w-5 h-5 text-muted-foreground" />
-                          </Button>
-                          
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="w-9 h-9 text-destructive hover:bg-destructive/10">
-                                <Trash2 className="w-5 h-5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-2xl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this expense? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="h-11 rounded-xl text-sm">Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => handleDelete(expense.id)}
-                                  className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl text-sm"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredExpenses.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-24 text-muted-foreground text-sm">
-                        No transactions match your criteria.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-sm md:text-base text-foreground">
+                          {currency.symbol}{formatAmount(expense.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" className="w-9 h-9 md:w-10 md:h-10" onClick={() => handleEditClick(expense)}>
+                              <Edit2 className="w-5 h-5 text-muted-foreground" />
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="w-9 h-9 md:w-10 md:h-10 text-destructive hover:bg-destructive/10">
+                                  <Trash2 className="w-5 h-5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="rounded-2xl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-lg md:text-xl font-headline font-bold">Delete Transaction?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm md:text-base">
+                                    Are you sure you want to delete this expense? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="gap-3 mt-4">
+                                  <AlertDialogCancel className="h-12 rounded-xl text-sm md:text-base font-bold">Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDelete(expense.id)}
+                                    className="h-12 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl text-sm md:text-base font-bold"
+                                  >
+                                    Delete Permanently
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredExpenses.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-24 text-muted-foreground text-sm md:text-base italic">
+                          No transactions match your current filters.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -400,68 +402,69 @@ export default function ExpensesPage() {
 
       {editingExpense && (
         <Dialog open={!!editingExpense} onOpenChange={(open) => !open && setEditingExpense(null)}>
-          <DialogContent className="sm:max-w-[450px] rounded-2xl">
+          <DialogContent className="sm:max-w-[450px] rounded-2xl p-8">
             <DialogHeader>
-              <DialogTitle className="font-headline text-xl">Edit Transaction</DialogTitle>
+              <DialogTitle className="font-headline text-2xl font-bold text-primary mb-4">Edit Transaction</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSaveEdit} className="space-y-6 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSaveEdit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
+                  <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
                   <Input 
                     type="number" 
-                    className="h-11 text-sm font-bold rounded-xl" 
+                    className="h-12 text-sm md:text-base font-bold rounded-xl" 
                     value={Math.abs(editingExpense.amount)} 
                     onChange={(e) => setEditingExpense({...editingExpense, amount: Math.abs(parseFloat(e.target.value)) || 0})} 
                     required 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Category</Label>
+                  <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Category</Label>
                   <Select value={editingExpense.category} onValueChange={(v) => setEditingExpense({...editingExpense, category: v})}>
-                    <SelectTrigger className="h-11 text-sm rounded-xl"><SelectValue /></SelectTrigger>
-                    <SelectContent className="max-h-[300px] rounded-xl">{categoriesList.map(cat => <SelectItem key={cat} value={cat} className="text-sm">{cat}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-12 text-sm md:text-base rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-[300px] rounded-xl">{categoriesList.map(cat => <SelectItem key={cat} value={cat} className="text-sm md:text-base">{cat}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Date</Label>
+                  <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
                   <Input 
                     type="date" 
-                    className="h-11 text-sm rounded-xl" 
+                    className="h-12 text-sm md:text-base rounded-xl font-medium" 
                     value={editingExpense.date} 
                     onChange={(e) => setEditingExpense({...editingExpense, date: e.target.value})} 
                     required 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Sub-Category</Label>
+                  <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Sub-Category</Label>
                   <Input 
-                    className="h-11 text-sm rounded-xl" 
+                    className="h-12 text-sm md:text-base rounded-xl" 
+                    placeholder="None"
                     value={editingExpense.subCategory || ""} 
                     onChange={(e) => setEditingExpense({...editingExpense, subCategory: e.target.value})} 
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Description</Label>
+                <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Description</Label>
                 <Input 
-                  className="h-11 text-sm rounded-xl" 
+                  className="h-12 text-sm md:text-base rounded-xl font-bold" 
                   value={editingExpense.description} 
                   onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} 
                   required 
                 />
               </div>
               
-              <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted">
+              <div className="flex items-center justify-between p-5 bg-primary/5 rounded-2xl border border-primary/10 shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="p-2.5 rounded-full bg-primary/10">
+                  <div className="p-2.5 rounded-xl bg-primary/10">
                     <Repeat className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <Label className="text-sm font-bold cursor-pointer" htmlFor="edit-recurring">Monthly Recurring</Label>
-                    <p className="text-xs text-muted-foreground">Persist for future months</p>
+                    <Label className="text-sm md:text-base font-bold cursor-pointer" htmlFor="edit-recurring">Monthly Recurring</Label>
+                    <p className="text-[10px] md:text-xs text-muted-foreground font-medium">Persist for future months</p>
                   </div>
                 </div>
                 <Switch 
@@ -472,7 +475,7 @@ export default function ExpensesPage() {
               </div>
 
               <DialogFooter className="pt-2">
-                <Button type="submit" className="w-full h-12 text-sm font-bold rounded-xl">Save Changes</Button>
+                <Button type="submit" className="w-full h-14 text-sm md:text-base font-bold rounded-xl shadow-lg shadow-primary/20">Save All Changes</Button>
               </DialogFooter>
             </form>
           </DialogContent>

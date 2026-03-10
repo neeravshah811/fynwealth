@@ -262,8 +262,8 @@ export function ExpenseCapture() {
       <CardHeader className="bg-primary/5 pb-8">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-2xl font-headline text-primary tracking-tight">Capture Expense</CardTitle>
-            <CardDescription className="text-sm mt-1">Easily record new transactions below.</CardDescription>
+            <CardTitle className="text-xl md:text-2xl font-headline text-primary tracking-tight">Capture Expense</CardTitle>
+            <CardDescription className="text-xs md:text-sm mt-1">Easily record new transactions below.</CardDescription>
           </div>
           {success && <CheckCircle2 className="text-emerald-500 w-10 h-10 animate-in zoom-in" />}
         </div>
@@ -271,55 +271,55 @@ export function ExpenseCapture() {
       <CardContent className="pt-8 px-6">
         <Tabs defaultValue="manual" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-10 bg-muted/40 p-1.5 h-12 rounded-xl">
-            <TabsTrigger value="manual" className="text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Manual</TabsTrigger>
-            <TabsTrigger value="scan" className="text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Scan Bill</TabsTrigger>
-            <TabsTrigger value="voice" className="text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Voice</TabsTrigger>
+            <TabsTrigger value="manual" className="text-[10px] md:text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Manual</TabsTrigger>
+            <TabsTrigger value="scan" className="text-[10px] md:text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Scan Bill</TabsTrigger>
+            <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase tracking-wider data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">Voice</TabsTrigger>
           </TabsList>
 
           <TabsContent value="manual">
             <form onSubmit={handleManualSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2 relative">
-                  <Label htmlFor="amount" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Amount</Label>
+                  <Label htmlFor="amount" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-base font-medium">{currency.symbol}</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm md:text-base font-bold">{currency.symbol}</span>
                     <input 
                       id="amount" 
                       type="number" 
                       placeholder="0.00" 
                       required
-                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 text-base font-bold ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 pl-9"
+                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm md:text-base font-bold ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 pl-10 shadow-sm"
                       value={manual.amount}
                       onChange={(e) => setManual({...manual, amount: e.target.value})}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Date</Label>
+                  <Label htmlFor="date" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
                   <Input 
                     id="date" 
                     type="date" 
-                    className="h-12 text-sm rounded-xl"
+                    className="h-12 text-sm md:text-base rounded-xl font-medium shadow-sm"
                     value={manual.date}
                     onChange={(e) => setManual({...manual, date: e.target.value})}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="category" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Category</Label>
+                  <Label htmlFor="category" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Category</Label>
                   <div className="flex gap-2">
                     <Select 
                       value={manual.category} 
                       onValueChange={(v) => setManual({...manual, category: v, subCategory: ''})}
                     >
-                      <SelectTrigger id="category" className="h-12 text-sm rounded-xl">
+                      <SelectTrigger id="category" className="h-12 text-sm md:text-base rounded-xl font-bold shadow-sm">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[250px]">
+                      <SelectContent className="max-h-[250px] rounded-xl">
                         {categoriesList.map(cat => (
-                          <SelectItem key={cat} value={cat} className="text-sm">{cat}</SelectItem>
+                          <SelectItem key={cat} value={cat} className="text-sm md:text-base">{cat}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -327,7 +327,7 @@ export function ExpenseCapture() {
                       type="button" 
                       size="icon" 
                       variant="outline" 
-                      className="h-12 w-12 shrink-0 rounded-xl"
+                      className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
                       onClick={() => { setCustomParent(""); setIsCustomDialogOpen(true); }}
                     >
                       <PlusCircle className="w-5 h-5" />
@@ -335,18 +335,18 @@ export function ExpenseCapture() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="subCategory" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Sub-Category</Label>
+                  <Label htmlFor="subCategory" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Sub-Category</Label>
                   <div className="flex gap-2">
                     <Select 
                       value={manual.subCategory} 
                       onValueChange={(v) => setManual({...manual, subCategory: v})}
                     >
-                      <SelectTrigger id="subCategory" className="h-12 text-sm rounded-xl">
+                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl shadow-sm">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
+                      <SelectContent className="max-h-[200px] rounded-xl">
                         {subCategories.map(sub => (
-                          <SelectItem key={sub} value={sub} className="text-sm">{sub}</SelectItem>
+                          <SelectItem key={sub} value={sub} className="text-sm md:text-base">{sub}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -354,7 +354,7 @@ export function ExpenseCapture() {
                       type="button" 
                       size="icon" 
                       variant="outline" 
-                      className="h-12 w-12 shrink-0 rounded-xl"
+                      className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
                       onClick={() => { setCustomParent(manual.category); setIsCustomDialogOpen(true); }}
                     >
                       <PlusCircle className="w-5 h-5" />
@@ -364,23 +364,23 @@ export function ExpenseCapture() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Document Upload (Image/PDF)</Label>
+                <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Document Upload (Image/PDF)</Label>
                 <div className="flex flex-col gap-3">
                   {!manualDoc ? (
                     <Button 
                       type="button" 
                       variant="outline" 
-                      className="h-12 w-full rounded-xl border-dashed border-primary/30 text-muted-foreground text-sm font-medium"
+                      className="h-12 w-full rounded-xl border-dashed border-primary/30 text-muted-foreground text-xs md:text-sm font-bold shadow-sm"
                       onClick={() => manualDocRef.current?.click()}
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       Upload Bill/Invoice
                     </Button>
                   ) : (
-                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/20 animate-in fade-in">
+                    <div className="flex items-center justify-between p-3.5 bg-primary/5 rounded-xl border border-primary/20 animate-in fade-in shadow-sm">
                       <div className="flex items-center gap-3 min-w-0">
                         {manualDoc.type === 'application/pdf' ? <FileText className="w-5 h-5 text-primary" /> : <ImageIcon className="w-5 h-5 text-primary" />}
-                        <span className="text-xs font-bold truncate text-foreground">{manualDoc.name}</span>
+                        <span className="text-xs md:text-sm font-bold truncate text-foreground">{manualDoc.name}</span>
                       </div>
                       <Button 
                         type="button" 
@@ -404,102 +404,103 @@ export function ExpenseCapture() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Description (Optional)</Label>
+                <Label htmlFor="description" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Description (Optional)</Label>
                 <Input 
                   id="description" 
                   placeholder="What did you spend on?" 
-                  className="h-12 text-sm rounded-xl"
+                  className="h-12 text-sm md:text-base rounded-xl shadow-sm"
                   value={manual.description}
                   onChange={(e) => setManual({...manual, description: e.target.value})}
                 />
               </div>
 
               {manual.category === 'Warranties' && (
-                <div className="bg-primary/5 p-5 rounded-xl border border-primary/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-5 animate-in fade-in slide-in-from-top-2 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="w-5 h-5 text-primary" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-primary">Warranty Details</span>
+                    <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-primary">Warranty Details</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-1.5">
                       <Label htmlFor="productName" className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Product Name</Label>
-                      <Input id="productName" className="h-10 text-sm rounded-lg" value={manual.productName} onChange={(e) => setManual({...manual, productName: e.target.value})} />
+                      <Input id="productName" className="h-11 text-sm md:text-base rounded-lg font-bold" value={manual.productName} onChange={(e) => setManual({...manual, productName: e.target.value})} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="purchaseDate" className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Purchase Date</Label>
-                      <Input id="purchaseDate" type="date" className="h-10 text-sm rounded-lg" value={manual.purchaseDate} onChange={(e) => setManual({...manual, purchaseDate: e.target.value})} />
+                      <Input id="purchaseDate" type="date" className="h-11 text-sm md:text-base rounded-lg font-medium" value={manual.purchaseDate} onChange={(e) => setManual({...manual, purchaseDate: e.target.value})} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-1.5">
                       <Label htmlFor="expiry" className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Expiry Date</Label>
-                      <Input id="expiry" type="date" className="h-10 text-sm rounded-lg" value={manual.warrantyExpiryDate} onChange={(e) => setManual({...manual, warrantyExpiryDate: e.target.value})} />
+                      <Input id="expiry" type="date" className="h-11 text-sm md:text-base rounded-lg font-medium" value={manual.warrantyExpiryDate} onChange={(e) => setManual({...manual, warrantyExpiryDate: e.target.value})} />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="contact" className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Service Center</Label>
-                      <Input id="contact" className="h-10 text-sm rounded-lg" value={manual.serviceCenterContact} onChange={(e) => setManual({...manual, serviceCenterContact: e.target.value})} />
+                      <Input id="contact" className="h-11 text-sm md:text-base rounded-lg" value={manual.serviceCenterContact} onChange={(e) => setManual({...manual, serviceCenterContact: e.target.value})} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="notes" className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Notes</Label>
-                    <Textarea id="notes" className="text-sm min-h-[80px] rounded-lg" value={manual.notes} onChange={(e) => setManual({...manual, notes: e.target.value})} />
+                    <Textarea id="notes" className="text-sm md:text-base min-h-[100px] rounded-lg" value={manual.notes} onChange={(e) => setManual({...manual, notes: e.target.value})} />
                   </div>
                 </div>
               )}
 
-              <div className="pt-4 pb-4 space-y-4 border-t border-dashed mt-6">
-                <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted">
+              <div className="pt-6 pb-4 space-y-4 border-t border-dashed mt-6">
+                <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted shadow-sm">
                   <div className="flex items-center gap-4">
-                    <div className="p-2.5 rounded-full bg-primary/10">
+                    <div className="p-2.5 rounded-xl bg-primary/10">
                       <Repeat className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <Label htmlFor="recurring" className="cursor-pointer text-sm font-bold">Monthly Recurring</Label>
-                      <p className="text-xs text-muted-foreground">Persist for future months</p>
+                      <Label htmlFor="recurring" className="cursor-pointer text-sm md:text-base font-bold">Monthly Recurring</Label>
+                      <p className="text-[10px] md:text-xs text-muted-foreground font-medium">Persist for future months</p>
                     </div>
                   </div>
                   <Switch 
                     id="recurring"
                     checked={manual.isRecurring}
                     onCheckedChange={(checked) => setManual({...manual, isRecurring: checked})}
+                    className="scale-90"
                   />
                 </div>
 
                 {manual.isRecurring && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-in slide-in-from-top-2 duration-300">
                     <div className="space-y-2">
-                      <Label htmlFor="frequency" className="text-xs font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                      <Label htmlFor="frequency" className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
                       <Select 
                         value={manual.frequency} 
                         onValueChange={(v) => setManual({...manual, frequency: v as Frequency})}
                       >
-                        <SelectTrigger id="frequency" className="h-11 text-sm rounded-xl">
+                        <SelectTrigger id="frequency" className="h-11 text-sm md:text-base rounded-xl font-bold shadow-sm">
                           <SelectValue placeholder="Frequency" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl">
                           {FREQUENCIES.map(freq => (
-                            <SelectItem key={freq} value={freq} className="text-sm">{freq}</SelectItem>
+                            <SelectItem key={freq} value={freq} className="text-sm md:text-base">{freq}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reminder-date" className="text-xs font-bold uppercase text-muted-foreground ml-1">Reminder Date</Label>
+                      <Label htmlFor="reminder-date" className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground ml-1">Reminder Date</Label>
                       <Input 
                         id="reminder-date" 
                         type="date" 
-                        className="h-11 text-sm rounded-xl"
+                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm"
                         value={manual.reminderDate}
                         onChange={(e) => setManual({...manual, reminderDate: e.target.value})}
                         required={manual.isRecurring}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reminder-time" className="text-xs font-bold uppercase text-muted-foreground ml-1">Reminder Time</Label>
+                      <Label htmlFor="reminder-time" className="text-[10px] md:text-xs font-bold uppercase text-muted-foreground ml-1">Reminder Time</Label>
                       <Input 
                         id="reminder-time" 
                         type="time" 
-                        className="h-11 text-sm rounded-xl"
+                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm"
                         value={manual.reminderTime}
                         onChange={(e) => setManual({...manual, reminderTime: e.target.value})}
                         required={manual.isRecurring}
@@ -509,21 +510,21 @@ export function ExpenseCapture() {
                 )}
               </div>
 
-              <Button type="submit" className="w-full h-14 bg-primary hover:bg-primary/90 text-base font-bold shadow-lg shadow-primary/20 rounded-xl">
+              <Button type="submit" className="w-full h-14 bg-primary hover:bg-primary/90 text-sm md:text-base font-bold shadow-lg shadow-primary/20 rounded-xl mt-6">
                 <Plus className="w-6 h-6 mr-2" />
-                Add Expense
+                Add Transaction
               </Button>
             </form>
           </TabsContent>
 
           <TabsContent value="scan">
             <div className="space-y-6">
-              <div className="flex flex-col items-center justify-center py-16 px-8 text-center border-2 border-dashed border-muted/50 rounded-2xl bg-muted/10 transition-colors hover:bg-muted/20">
-                <div className="p-5 bg-primary/10 rounded-full mb-6">
-                  <Camera className="w-10 h-10 text-primary" />
+              <div className="flex flex-col items-center justify-center py-20 px-8 text-center border-2 border-dashed border-muted/50 rounded-2xl bg-muted/10 transition-colors hover:bg-muted/20">
+                <div className="p-6 bg-primary/10 rounded-full mb-6">
+                  <Camera className="w-12 h-12 text-primary" />
                 </div>
-                <h3 className="font-headline font-bold mb-3 text-lg">Scan Bill</h3>
-                <p className="text-sm text-muted-foreground mb-8 max-w-[280px]">Our AI will extract the merchant, amount, and date from your receipt.</p>
+                <h3 className="font-headline font-bold mb-3 text-lg md:text-xl">Scan Bill</h3>
+                <p className="text-xs md:text-sm text-muted-foreground mb-8 max-w-[300px]">Our AI will automatically extract the merchant, amount, and date from your receipt.</p>
                 
                 <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={processImage} />
                 <input type="file" ref={imageUploadRef} className="hidden" accept="image/*" onChange={processImage} />
@@ -541,35 +542,37 @@ export function ExpenseCapture() {
                     variant="outline"
                     onClick={() => imageUploadRef.current?.click()} 
                     disabled={loading} 
-                    className="h-14 font-bold rounded-xl border-primary text-primary hover:bg-primary/5"
+                    className="h-14 font-bold rounded-xl border-primary text-primary hover:bg-primary/5 shadow-sm"
                   >
                     {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Upload className="w-5 h-5 mr-2" />}
-                    Upload
+                    Upload Receipt
                   </Button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted">
+              <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted shadow-sm">
                 <div className="flex items-center gap-4">
-                  <Repeat className="w-6 h-6 text-primary" />
+                  <div className="p-2.5 rounded-xl bg-primary/10">
+                    <Repeat className="w-6 h-6 text-primary" />
+                  </div>
                   <div>
-                    <Label className="text-sm font-bold">Monthly Recurring</Label>
-                    <p className="text-xs text-muted-foreground">Applies to scanned bill</p>
+                    <Label className="text-sm md:text-base font-bold">Monthly Recurring</Label>
+                    <p className="text-[10px] md:text-xs text-muted-foreground font-medium">Applies to scanned bill</p>
                   </div>
                 </div>
-                <Switch checked={isRecurringGlobal} onCheckedChange={setIsRecurringGlobal} />
+                <Switch checked={isRecurringGlobal} onCheckedChange={setIsRecurringGlobal} className="scale-90" />
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="voice">
             <div className="space-y-6">
-              <div className="flex flex-col items-center justify-center py-16 px-8 text-center border-2 border-dashed border-muted/50 rounded-2xl bg-muted/10 transition-colors hover:bg-muted/20">
-                <div className="p-5 bg-accent/10 rounded-full mb-6">
-                  <Mic className="w-10 h-10 text-accent" />
+              <div className="flex flex-col items-center justify-center py-20 px-8 text-center border-2 border-dashed border-muted/50 rounded-2xl bg-muted/10 transition-colors hover:bg-muted/20">
+                <div className="p-6 bg-accent/10 rounded-full mb-6">
+                  <Mic className="w-12 h-12 text-accent" />
                 </div>
-                <h3 className="font-headline font-bold mb-3 text-lg">Voice Capture</h3>
-                <p className="text-sm text-muted-foreground mb-8 max-w-[280px]">Mention the amount and description clearly.</p>
+                <h3 className="font-headline font-bold mb-3 text-lg md:text-xl">Voice Capture</h3>
+                <p className="text-xs md:text-sm text-muted-foreground mb-8 max-w-[300px]">Mention the amount, category, and description clearly.</p>
                 
                 <input type="file" ref={micInputRef} className="hidden" accept="audio/*" capture="user" onChange={processVoice} />
                 <input type="file" ref={audioUploadRef} className="hidden" accept="audio/*" onChange={processVoice} />
@@ -587,7 +590,7 @@ export function ExpenseCapture() {
                     variant="outline"
                     onClick={() => audioUploadRef.current?.click()} 
                     disabled={loading} 
-                    className="h-14 font-bold border-accent text-accent hover:bg-accent/5 rounded-xl"
+                    className="h-14 font-bold border-accent text-accent hover:bg-accent/5 rounded-xl shadow-sm"
                   >
                     {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Upload className="w-5 h-5 mr-2" />}
                     Upload Audio
@@ -595,15 +598,17 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted">
+              <div className="flex items-center justify-between p-5 bg-muted/30 rounded-xl border border-muted shadow-sm">
                 <div className="flex items-center gap-4">
-                  <Repeat className="w-6 h-6 text-primary" />
+                  <div className="p-2.5 rounded-xl bg-primary/10">
+                    <Repeat className="w-6 h-6 text-primary" />
+                  </div>
                   <div>
-                    <Label className="text-sm font-bold">Monthly Recurring</Label>
-                    <p className="text-xs text-muted-foreground">Applies to voice entry</p>
+                    <Label className="text-sm md:text-base font-bold">Monthly Recurring</Label>
+                    <p className="text-[10px] md:text-xs text-muted-foreground font-medium">Applies to voice entry</p>
                   </div>
                 </div>
-                <Switch checked={isRecurringGlobal} onCheckedChange={setIsRecurringGlobal} />
+                <Switch checked={isRecurringGlobal} onCheckedChange={setIsRecurringGlobal} className="scale-90" />
               </div>
             </div>
           </TabsContent>
@@ -611,32 +616,32 @@ export function ExpenseCapture() {
       </CardContent>
 
       <Dialog open={isCustomDialogOpen} onOpenChange={setIsCustomDialogOpen}>
-        <DialogContent className="max-w-[400px]">
+        <DialogContent className="max-w-[400px] p-8 rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-headline">
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary mb-2">
               {customParent ? `New Sub-category for ${customParent}` : "New Category"}
             </DialogTitle>
           </DialogHeader>
-          <div className="py-8">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1 mb-2 block">Name</Label>
+          <div className="py-6">
+            <Label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 mb-3 block">Category Name</Label>
             {customParent ? (
               <Input 
                 placeholder="e.g. Organic Produce" 
                 value={newCustomSubCategory} 
-                className="text-sm h-12 rounded-xl"
+                className="text-sm md:text-base h-12 rounded-xl font-bold shadow-sm"
                 onChange={(e) => setNewCustomSubCategory(e.target.value)} 
               />
             ) : (
               <Input 
                 placeholder="e.g. Hobby Projects" 
                 value={newCustomCategory} 
-                className="text-sm h-12 rounded-xl"
+                className="text-sm md:text-base h-12 rounded-xl font-bold shadow-sm"
                 onChange={(e) => setNewCustomCategory(e.target.value)} 
               />
             )}
           </div>
           <DialogFooter>
-            <Button className="w-full h-12 text-sm font-bold rounded-xl" onClick={handleAddCustom}>Confirm & Add</Button>
+            <Button className="w-full h-14 text-sm md:text-base font-bold rounded-xl shadow-lg" onClick={handleAddCustom}>Confirm & Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

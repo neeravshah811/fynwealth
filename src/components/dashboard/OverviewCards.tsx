@@ -46,16 +46,16 @@ export function OverviewCards() {
   };
 
   const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => (
-    <Card className="shadow-sm border-none bg-card/80 backdrop-blur overflow-hidden ring-1 ring-muted/20 h-24">
+    <Card className="shadow-sm border-none bg-card/80 backdrop-blur overflow-hidden ring-1 ring-muted/20 h-auto min-h-[90px] md:min-h-[100px]">
       <CardHeader className="flex flex-row items-center justify-between p-3 pb-1 space-y-0">
-        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
-        <Icon className={cn("w-3.5 h-3.5 shrink-0", colorClass)} />
+        <CardTitle className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
+        <Icon className={cn("w-3.5 h-3.5 md:w-4 md:h-4 shrink-0", colorClass)} />
       </CardHeader>
       <CardContent className="px-3 pb-3">
-        <div className={cn("text-lg font-bold font-headline truncate leading-none", privacyMode && "blur-md select-none", colorClass)}>
+        <div className={cn("text-lg md:text-xl font-bold font-headline truncate leading-tight", privacyMode && "blur-md select-none", colorClass)}>
           {currency.symbol}{formatAmount(amount)}
         </div>
-        <p className="text-[9px] text-muted-foreground mt-1.5 truncate font-medium uppercase tracking-tight">
+        <p className="text-[9px] md:text-[10px] text-muted-foreground mt-1 truncate font-medium uppercase tracking-tight">
           {subtext}
         </p>
       </CardContent>

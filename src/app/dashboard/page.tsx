@@ -22,7 +22,6 @@ import {
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 
-// Lazy load heavy chart components to improve initial dashboard TTI
 const SpendingChart = dynamic(() => import("@/components/dashboard/SpendingChart").then(mod => mod.SpendingChart), {
   loading: () => <Card className="h-[250px] animate-pulse bg-muted/20" />
 });
@@ -54,13 +53,11 @@ export default function DashboardPage() {
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
   });
 
-  // Recent/Paid: Today or Past
   const recentExpenses = [...filteredByView]
     .filter(e => e.date <= todayStr)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 3);
 
-  // Upcoming/Pending: Strictly Future
   const upcomingExpenses = [...filteredByView]
     .filter(e => e.date > todayStr)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -79,19 +76,19 @@ export default function DashboardPage() {
   };
 
   const ExpenseRow = ({ expense }: { expense: Expense }) => (
-    <div key={expense.id} className="flex items-center justify-between p-3 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
+    <div key={expense.id} className="flex items-center justify-between p-3.5 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] shrink-0 uppercase">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] md:text-xs shrink-0 uppercase">
           {expense.category[0]}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold truncate text-foreground leading-none" title={expense.description}>{expense.description}</p>
-          <p className="text-[9px] text-muted-foreground truncate uppercase tracking-tight mt-1">
+          <p className="text-xs md:text-sm font-bold truncate text-foreground leading-none mb-1.5" title={expense.description}>{expense.description}</p>
+          <p className="text-[10px] md:text-xs text-muted-foreground truncate uppercase tracking-tight">
             {expense.category} • {format(new Date(expense.date), 'MMM dd')}
           </p>
         </div>
       </div>
-      <div className="text-[11px] font-bold text-destructive shrink-0 whitespace-nowrap ml-2">
+      <div className="text-xs md:text-sm font-bold text-destructive shrink-0 whitespace-nowrap ml-2">
         {currency.symbol}{formatAmount(expense.amount)}
       </div>
     </div>
@@ -101,34 +98,34 @@ export default function DashboardPage() {
   const years = Array.from({ length: 11 }, (_, i) => 2020 + i);
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20 max-w-7xl mx-auto">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex flex-col gap-0.5">
-          <h1 className="text-xl font-bold font-headline text-primary tracking-tight">Dashboard</h1>
-          <p className="text-[10px] text-muted-foreground">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
+          <h1 className="text-xl md:text-2xl font-bold font-headline text-primary tracking-tight">Dashboard</h1>
+          <p className="text-xs text-muted-foreground">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
         <div className="flex items-center gap-2">
           <Select value={viewMonth.toString()} onValueChange={(v) => setViewDate(parseInt(v), viewYear)}>
-            <SelectTrigger className="w-32 h-9 text-[10px] rounded-lg">
-              <CalendarIcon className="w-3 h-3 mr-1.5 text-primary" />
+            <SelectTrigger className="w-32 md:w-40 h-10 text-xs md:text-sm rounded-lg">
+              <CalendarIcon className="w-4 h-4 mr-2 text-primary" />
               <SelectValue placeholder="Month" />
             </SelectTrigger>
             <SelectContent>
               {months.map(m => (
-                <SelectItem key={m} value={m.toString()} className="text-[10px]">
+                <SelectItem key={m} value={m.toString()} className="text-xs md:text-sm">
                   {format(new Date(0, m), 'MMMM')}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={viewYear.toString()} onValueChange={(v) => setViewDate(viewMonth, parseInt(v))}>
-            <SelectTrigger className="w-24 h-9 text-[10px] rounded-lg">
+            <SelectTrigger className="w-24 md:w-28 h-10 text-xs md:text-sm rounded-lg">
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
               {years.map(y => (
-                <SelectItem key={y} value={y.toString()} className="text-[10px]">{y}</SelectItem>
+                <SelectItem key={y} value={y.toString()} className="text-xs md:text-sm">{y}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -137,7 +134,7 @@ export default function DashboardPage() {
 
       <OverviewCards />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <SpendingChart />
         </div>
@@ -146,25 +143,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Recent Expenses - Includes Today */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur ring-1 ring-primary/5">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b border-muted/50">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
-              <CardTitle className="text-xs font-headline font-bold uppercase tracking-wider">Recent</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider">Recent</CardTitle>
             </div>
-            <Link href="/expenses" className="text-[10px] font-bold text-primary hover:underline">
+            <Link href="/expenses" className="text-xs font-bold text-primary hover:underline">
               All
             </Link>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="min-h-[160px]">
+            <div className="min-h-[200px]">
               {recentExpenses.map((expense) => (
                 <ExpenseRow key={expense.id} expense={expense} />
               ))}
               {recentExpenses.length === 0 && (
-                <div className="text-[10px] text-center text-muted-foreground py-12 italic">
+                <div className="text-xs text-center text-muted-foreground py-16 italic">
                   No recent activity.
                 </div>
               )}
@@ -172,25 +168,24 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Upcoming - Strictly Future */}
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur ring-1 ring-accent/10">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b border-muted/50">
             <div className="flex items-center gap-2">
               <CalendarRange className="w-4 h-4 text-accent" />
-              <CardTitle className="text-xs font-headline font-bold uppercase tracking-wider">Upcoming</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider">Upcoming</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[9px] font-bold text-accent" onClick={handleRollover}>
-              <RefreshCcw className="w-3 h-3 mr-1" />
+            <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] md:text-xs font-bold text-accent" onClick={handleRollover}>
+              <RefreshCcw className="w-3 h-3 mr-1.5" />
               Rollover
             </Button>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="min-h-[160px]">
+            <div className="min-h-[200px]">
               {upcomingExpenses.map((expense) => (
                 <ExpenseRow key={expense.id} expense={expense} />
               ))}
               {upcomingExpenses.length === 0 && (
-                <div className="text-[10px] text-center text-muted-foreground py-12 italic">
+                <div className="text-xs text-center text-muted-foreground py-16 italic">
                   Nothing scheduled.
                 </div>
               )}
@@ -198,49 +193,48 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* AI Insights Summary */}
         <Card className="border-none shadow-sm bg-primary/5 ring-1 ring-primary/10">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b border-primary/10">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              <CardTitle className="text-xs font-headline font-bold uppercase tracking-wider text-primary">AI Insights</CardTitle>
+              <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider text-primary">AI Insights</CardTitle>
             </div>
-            <Link href="/insights" className="text-[10px] font-bold text-primary hover:underline">
+            <Link href="/insights" className="text-xs font-bold text-primary hover:underline">
               More
             </Link>
           </CardHeader>
-          <CardContent className="p-3">
-            <div className="space-y-3">
+          <CardContent className="p-4">
+            <div className="space-y-4">
               {insights.predictions?.predictions?.[0] ? (
-                <div className="p-2 bg-card rounded-lg border border-primary/5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendingUp className="w-3 h-3 text-primary" />
-                    <span className="text-[10px] font-bold text-primary uppercase">Forecast</span>
+                <div className="p-3 bg-card rounded-xl border border-primary/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] md:text-xs font-bold text-primary uppercase">Forecast</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground line-clamp-2">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Expect heavy spend in {insights.predictions.predictions[0].month} due to {insights.predictions.predictions[0].reason}.
                   </p>
                 </div>
               ) : (
-                <div className="text-[10px] text-center text-muted-foreground py-2 italic">
+                <div className="text-xs text-center text-muted-foreground py-4 italic">
                   Add more data for predictions.
                 </div>
               )}
               
               {insights.unnecessary?.unnecessaryExpenses?.[0] ? (
-                <div className="p-2 bg-accent/5 rounded-lg border border-accent/10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertCircle className="w-3 h-3 text-accent" />
-                    <span className="text-[10px] font-bold text-accent uppercase">Saving Tip</span>
+                <div className="p-3 bg-accent/5 rounded-xl border border-accent/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-accent" />
+                    <span className="text-[10px] md:text-xs font-bold text-accent uppercase">Saving Tip</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground line-clamp-2">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Review {insights.unnecessary.unnecessaryExpenses[0].description}: {insights.unnecessary.unnecessaryExpenses[0].reason}
                   </p>
                 </div>
               ) : (
-                <div className="p-2 bg-muted/20 rounded-lg text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Daily Tip</p>
-                  <p className="text-[10px] italic mt-1 leading-tight">Review weekly subscriptions to save on recurring fees.</p>
+                <div className="p-3 bg-muted/20 rounded-xl text-center">
+                  <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold tracking-tight mb-1">Daily Tip</p>
+                  <p className="text-xs italic leading-tight">Review weekly subscriptions to save on recurring fees.</p>
                 </div>
               )}
             </div>

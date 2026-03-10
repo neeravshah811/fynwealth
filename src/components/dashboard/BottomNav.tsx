@@ -25,7 +25,7 @@ export function BottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/80 backdrop-blur-xl border-t shadow-[0_-8px_30px_rgb(0,0,0,0.12)] safe-area-pb">
-      <div className="max-w-screen-md mx-auto px-4 h-20 flex items-center justify-between">
+      <div className="max-w-screen-md mx-auto px-2 h-20 flex items-center justify-between">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -53,7 +53,7 @@ export function BottomNav() {
                     isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
                   )} />
                   <span className={cn(
-                    "text-[10px] font-bold uppercase tracking-tight transition-colors",
+                    "text-[9px] md:text-[11px] font-bold uppercase tracking-tight transition-colors",
                     isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
                   )}>
                     {item.name}
@@ -61,7 +61,7 @@ export function BottomNav() {
                 </>
               )}
               {isActive && !item.isCenter && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full" />
               )}
             </Link>
           );
