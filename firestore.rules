@@ -10,8 +10,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@fynwealth.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
-        exists(/databases/$(database)/documents/admins/admin_list) && get(/databases/$(database)/documents/admins/admin_list).data.emails.hasAny([request.auth.token.email])
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
@@ -20,7 +19,7 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
-    // Admin email list - allow authenticated users to read/list for role verification
+    // Admin collection rules
     match /admins/{adminId} {
       allow read: if isSignedIn();
       allow write: if false;
@@ -44,10 +43,15 @@ service cloud.firestore {
       }
     }
 
-    // App Stats
+    // App Stats - Allow all signed-in users to read basic app metrics
     match /analytics/appStats {
       allow read: if isSignedIn();
       allow write: if false; 
+    }
+    
+    // Catch-all for analytics sub-paths
+    match /analytics/{docId} {
+      allow read: if isAdmin();
     }
   }
 }

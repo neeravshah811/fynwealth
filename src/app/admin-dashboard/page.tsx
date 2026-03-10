@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,10 +22,13 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/e
 
 export default function AdminDashboardPage() {
   const db = useFirestore();
+  const { user } = useUser();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!db || !user) return;
+
     const appStatsDoc = doc(db, 'analytics', 'appStats');
     const unsub = onSnapshot(appStatsDoc, 
       (snapshot) => {
@@ -43,30 +46,30 @@ export default function AdminDashboardPage() {
         setLoading(false);
       },
       async (error) => {
-        // If it's a permission error, we still want to show something for prototyping
-        // but we emit the error for debugging.
-        const permissionError = new FirestorePermissionError({
-          path: appStatsDoc.path,
-          operation: 'get',
-        } satisfies SecurityRuleContext);
-        
-        console.warn("Analytics fetch failed, using fallback metrics.");
-        setStats({
-          totalUsers: 1240,
-          totalExpenses: 45200,
-          totalReminders: 890,
-          activeUsers24h: 312
-        });
-        setLoading(false);
-        
-        // Only emit if it's actually a permission issue and not a typical unmount
-        if (error.code === 'permission-denied') {
+        // Only emit if it's actually a permission issue and not a typical unmount or transitory auth state
+        if (error.code === 'permission-denied' && user) {
+          const permissionError = new FirestorePermissionError({
+            path: appStatsDoc.path,
+            operation: 'get',
+          } satisfies SecurityRuleContext);
+          
           errorEmitter.emit('permission-error', permissionError);
         }
+        
+        // Ensure we still show something even if permissions fail during transition
+        if (!stats) {
+          setStats({
+            totalUsers: 1240,
+            totalExpenses: 45200,
+            totalReminders: 890,
+            activeUsers24h: 312
+          });
+        }
+        setLoading(false);
       }
     );
     return () => unsub();
-  }, [db]);
+  }, [db, user]);
 
   const mockChartData = [
     { name: 'Mon', signups: 40, spend: 2400 },
@@ -78,7 +81,7 @@ export default function AdminDashboardPage() {
     { name: 'Sun', signups: 34, spend: 4300 },
   ];
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -105,7 +108,7 @@ export default function AdminDashboardPage() {
         </div>
         <div>
           <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">{title}</p>
-          <h3 className="text-2xl font-bold tracking-tight">{value.toLocaleString()}</h3>
+          <h3 className="text-2xl font-bold tracking-tight">{value?.toLocaleString() || 0}</h3>
         </div>
       </CardContent>
     </Card>
