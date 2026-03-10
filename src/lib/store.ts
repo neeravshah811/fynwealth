@@ -148,7 +148,8 @@ export const useFynWealthStore = create<FynWealthState>()(
             { 
               ...expense, 
               id,
-              status
+              status,
+              folderId: expense.folderId ?? null // Explicitly initialize as null if undefined
             }
           ]
         }));
@@ -184,7 +185,8 @@ export const useFynWealthStore = create<FynWealthState>()(
             ...newExpenses.map(exp => ({
               ...exp,
               id: Math.random().toString(36).substring(7),
-              status: exp.status || (exp.date <= todayStr ? 'paid' : 'unpaid')
+              status: exp.status || (exp.date <= todayStr ? 'paid' : 'unpaid'),
+              folderId: exp.folderId ?? null
             }))
           ]
         }));
@@ -247,7 +249,8 @@ export const useFynWealthStore = create<FynWealthState>()(
               status: 'unpaid',
               notes: bill.notes,
               reminderTime: bill.dueTime,
-              billImageData: bill.billImageData
+              billImageData: bill.billImageData,
+              folderId: null // Initialize Root for bill-linked expenses
             }
           ]
         }));
@@ -350,7 +353,8 @@ export const useFynWealthStore = create<FynWealthState>()(
               date: newDateStr,
               status: newDateStr <= todayStr ? 'paid' : 'unpaid',
               reminderDate: newDateStr,
-              reminderTime: t.reminderTime || "09:00"
+              reminderTime: t.reminderTime || "09:00",
+              folderId: t.folderId ?? null
             };
           });
 

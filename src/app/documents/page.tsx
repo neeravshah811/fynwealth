@@ -59,7 +59,8 @@ export default function DocumentsPage() {
         e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
         e.category.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      .filter(e => e.folderId === currentFolderId)
+      // Fix: Normalize undefined/null folderId to null for reliable comparison at Root level
+      .filter(e => (e.folderId ?? null) === currentFolderId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [expenses, searchTerm, currentFolderId]);
 
@@ -146,7 +147,7 @@ export default function DocumentsPage() {
                     <div className="p-4 rounded-2xl bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                       <FolderIcon className="w-8 h-8 fill-current" />
                     </div>
-                    <span className="text-[11px] md:text-xs font-bold truncate w-full px-1">{folder.name}</span>
+                    <span className="text-xs font-bold truncate w-full px-1">{folder.name}</span>
                     
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -258,7 +259,7 @@ export default function DocumentsPage() {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="flex-1 h-9 text-[10px] font-bold rounded-lg border-primary/20 text-primary"
+                              className="flex-1 h-9 text-xs font-bold rounded-lg border-primary/20 text-primary"
                             >
                               <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />
                               Move
@@ -317,7 +318,7 @@ export default function DocumentsPage() {
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Folder Name</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Folder Name</label>
               <Input 
                 placeholder="e.g. Travel Receipts" 
                 value={newFolderName}
