@@ -126,7 +126,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary"
+              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
               onClick={() => setShowTutorial(true)}
               title="Show Tutorial"
             >
@@ -138,13 +138,13 @@ export default function DashboardPage() {
                 <Button 
                   variant="outline" 
                   size="icon" 
-                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary"
+                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
                   title="Select Date"
                 >
                   <CalendarIcon className="w-5 h-5" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl" align="end">
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
                 <Calendar
                   mode="single"
                   selected={new Date(viewYear, viewMonth)}
