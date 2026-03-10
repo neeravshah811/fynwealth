@@ -16,6 +16,12 @@ export type Currency = {
   name: string;
 };
 
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Expense {
   id: string;
   amount: number;
@@ -36,6 +42,7 @@ export interface Expense {
   serviceCenterContact?: string;
   notes?: string;
   billId?: string; // Linked bill ID
+  folderId?: string | null; // Folder association
 }
 
 export interface Bill {
@@ -74,6 +81,7 @@ export interface AIInsights {
 interface FynWealthState {
   expenses: Expense[];
   bills: Bill[];
+  folders: Folder[];
   budgets: Budget[];
   currency: Currency;
   profile: UserProfile | null;
@@ -97,6 +105,9 @@ interface FynWealthState {
   updateProfile: (profile: UserProfile) => void;
   addCustomCategory: (name: string) => void;
   addCustomSubCategory: (parent: string, name: string) => void;
+  addFolder: (name: string) => void;
+  deleteFolder: (id: string) => void;
+  moveExpenseToFolder: (expenseId: string, folderId: string | null) => void;
   setViewDate: (month: number, year: number) => void;
   setInsights: (insights: Partial<AIInsights>) => void;
   togglePrivacyMode: () => void;
@@ -111,6 +122,7 @@ export const useFynWealthStore = create<FynWealthState>()(
     (set, get) => ({
       expenses: [],
       bills: [],
+      folders: [],
       budgets: [],
       currency: SUPPORTED_CURRENCIES[0],
       profile: null,
@@ -278,6 +290,23 @@ export const useFynWealthStore = create<FynWealthState>()(
           [parent]: [...(state.customCategories[parent] || []), name] 
         }
       })),
+      addFolder: (name) => set((state) => ({
+        folders: [
+          ...state.folders,
+          {
+            id: Math.random().toString(36).substring(7),
+            name,
+            createdAt: new Date().toISOString()
+          }
+        ]
+      })),
+      deleteFolder: (id) => set((state) => ({
+        folders: state.folders.filter((f) => f.id !== id),
+        expenses: state.expenses.map((e) => e.folderId === id ? { ...e, folderId: null } : e)
+      })),
+      moveExpenseToFolder: (expenseId, folderId) => set((state) => ({
+        expenses: state.expenses.map((e) => e.id === expenseId ? { ...e, folderId } : e)
+      })),
       setViewDate: (month, year) => set({ viewMonth: month, viewYear: year }),
       setInsights: (newInsights) => set((state) => ({
         insights: { ...state.insights, ...newInsights, lastGenerated: new Date().toISOString() }
@@ -338,6 +367,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       clearAllData: () => set({ 
         expenses: [], 
         bills: [],
+        folders: [],
         budgets: [], 
         customCategories: {}, 
         profile: null, 
