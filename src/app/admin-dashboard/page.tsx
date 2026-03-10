@@ -16,6 +16,9 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { cn } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function AdminDashboardPage() {
   const db = useFirestore();
@@ -23,20 +26,31 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'analytics', 'appStats'), (doc) => {
-      if (doc.exists()) {
-        setStats(doc.data());
-      } else {
-        // Fallback for demo if document doesn't exist
-        setStats({
-          totalUsers: 1240,
-          totalExpenses: 45200,
-          totalReminders: 890,
-          activeUsers24h: 312
-        });
+    const appStatsDoc = doc(db, 'analytics', 'appStats');
+    const unsub = onSnapshot(appStatsDoc, 
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setStats(snapshot.data());
+        } else {
+          // Fallback for demo if document doesn't exist
+          setStats({
+            totalUsers: 1240,
+            totalExpenses: 45200,
+            totalReminders: 890,
+            activeUsers24h: 312
+          });
+        }
+        setLoading(false);
+      },
+      async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: appStatsDoc.path,
+          operation: 'get',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
     return () => unsub();
   }, [db]);
 
@@ -208,8 +222,4 @@ export default function AdminDashboardPage() {
       </div>
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

@@ -8,8 +8,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
-             (isSignedIn() && get(/databases/$(database)/documents/admins/admin_list).data.emails.hasAny([request.auth.token.email]));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
+        exists(/databases/$(database)/documents/admins/admin_list) && get(/databases/$(database)/documents/admins/admin_list).data.emails.hasAny([request.auth.token.email])
+      );
     }
 
     // Admins can read everything for monitoring
@@ -17,10 +19,14 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
-    // Admin email list
+    // Admin email list - allow authenticated users to read/list for role verification
     match /admins/{adminId} {
       allow read: if isSignedIn();
       allow write: if false; // Managed via Firebase Console for security
+    }
+    
+    match /admins {
+      allow list: if isSignedIn();
     }
 
     // User data rules

@@ -15,12 +15,13 @@ import {
   Clock, 
   Receipt, 
   CreditCard,
-  ExternalLink,
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function UserDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const resolvedParams = use(params);
@@ -33,7 +34,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
   useEffect(() => {
     async function fetchData() {
       try {
-        const userDoc = await getDoc(doc(db, 'users', uid));
+        const userDocRef = doc(db, 'users', uid);
+        const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           setUser({ id: userDoc.id, ...userDoc.data() });
         }
@@ -42,8 +44,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
         const q = query(expensesRef, orderBy('date', 'desc'), limit(50));
         const expSnapshot = await getDocs(q);
         setExpenses(expSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Fetch detail failed", error);
+      } catch (error: any) {
+        const permissionError = new FirestorePermissionError({
+          path: `users/${uid}`,
+          operation: 'get',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
       } finally {
         setLoading(false);
       }

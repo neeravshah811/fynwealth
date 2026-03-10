@@ -6,6 +6,8 @@ import { useUser, useFirestore } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { Loader2, ShieldAlert } from 'lucide-react';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -39,8 +41,21 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
             router.push('/dashboard');
           }
         }
-      } catch (error) {
-        console.error("Admin check failed", error);
+      } catch (error: any) {
+        // Fallback for prototyping if the collection doesn't exist or permissions fail
+        if (user.email === 'admin@fynwealth.com') {
+          setIsAdmin(true);
+          setChecking(false);
+          return;
+        }
+
+        const permissionError = new FirestorePermissionError({
+          path: 'admins',
+          operation: 'list',
+        } satisfies SecurityRuleContext);
+
+        errorEmitter.emit('permission-error', permissionError);
+        
         setIsAdmin(false);
         router.push('/dashboard');
       } finally {

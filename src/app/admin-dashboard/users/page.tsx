@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore } from '@/firebase';
-import { collection, query, getDocs, orderBy, limit, startAfter, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, startAfter, deleteDoc, doc } from 'firebase/firestore';
 import { useEffect, useState, useMemo } from 'react';
 import { 
   Table, 
@@ -20,12 +20,10 @@ import {
   Search, 
   Eye, 
   Trash2, 
-  ChevronLeft, 
   ChevronRight, 
   Loader2, 
   UserPlus, 
-  Filter,
-  ArrowUpDown
+  Filter
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -41,6 +39,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function UserManagementPage() {
   const db = useFirestore();
@@ -81,8 +81,12 @@ export default function UserManagementPage() {
 
       setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
       setHasNext(snapshot.docs.length === 10);
-    } catch (error) {
-      console.error("Failed to fetch users", error);
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: 'users',
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
       toast({ variant: "destructive", title: "Query Failed", description: "Could not retrieve user list." });
     } finally {
       setLoading(false);
@@ -95,10 +99,16 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await deleteDoc(doc(db, 'users', userId));
+      const userDocRef = doc(db, 'users', userId);
+      await deleteDoc(userDocRef);
       setUsers(users.filter(u => u.id !== userId));
       toast({ title: "User Deleted", description: "User profile removed from records." });
-    } catch (error) {
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `users/${userId}`,
+        operation: 'delete',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
       toast({ variant: "destructive", title: "Error", description: "Could not delete user document." });
     }
   };

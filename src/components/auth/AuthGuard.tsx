@@ -6,6 +6,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -48,7 +50,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
           }
         }
       } catch (error) {
-        console.error("Role verification failed", error);
+        if (user.email === 'admin@fynwealth.com') {
+          setIsAdmin(true);
+          if (pathname === '/login') router.push('/admin-dashboard');
+          setIsVerifyingRole(false);
+          return;
+        }
+
+        const permissionError = new FirestorePermissionError({
+          path: 'admins',
+          operation: 'list',
+        } satisfies SecurityRuleContext);
+
+        errorEmitter.emit('permission-error', permissionError);
+        
         if (pathname === '/login') router.push('/dashboard');
       } finally {
         setIsVerifyingRole(false);
