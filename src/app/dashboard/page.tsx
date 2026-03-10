@@ -1,18 +1,27 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
-import { OverviewCards } from "@/components/dashboard/OverviewCards";
-import { SpendingChart } from "@/components/dashboard/SpendingChart";
-import { CategoryPieChart } from "@/components/dashboard/CategoryPieChart";
+import dynamic from "next/dynamic";
+import { OverviewCards } from "@/components/dashboard";
 import { useFynWealthStore, SUPPORTED_CURRENCIES, Expense } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Coins, ChevronRight, FileText, CalendarRange, RefreshCcw, Calendar as CalendarIcon } from "lucide-react";
+import { Coins, ChevronRight, FileText, CalendarRange, RefreshCcw, Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+
+// Lazy load heavy chart components to improve initial dashboard TTI
+const SpendingChart = dynamic(() => import("@/components/dashboard/SpendingChart").then(mod => mod.SpendingChart), {
+  loading: () => <Card className="h-[350px] animate-pulse bg-muted/20" />
+});
+
+const CategoryPieChart = dynamic(() => import("@/components/dashboard/CategoryPieChart").then(mod => mod.CategoryPieChart), {
+  loading: () => <Card className="h-[350px] animate-pulse bg-muted/20" />
+});
 
 export default function DashboardPage() {
   const { expenses, currency, setCurrency, viewMonth, viewYear, setViewDate, rolloverRecurring } = useFynWealthStore();
@@ -23,7 +32,11 @@ export default function DashboardPage() {
   }, []);
 
   if (!mounted) {
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
   
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -81,11 +94,11 @@ export default function DashboardPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-12 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold font-headline text-primary tracking-tight">Financial Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Reviewing finances for {format(new Date(viewYear, viewMonth), 'MMMM yyyy')}.</p>
+          <h1 className="text-3xl font-bold font-headline text-primary tracking-tight text-center md:text-left">Financial Dashboard</h1>
+          <p className="text-sm text-muted-foreground text-center md:text-left">Reviewing finances for {format(new Date(viewYear, viewMonth), 'MMMM yyyy')}.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3">
           <Select value={viewMonth.toString()} onValueChange={(v) => setViewDate(parseInt(v), viewYear)}>
             <SelectTrigger className="w-40 h-11 text-sm">
               <CalendarIcon className="w-4 h-4 mr-2 text-primary" />
@@ -124,14 +137,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Expenses */}
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur flex flex-col overflow-hidden ring-1 ring-primary/5">
           <CardHeader className="flex flex-row items-center justify-between shrink-0 border-b border-muted/50 pb-4">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg font-headline">Recent Expenses</CardTitle>
+              <CardTitle className="text-lg font-headline text-sm md:text-base">Recent Expenses</CardTitle>
             </div>
-            <Link href="/expenses" className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
+            <Link href="/expenses" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
               View All <ChevronRight className="w-4 h-4" />
             </Link>
           </CardHeader>
@@ -142,31 +154,28 @@ export default function DashboardPage() {
               ))}
               {recentExpenses.length === 0 && (
                 <div className="text-sm text-center text-muted-foreground py-16">
-                  No recent expenses recorded for this month.
+                  No recent expenses recorded.
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Upcoming Expenses */}
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur flex flex-col overflow-hidden ring-1 ring-accent/10">
           <CardHeader className="flex flex-row items-center justify-between shrink-0 border-b border-muted/50 pb-4">
             <div className="flex items-center gap-2">
               <CalendarRange className="w-5 h-5 text-accent" />
-              <CardTitle className="text-lg font-headline">Upcoming & Recurring</CardTitle>
+              <CardTitle className="text-lg font-headline text-sm md:text-base">Upcoming & Recurring</CardTitle>
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-9 text-xs font-bold text-accent border-accent/30 hover:bg-accent/5"
-                onClick={handleRollover}
-              >
-                <RefreshCcw className="w-3.5 h-3.5 mr-2" />
-                Rollover
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 text-[10px] font-bold text-accent border-accent/30 hover:bg-accent/5"
+              onClick={handleRollover}
+            >
+              <RefreshCcw className="w-3.5 h-3.5 mr-1" />
+              Rollover
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-muted/50">
@@ -187,18 +196,17 @@ export default function DashboardPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Coins className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg font-headline">Currency Preference</CardTitle>
+            <CardTitle className="text-lg font-headline text-sm">Currency Preference</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-1">
-              <p className="text-sm text-muted-foreground leading-relaxed">Change the default currency used across the entire application. All past data will be updated to display with this symbol.</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Change the default currency used across the entire application.</p>
             </div>
-            <div className="w-full md:w-72 space-y-2">
-              <Label htmlFor="currency-select" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Current Currency</Label>
+            <div className="w-full md:w-64 space-y-2">
               <Select value={currency.code} onValueChange={setCurrency}>
-                <SelectTrigger id="currency-select" className="w-full h-12 text-sm">
+                <SelectTrigger id="currency-select" className="w-full h-11 text-sm rounded-xl">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
