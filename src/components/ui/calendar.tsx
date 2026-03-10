@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -54,11 +55,10 @@ function Calendar({
         range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        // Dropdown specific styles
-        caption_dropdowns: "flex justify-center gap-1 items-center",
-        dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-1 rounded transition-colors",
-        dropdown_month: "capitalize",
-        dropdown_year: "",
+        caption_dropdowns: "flex justify-center gap-1 items-center z-20",
+        dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-1 rounded transition-colors focus:outline-none appearance-none",
+        dropdown_month: "relative inline-flex items-center",
+        dropdown_year: "relative inline-flex items-center",
         ...classNames,
       }}
       components={{
