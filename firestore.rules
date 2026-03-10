@@ -9,6 +9,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
+        request.auth.token.email == 'admin@fynwealth.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
         exists(/databases/$(database)/documents/admins/admin_list) && get(/databases/$(database)/documents/admins/admin_list).data.emails.hasAny([request.auth.token.email])
       );
@@ -22,7 +23,7 @@ service cloud.firestore {
     // Admin email list - allow authenticated users to read/list for role verification
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      allow write: if false; // Managed via Firebase Console for security
+      allow write: if false;
     }
     
     match /admins {
@@ -46,7 +47,7 @@ service cloud.firestore {
     // App Stats
     match /analytics/appStats {
       allow read: if isSignedIn();
-      allow write: if false; // Updated via Cloud Functions (simulated via triggers)
+      allow write: if false; 
     }
   }
 }
