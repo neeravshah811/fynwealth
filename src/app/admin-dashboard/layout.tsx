@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AdminGuard } from '@/components/admin/AdminGuard';
@@ -10,15 +9,22 @@ import {
   BarChart3, 
   Settings, 
   LogOut, 
-  User as UserIcon,
   Search,
-  Bell
+  Bell,
+  Menu
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { SideDrawer } from '@/components/dashboard/SideDrawer';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,34 +44,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Settings', href: '/admin-dashboard/settings', icon: Settings },
   ];
 
+  const AdminNav = () => (
+    <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-4 mt-2">Main Menu</p>
+      {navItems.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all group",
+            pathname === item.href 
+              ? "bg-primary text-primary-foreground shadow-md" 
+              : "text-muted-foreground hover:bg-muted"
+          )}
+        >
+          <item.icon className={cn("w-4 h-4", pathname === item.href ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
+          {item.name}
+        </Link>
+      ))}
+    </nav>
+  );
+
   return (
     <AdminGuard>
       <div className="flex h-screen bg-[#F8F9FC] dark:bg-background overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 border-r bg-white dark:bg-card flex flex-col shadow-sm z-20">
+        {/* Desktop Sidebar */}
+        <aside className="w-64 border-r bg-white dark:bg-card hidden md:flex flex-col shadow-sm z-20">
           <div className="p-6 border-b flex items-center gap-3">
             <Logo className="scale-90 origin-left" />
             <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">Admin</span>
           </div>
           
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-4 mt-2">Main Menu</p>
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all group",
-                  pathname === item.href 
-                    ? "bg-primary text-primary-foreground shadow-md" 
-                    : "text-muted-foreground hover:bg-muted"
-                )}
-              >
-                <item.icon className={cn("w-4 h-4", pathname === item.href ? "text-white" : "text-muted-foreground group-hover:text-primary")} />
-                {item.name}
-              </Link>
-            ))}
-          </nav>
+          <AdminNav />
 
           <div className="p-4 border-t bg-muted/10">
             <Button 
@@ -82,8 +92,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Header */}
-          <header className="h-16 border-b bg-white dark:bg-card px-8 flex items-center justify-between z-10 shadow-sm">
-            <div className="flex items-center flex-1 max-w-xl">
+          <header className="h-16 border-b bg-white dark:bg-card px-4 md:px-8 flex items-center justify-between z-10 shadow-sm">
+            <div className="flex items-center flex-1 max-w-xl gap-2">
+              {/* Mobile Sidebar Trigger */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-64">
+                  <div className="p-6 border-b flex items-center gap-3">
+                    <Logo className="scale-90 origin-left" />
+                    <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">Admin</span>
+                  </div>
+                  <AdminNav />
+                </SheetContent>
+              </Sheet>
+
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input 
@@ -94,15 +120,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors">
+            <div className="flex items-center gap-2 md:gap-6">
+              {/* Three dots settings drawer (like normal users) */}
+              <SideDrawer standalone />
+
+              <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors hidden sm:block">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full border-2 border-white"></span>
               </button>
               
-              <div className="flex items-center gap-3 pl-6 border-l">
+              <div className="flex items-center gap-3 pl-2 md:pl-6 border-l">
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold truncate max-w-[150px]">{user?.email}</p>
+                  <p className="text-xs font-bold truncate max-w-[120px]">{user?.email}</p>
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Super Admin</p>
                 </div>
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shadow-inner uppercase">
@@ -113,7 +142,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </header>
 
           {/* Content Area */}
-          <main className="flex-1 overflow-y-auto p-8 scrollbar-thin">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
             {children}
           </main>
         </div>
