@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { 
-  ChevronRight, 
   FileText, 
   CalendarRange, 
   RefreshCcw, 
@@ -55,14 +54,16 @@ export default function DashboardPage() {
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
   });
 
+  // Recent/Paid: Today or Past
   const recentExpenses = [...filteredByView]
     .filter(e => e.date <= todayStr)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 3);
 
+  // Upcoming/Pending: Strictly Future
   const upcomingExpenses = [...filteredByView]
     .filter(e => e.date > todayStr)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
   const formatAmount = (amount: number) => {
@@ -146,7 +147,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Recent Expenses */}
+        {/* Recent Expenses - Includes Today */}
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur ring-1 ring-primary/5">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b border-muted/50">
             <div className="flex items-center gap-2">
@@ -171,7 +172,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Upcoming */}
+        {/* Upcoming - Strictly Future */}
         <Card className="border-none shadow-sm bg-card/80 backdrop-blur ring-1 ring-accent/10">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b border-muted/50">
             <div className="flex items-center gap-2">

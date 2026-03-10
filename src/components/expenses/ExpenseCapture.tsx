@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, ShieldCheck, PlusCircle, AlertCircle, Upload, Image as ImageIcon, FileText, X } from "lucide-react";
+import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, ShieldCheck, PlusCircle, Upload, Image as ImageIcon, FileText, X } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -41,10 +43,10 @@ export function ExpenseCapture() {
     description: '',
     category: 'Miscellaneous',
     subCategory: '',
-    date: new Date().toISOString().split('T')[0],
+    date: format(new Date(), 'yyyy-MM-dd'),
     isRecurring: false,
     frequency: 'Monthly' as Frequency,
-    reminderDate: new Date().toISOString().split('T')[0],
+    reminderDate: format(new Date(), 'yyyy-MM-dd'),
     reminderTime: '09:00',
     productName: '',
     purchaseDate: '',
@@ -69,6 +71,7 @@ export function ExpenseCapture() {
     
     const amount = Math.abs(parseFloat(manual.amount));
     const description = manual.description.trim() || `${manual.category} Expense`;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     
     addExpense({
       amount,
@@ -76,6 +79,7 @@ export function ExpenseCapture() {
       category: manual.category,
       subCategory: manual.subCategory,
       date: manual.date,
+      status: manual.date <= todayStr ? 'paid' : 'unpaid',
       isRecurring: manual.isRecurring,
       frequency: manual.isRecurring ? manual.frequency : undefined,
       reminderDate: manual.isRecurring ? manual.reminderDate : undefined,
@@ -93,10 +97,10 @@ export function ExpenseCapture() {
       description: '', 
       category: 'Miscellaneous', 
       subCategory: '',
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       isRecurring: false,
       frequency: 'Monthly',
-      reminderDate: new Date().toISOString().split('T')[0],
+      reminderDate: format(new Date(), 'yyyy-MM-dd'),
       reminderTime: '09:00',
       productName: '',
       purchaseDate: '',
@@ -149,14 +153,15 @@ export function ExpenseCapture() {
           }
 
           const amount = Math.abs(result.totalAmount);
-          const date = result.transactionDate || new Date().toISOString().split('T')[0];
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const date = result.transactionDate || todayStr;
 
           addExpense({
             amount,
             description: result.merchantName || 'Scanned Receipt',
             category: detectedCategory,
             date,
-            status: 'paid',
+            status: date <= todayStr ? 'paid' : 'unpaid',
             billImageData: base64String,
             isRecurring: isRecurringGlobal,
             frequency: isRecurringGlobal ? 'Monthly' : undefined,
@@ -199,14 +204,15 @@ export function ExpenseCapture() {
         
         if (result.amount > 0) {
           const amount = Math.abs(result.amount);
-          const date = result.date || new Date().toISOString().split('T')[0];
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const date = result.date || todayStr;
 
           addExpense({
             amount,
             description: result.description || 'Voice Entry',
             category: result.category || 'Miscellaneous',
             date,
-            status: 'paid',
+            status: date <= todayStr ? 'paid' : 'unpaid',
             isRecurring: isRecurringGlobal,
             frequency: isRecurringGlobal ? 'Monthly' : undefined,
             reminderDate: isRecurringGlobal ? date : undefined,

@@ -4,6 +4,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SUPPORTED_CURRENCIES } from "./constants";
+import { format } from "date-fns";
 
 export { SUPPORTED_CURRENCIES, SYSTEM_CATEGORIES } from "./constants";
 
@@ -124,13 +125,18 @@ export const useFynWealthStore = create<FynWealthState>()(
       hasSeenTutorial: false,
       addExpense: (expense) => {
         const id = Math.random().toString(36).substring(7);
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        
+        // Ensure status is 'paid' if date is today or in the past, unless explicitly marked as unpaid
+        const status = expense.status || (expense.date <= todayStr ? 'paid' : 'unpaid');
+
         set((state) => ({
           expenses: [
             ...state.expenses, 
             { 
               ...expense, 
               id,
-              status: expense.status || 'paid'
+              status
             }
           ]
         }));
@@ -143,7 +149,7 @@ export const useFynWealthStore = create<FynWealthState>()(
           else if (expense.frequency === 'Half-yearly') date.setMonth(date.getMonth() + 6);
           else if (expense.frequency === 'Annually') date.setFullYear(date.getFullYear() + 1);
           
-          const nextDateStr = date.toISOString().split('T')[0];
+          const nextDateStr = format(date, 'yyyy-MM-dd');
 
           get().addBill({
             name: expense.description || `${expense.category} Recurring`,
@@ -157,16 +163,19 @@ export const useFynWealthStore = create<FynWealthState>()(
           });
         }
       },
-      addExpenses: (newExpenses) => set((state) => ({
-        expenses: [
-          ...state.expenses,
-          ...newExpenses.map(exp => ({
-            ...exp,
-            id: Math.random().toString(36).substring(7),
-            status: exp.status || 'paid'
-          }))
-        ]
-      })),
+      addExpenses: (newExpenses) => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        set((state) => ({
+          expenses: [
+            ...state.expenses,
+            ...newExpenses.map(exp => ({
+              ...exp,
+              id: Math.random().toString(36).substring(7),
+              status: exp.status || (exp.date <= todayStr ? 'paid' : 'unpaid')
+            }))
+          ]
+        }));
+      },
       updateExpense: (id, updatedFields) => set((state) => {
         const expense = state.expenses.find(e => e.id === id);
         const newExpenses = state.expenses.map((e) => e.id === id ? { ...e, ...updatedFields } : e);
@@ -275,6 +284,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       rolloverRecurring: () => {
         const state = get();
         const { expenses, viewMonth, viewYear } = state;
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
         
         const recurringTemplates = expenses.filter(e => e.isRecurring && e.frequency === 'Monthly');
         
@@ -300,12 +310,13 @@ export const useFynWealthStore = create<FynWealthState>()(
             const lastDayOfViewMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
             const safeDay = Math.min(originalDay, lastDayOfViewMonth);
             
-            const newDateStr = new Date(viewYear, viewMonth, safeDay).toISOString().split('T')[0];
+            const newDate = new Date(viewYear, viewMonth, safeDay);
+            const newDateStr = format(newDate, 'yyyy-MM-dd');
             
             return {
               ...t,
               date: newDateStr,
-              status: 'unpaid',
+              status: newDateStr <= todayStr ? 'paid' : 'unpaid',
               reminderDate: newDateStr,
               reminderTime: t.reminderTime || "09:00"
             };
