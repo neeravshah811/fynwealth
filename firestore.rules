@@ -19,14 +19,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Admins registry - users can read to verify their own role, admins can write
-    match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    
+    // Admins registry - users can query to verify their own role, admins can write
     match /admins {
       allow list: if isSignedIn();
+      
+      match /{adminId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
     }
 
     // User-specific data protection
