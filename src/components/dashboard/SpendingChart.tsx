@@ -41,26 +41,25 @@ export function SpendingChart() {
 
   return (
     <Card className="shadow-sm border-none bg-card/80 backdrop-blur lg:col-span-2 h-full flex flex-col">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-headline">Spending by Category</CardTitle>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[350px]">
+      <CardContent className="flex-1 min-h-[250px] p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} 
-              dy={10}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} 
+              dy={5}
             />
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} 
-              dx={-10}
-              tickFormatter={(value) => `${currency.symbol}${value}`}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} 
+              tickFormatter={(value) => `${currency.symbol}${value >= 1000 ? (value/1000).toFixed(0)+'k' : value}`}
             />
             <Tooltip 
               cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
@@ -69,23 +68,15 @@ export function SpendingChart() {
                 border: 'none', 
                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                 backgroundColor: 'hsl(var(--card))',
-                fontSize: '11px',
-                padding: '10px 14px'
+                fontSize: '10px',
+                padding: '8px 10px'
               }}
-              formatter={(value: number) => {
-                const pSpent = totalSpent > 0 ? ((value / totalSpent) * 100).toFixed(1) : "0";
-                const pBudget = totalBudget > 0 ? ((value / totalBudget) * 100).toFixed(1) : "0";
-                return [
-                  <div className="flex flex-col gap-1" key="tooltip-content">
-                    <span className="font-bold text-foreground">{currency.symbol}{value.toLocaleString()}</span>
-                    <span className="text-muted-foreground">{pSpent}% of total spent</span>
-                    {totalBudget > 0 && <span className="text-muted-foreground">{pBudget}% of total budget</span>}
-                  </div>,
-                  null
-                ];
-              }}
+              formatter={(value: number) => [
+                <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
+                null
+              ]}
             />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}

@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 
 export function CategoryPieChart() {
-  const { expenses, budgets, currency, viewMonth, viewYear } = useFynWealthStore();
+  const { expenses, currency, viewMonth, viewYear } = useFynWealthStore();
 
   const data = expenses
     .filter(e => {
@@ -31,25 +31,22 @@ export function CategoryPieChart() {
     }, [])
     .sort((a, b) => b.value - a.value);
 
-  const totalSpent = data.reduce((sum, item) => sum + item.value, 0);
-  const totalBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
-
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', '#10b981', '#3b82f6', '#f43f5e', '#8b5cf6', '#0ea5e9', '#f97316'];
 
   return (
     <Card className="shadow-sm border-none bg-card/80 backdrop-blur lg:col-span-1 h-full flex flex-col">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-headline">Spending Distribution</CardTitle>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Distribution</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[350px]">
+      <CardContent className="flex-1 min-h-[250px] p-2">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
-              cy="45%"
-              innerRadius={60}
-              outerRadius={85}
+              cy="40%"
+              innerRadius={50}
+              outerRadius={70}
               paddingAngle={4}
               dataKey="value"
               stroke="none"
@@ -64,31 +61,23 @@ export function CategoryPieChart() {
                 border: 'none', 
                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                 backgroundColor: 'hsl(var(--card))',
-                fontSize: '11px',
-                padding: '10px 14px'
+                fontSize: '10px',
+                padding: '8px 10px'
               }}
-              formatter={(value: number) => {
-                const pSpent = totalSpent > 0 ? ((value / totalSpent) * 100).toFixed(1) : "0";
-                const pBudget = totalBudget > 0 ? ((value / totalBudget) * 100).toFixed(1) : "0";
-                return [
-                  <div className="flex flex-col gap-1" key="tooltip-content">
-                    <span className="font-bold text-foreground">{currency.symbol}{value.toLocaleString()}</span>
-                    <span className="text-muted-foreground">{pSpent}% of total spent</span>
-                    {totalBudget > 0 && <span className="text-muted-foreground">{pBudget}% of total budget</span>}
-                  </div>,
-                  null
-                ];
-              }}
+              formatter={(value: number) => [
+                <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
+                null
+              ]}
             />
             <Legend 
               verticalAlign="bottom" 
               align="center"
               iconType="circle"
-              iconSize={8}
+              iconSize={6}
               wrapperStyle={{ 
-                fontSize: '11px', 
-                paddingTop: '20px',
-                lineHeight: '18px'
+                fontSize: '9px', 
+                paddingTop: '10px',
+                lineHeight: '14px'
               }}
             />
           </PieChart>
