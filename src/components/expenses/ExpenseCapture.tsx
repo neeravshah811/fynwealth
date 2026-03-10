@@ -341,7 +341,7 @@ export function ExpenseCapture() {
                       value={manual.subCategory} 
                       onValueChange={(v) => setManual({...manual, subCategory: v})}
                     >
-                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl shadow-sm">
+                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl font-bold shadow-sm">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px] rounded-xl">
