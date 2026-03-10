@@ -23,6 +23,8 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
+  SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
 
@@ -102,6 +104,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-64">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Admin Navigation Menu</SheetTitle>
+                    <SheetDescription>Main navigation menu for administrative tasks.</SheetDescription>
+                  </SheetHeader>
                   <div className="p-6 border-b flex items-center gap-3">
                     <Logo className="scale-90 origin-left" />
                     <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">Admin</span>
