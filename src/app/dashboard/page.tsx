@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -110,7 +109,7 @@ export default function DashboardPage() {
   );
 
   const months = Array.from({ length: 12 }, (_, i) => i);
-  const years = Array.from({ length: 11 }, (_, i) => 2020 + i);
+  const years = Array.from({ length: 16 }, (_, i) => 2020 + i);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20 max-w-7xl mx-auto">
