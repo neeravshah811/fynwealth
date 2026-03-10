@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef } from "react";
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, ShieldCheck, PlusCircle, AlertCircle, Upload, Image as ImageIcon, Music } from "lucide-react";
+import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, ShieldCheck, PlusCircle, AlertCircle, Upload, Image as ImageIcon, FileText, X } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
@@ -35,6 +34,7 @@ export function ExpenseCapture() {
   const [customParent, setCustomParent] = useState("");
   
   const [isRecurringGlobal, setIsRecurringGlobal] = useState(false);
+  const [manualDoc, setManualDoc] = useState<{ data: string; type: string; name: string } | null>(null);
 
   const [manual, setManual] = useState({
     amount: '',
@@ -57,6 +57,7 @@ export function ExpenseCapture() {
   const imageUploadRef = useRef<HTMLInputElement>(null);
   const micInputRef = useRef<HTMLInputElement>(null);
   const audioUploadRef = useRef<HTMLInputElement>(null);
+  const manualDocRef = useRef<HTMLInputElement>(null);
 
   const allCategories = { ...SYSTEM_CATEGORIES, ...customCategories };
   const categoriesList = Object.keys(allCategories);
@@ -83,7 +84,8 @@ export function ExpenseCapture() {
       purchaseDate: manual.category === 'Warranties' ? manual.purchaseDate : undefined,
       warrantyExpiryDate: manual.category === 'Warranties' ? manual.warrantyExpiryDate : undefined,
       serviceCenterContact: manual.category === 'Warranties' ? manual.serviceCenterContact : undefined,
-      notes: manual.category === 'Warranties' ? manual.notes : undefined
+      notes: manual.category === 'Warranties' ? manual.notes : undefined,
+      billImageData: manualDoc?.data
     });
 
     setManual({ 
@@ -102,7 +104,23 @@ export function ExpenseCapture() {
       serviceCenterContact: '',
       notes: ''
     });
+    setManualDoc(null);
     showSuccess();
+  };
+
+  const handleManualDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setManualDoc({
+        data: reader.result as string,
+        type: file.type,
+        name: file.name
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const showSuccess = () => {
@@ -139,7 +157,7 @@ export function ExpenseCapture() {
             category: detectedCategory,
             date,
             status: 'paid',
-            billImageData: base64String, // Store the document image
+            billImageData: base64String,
             isRecurring: isRecurringGlobal,
             frequency: isRecurringGlobal ? 'Monthly' : undefined,
             reminderDate: isRecurringGlobal ? date : undefined,
@@ -155,7 +173,7 @@ export function ExpenseCapture() {
           toast({
             variant: "destructive",
             title: "Scan Failed",
-            description: "Could not find a total amount. Please ensure the receipt is well-lit and the total is visible."
+            description: "Could not find a total amount. Please ensure the receipt is visible."
           });
         }
       };
@@ -204,7 +222,7 @@ export function ExpenseCapture() {
           toast({
             variant: "destructive",
             title: "Voice Analysis Failed",
-            description: "We couldn't extract an amount. Please speak clearly and mention the amount and item."
+            description: "We couldn't extract an amount."
           });
         }
       };
@@ -336,6 +354,46 @@ export function ExpenseCapture() {
                       <PlusCircle className="w-5 h-5" />
                     </Button>
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Document Upload (Image/PDF)</Label>
+                <div className="flex flex-col gap-3">
+                  {!manualDoc ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="h-12 w-full rounded-xl border-dashed border-primary/30 text-muted-foreground text-sm font-medium"
+                      onClick={() => manualDocRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Bill/Invoice
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/20 animate-in fade-in">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {manualDoc.type === 'application/pdf' ? <FileText className="w-5 h-5 text-primary" /> : <ImageIcon className="w-5 h-5 text-primary" />}
+                        <span className="text-xs font-bold truncate text-foreground">{manualDoc.name}</span>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
+                        onClick={() => setManualDoc(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={manualDocRef} 
+                    className="hidden" 
+                    accept="image/*,application/pdf" 
+                    onChange={handleManualDocUpload} 
+                  />
                 </div>
               </div>
 
