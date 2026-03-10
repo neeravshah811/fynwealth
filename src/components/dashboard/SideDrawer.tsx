@@ -39,6 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Logo } from "@/components/Logo";
@@ -111,7 +112,6 @@ export function SideDrawer() {
 
             <div className="flex flex-col flex-1 justify-between p-4 overflow-y-auto">
               <div className="space-y-4">
-                {/* Preferences Section */}
                 <div className="space-y-3">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1">Preferences</p>
                   
@@ -166,17 +166,15 @@ export function SideDrawer() {
                   <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1">Maintenance</p>
                   
                   <AlertDialog>
-                    <button onClick={(e) => e.stopPropagation()} className="w-full">
-                      <SheetTrigger asChild>
-                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
-                          <div className="flex items-center gap-2.5 text-amber-600">
-                            <Eraser className="w-4 h-4" />
-                            <span className="text-[11px] font-bold">Clear {monthName} Data</span>
-                          </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      </SheetTrigger>
-                    </button>
+                    <AlertDialogTrigger asChild>
+                      <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
+                        <div className="flex items-center gap-2.5 text-amber-600">
+                          <Eraser className="w-4 h-4" />
+                          <span className="text-[11px] font-bold">Clear {monthName} Data</span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </AlertDialogTrigger>
                     <AlertDialogContent className="rounded-xl">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-sm">Clear {monthName} Data?</AlertDialogTitle>
@@ -194,17 +192,15 @@ export function SideDrawer() {
                   </AlertDialog>
 
                   <AlertDialog>
-                    <button onClick={(e) => e.stopPropagation()} className="w-full">
-                      <SheetTrigger asChild>
-                        <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
-                          <div className="flex items-center gap-2.5 text-destructive">
-                            <Trash2 className="w-4 h-4" />
-                            <span className="text-[11px] font-bold">Reset App Data</span>
-                          </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      </SheetTrigger>
-                    </button>
+                    <AlertDialogTrigger asChild>
+                      <button className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-muted/50 transition-colors group text-left">
+                        <div className="flex items-center gap-2.5 text-destructive">
+                          <Trash2 className="w-4 h-4" />
+                          <span className="text-[11px] font-bold">Reset App Data</span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </AlertDialogTrigger>
                     <AlertDialogContent className="rounded-xl">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-sm">Permanent Reset?</AlertDialogTitle>
