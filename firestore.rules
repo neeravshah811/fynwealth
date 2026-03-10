@@ -19,11 +19,6 @@ service cloud.firestore {
       allow write: if false; 
     }
 
-    // Global administrative read access for monitoring all documents
-    match /{document=**} {
-      allow read: if isAdmin();
-    }
-
     // Admins registry - users can read to verify their own role
     match /admins/{adminId} {
       allow read: if isSignedIn();
@@ -36,12 +31,9 @@ service cloud.firestore {
 
     // User-specific data protection
     match /users/{userId} {
-      // Users can manage their own profile and records
       allow get, write: if isSignedIn() && request.auth.uid == userId;
-      // Admins can list all users for management
       allow list: if isAdmin();
 
-      // Sub-collections inherit access based on ownership
       match /expenses/{expenseId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
@@ -51,8 +43,8 @@ service cloud.firestore {
       }
     }
 
-    // Catch-all for analytics sub-paths
-    match /analytics/{docId} {
+    // Catch-all for analytics and other paths for admins
+    match /{document=**} {
       allow read: if isAdmin();
     }
   }

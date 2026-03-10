@@ -30,13 +30,11 @@ export default function AdminDashboardPage() {
 
     const appStatsDoc = doc(db, 'analytics', 'appStats');
     
-    // Use a try-catch for immediate failures and the error callback for the stream
     const unsub = onSnapshot(appStatsDoc, 
       (snapshot) => {
         if (snapshot.exists()) {
           setStats(snapshot.data());
         } else {
-          // Fallback for demo if document doesn't exist yet
           setStats({
             totalUsers: 1240,
             totalExpenses: 45200,
@@ -47,7 +45,6 @@ export default function AdminDashboardPage() {
         setLoading(false);
       },
       async (error) => {
-        // Log the error for the agent to fix but don't crash the UI for the user
         if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: appStatsDoc.path,
@@ -57,7 +54,6 @@ export default function AdminDashboardPage() {
           errorEmitter.emit('permission-error', permissionError);
         }
         
-        // Ensure we still show fallback metrics even on permission errors
         if (!stats) {
           setStats({
             totalUsers: 1240,
