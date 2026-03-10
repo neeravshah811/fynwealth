@@ -51,6 +51,7 @@ export interface Bill {
   notes?: string;
   status: 'pending' | 'paid';
   notified?: boolean;
+  billImageData?: string;
 }
 
 export interface Budget {
@@ -127,7 +128,6 @@ export const useFynWealthStore = create<FynWealthState>()(
         const id = Math.random().toString(36).substring(7);
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         
-        // Ensure status is 'paid' if date is today or in the past, unless explicitly marked as unpaid
         const status = expense.status || (expense.date <= todayStr ? 'paid' : 'unpaid');
 
         set((state) => ({
@@ -159,7 +159,8 @@ export const useFynWealthStore = create<FynWealthState>()(
             frequency: expense.frequency,
             category: expense.category,
             subCategory: expense.subCategory,
-            notes: expense.notes
+            notes: expense.notes,
+            billImageData: expense.billImageData
           });
         }
       },
@@ -189,6 +190,7 @@ export const useFynWealthStore = create<FynWealthState>()(
             dueDate: updatedFields.date !== undefined ? updatedFields.date : b.dueDate,
             category: updatedFields.category !== undefined ? updatedFields.category : b.category,
             subCategory: updatedFields.subCategory !== undefined ? updatedFields.subCategory : b.subCategory,
+            billImageData: updatedFields.billImageData !== undefined ? updatedFields.billImageData : b.billImageData,
           } : b);
         }
 
@@ -232,7 +234,8 @@ export const useFynWealthStore = create<FynWealthState>()(
               date: bill.dueDate,
               status: 'unpaid',
               notes: bill.notes,
-              reminderTime: bill.dueTime
+              reminderTime: bill.dueTime,
+              billImageData: bill.billImageData
             }
           ]
         }));

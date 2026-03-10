@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFynWealthStore, Frequency, SYSTEM_CATEGORIES } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,10 @@ import {
   X,
   CreditCard,
   History,
-  CalendarDays
+  CalendarDays,
+  Upload,
+  FileText,
+  Image as ImageIcon
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
@@ -30,6 +33,8 @@ const REMINDER_FREQUENCIES: Frequency[] = ['One-time', 'Weekly', 'Monthly', 'Qua
 export default function BillsPage() {
   const { bills, addBill, deleteBill, markBillPaid, currency, customCategories } = useFynWealthStore();
   const [showForm, setShowForm] = useState(false);
+  const [billDoc, setBillDoc] = useState<{ data: string; type: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -45,6 +50,21 @@ export default function BillsPage() {
   const allCategories = { ...SYSTEM_CATEGORIES, ...customCategories };
   const categoriesList = Object.keys(allCategories);
 
+  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBillDoc({
+        data: reader.result as string,
+        type: file.type,
+        name: file.name
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.amount || !formData.dueDate) return;
@@ -57,7 +77,8 @@ export default function BillsPage() {
       frequency: formData.frequency,
       category: formData.category,
       subCategory: formData.subCategory,
-      notes: formData.notes
+      notes: formData.notes,
+      billImageData: billDoc?.data
     });
 
     setFormData({
@@ -70,6 +91,7 @@ export default function BillsPage() {
       subCategory: '',
       notes: ''
     });
+    setBillDoc(null);
     setShowForm(false);
     toast({ title: "Reminder Set", description: `We'll remind you about ${formData.name}.` });
   };
@@ -173,6 +195,46 @@ export default function BillsPage() {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Attach Bill/Invoice (Optional)</Label>
+                <div className="flex flex-col gap-3">
+                  {!billDoc ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="h-12 w-full rounded-xl border-dashed border-primary/30 text-muted-foreground text-sm font-medium"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Document
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/20">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {billDoc.type === 'application/pdf' ? <FileText className="w-5 h-5 text-primary" /> : <ImageIcon className="w-5 h-5 text-primary" />}
+                        <span className="text-xs font-bold truncate text-foreground">{billDoc.name}</span>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
+                        onClick={() => setBillDoc(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*,application/pdf" 
+                    onChange={handleDocUpload} 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Notes (Optional)</Label>
                 <Textarea 
                   placeholder="Payment details, account numbers, etc." 
@@ -222,6 +284,11 @@ export default function BillsPage() {
                           <Badge variant="secondary" className="text-xs uppercase font-bold py-0 h-6 bg-primary/5 text-primary border-none">
                             {bill.category}
                           </Badge>
+                          {bill.billImageData && (
+                            <Badge variant="outline" className="text-[10px] h-6 border-emerald-500/20 text-emerald-600 bg-emerald-50/50">
+                              <FileText className="w-3 h-3 mr-1" /> DOC
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
