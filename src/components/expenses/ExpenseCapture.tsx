@@ -279,16 +279,15 @@ export function ExpenseCapture() {
           <TabsContent value="manual">
             <form onSubmit={handleManualSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2 relative">
-                  <Label htmlFor="amount" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="amount" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm md:text-base font-bold">{currency.symbol}</span>
-                    <input 
+                    <Input 
                       id="amount" 
                       type="number" 
                       placeholder="0.00" 
                       required
-                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm md:text-base font-bold ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 pl-10 shadow-sm"
+                      className="h-12 text-sm md:text-base font-bold rounded-xl bg-background border-input focus:ring-primary shadow-sm"
                       value={manual.amount}
                       onChange={(e) => setManual({...manual, amount: e.target.value})}
                     />
@@ -299,7 +298,7 @@ export function ExpenseCapture() {
                   <Input 
                     id="date" 
                     type="date" 
-                    className="h-12 text-sm md:text-base rounded-xl font-medium shadow-sm"
+                    className="h-12 text-sm md:text-base rounded-xl font-medium shadow-sm bg-background"
                     value={manual.date}
                     onChange={(e) => setManual({...manual, date: e.target.value})}
                   />
@@ -314,7 +313,7 @@ export function ExpenseCapture() {
                       value={manual.category} 
                       onValueChange={(v) => setManual({...manual, category: v, subCategory: ''})}
                     >
-                      <SelectTrigger id="category" className="h-12 text-sm md:text-base rounded-xl font-bold shadow-sm">
+                      <SelectTrigger id="category" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[250px] rounded-xl">
@@ -327,7 +326,7 @@ export function ExpenseCapture() {
                       type="button" 
                       size="icon" 
                       variant="outline" 
-                      className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
+                      className="h-12 w-12 shrink-0 rounded-xl border-input bg-background"
                       onClick={() => { setCustomParent(""); setIsCustomDialogOpen(true); }}
                     >
                       <PlusCircle className="w-5 h-5" />
@@ -341,7 +340,7 @@ export function ExpenseCapture() {
                       value={manual.subCategory} 
                       onValueChange={(v) => setManual({...manual, subCategory: v})}
                     >
-                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl font-bold shadow-sm">
+                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px] rounded-xl">
@@ -354,7 +353,7 @@ export function ExpenseCapture() {
                       type="button" 
                       size="icon" 
                       variant="outline" 
-                      className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
+                      className="h-12 w-12 shrink-0 rounded-xl border-input bg-background"
                       onClick={() => { setCustomParent(manual.category); setIsCustomDialogOpen(true); }}
                     >
                       <PlusCircle className="w-5 h-5" />
@@ -408,7 +407,7 @@ export function ExpenseCapture() {
                 <Input 
                   id="description" 
                   placeholder="What did you spend on?" 
-                  className="h-12 text-sm md:text-base rounded-xl shadow-sm"
+                  className="h-12 text-sm md:text-base rounded-xl shadow-sm bg-background"
                   value={manual.description}
                   onChange={(e) => setManual({...manual, description: e.target.value})}
                 />
@@ -474,7 +473,7 @@ export function ExpenseCapture() {
                         value={manual.frequency} 
                         onValueChange={(v) => setManual({...manual, frequency: v as Frequency})}
                       >
-                        <SelectTrigger id="frequency" className="h-11 text-sm md:text-base rounded-xl font-bold shadow-sm">
+                        <SelectTrigger id="frequency" className="h-11 text-sm md:text-base rounded-xl font-bold shadow-sm bg-background border-input">
                           <SelectValue placeholder="Frequency" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
@@ -489,7 +488,7 @@ export function ExpenseCapture() {
                       <Input 
                         id="reminder-date" 
                         type="date" 
-                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm"
+                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm bg-background"
                         value={manual.reminderDate}
                         onChange={(e) => setManual({...manual, reminderDate: e.target.value})}
                         required={manual.isRecurring}
@@ -500,7 +499,7 @@ export function ExpenseCapture() {
                       <Input 
                         id="reminder-time" 
                         type="time" 
-                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm"
+                        className="h-11 text-sm md:text-base rounded-xl font-medium shadow-sm bg-background"
                         value={manual.reminderTime}
                         onChange={(e) => setManual({...manual, reminderTime: e.target.value})}
                         required={manual.isRecurring}
