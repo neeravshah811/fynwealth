@@ -25,7 +25,7 @@ import {
   UserPlus, 
   Filter
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import Link from 'next/link';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -121,6 +121,19 @@ export default function UserManagementPage() {
     );
   }, [users, searchTerm]);
 
+  const safeFormatDate = (dateValue: any, formatStr: string = 'MMM dd, yyyy') => {
+    if (!dateValue) return 'N/A';
+    
+    let date: Date;
+    if (typeof dateValue.toDate === 'function') {
+      date = dateValue.toDate();
+    } else {
+      date = new Date(dateValue);
+    }
+
+    return isValid(date) ? format(date, formatStr) : 'N/A';
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -202,7 +215,7 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell>
                     <p className="text-xs font-medium">
-                      {user.createdAt ? format(new Date(user.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                      {safeFormatDate(user.createdAt)}
                     </p>
                   </TableCell>
                   <TableCell className="text-center">

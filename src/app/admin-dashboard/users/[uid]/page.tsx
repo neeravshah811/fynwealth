@@ -18,7 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -56,6 +56,19 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
     }
     fetchData();
   }, [db, uid]);
+
+  const safeFormatDate = (dateValue: any, formatStr: string = 'MMM dd, yyyy') => {
+    if (!dateValue) return 'N/A';
+    
+    let date: Date;
+    if (typeof dateValue.toDate === 'function') {
+      date = dateValue.toDate();
+    } else {
+      date = new Date(dateValue);
+    }
+
+    return isValid(date) ? format(date, formatStr) : 'N/A';
+  };
 
   if (loading) {
     return (
@@ -109,14 +122,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                   <Calendar className="w-4 h-4" />
                   <span>Joined</span>
                 </div>
-                <span className="font-bold">{user.createdAt ? format(new Date(user.createdAt), 'MMM dd, yyyy') : 'N/A'}</span>
+                <span className="font-bold">{safeFormatDate(user.createdAt)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="w-4 h-4" />
                   <span>Last Active</span>
                 </div>
-                <span className="font-bold">{user.lastActive ? format(new Date(user.lastActive), 'MMM dd, HH:mm') : 'N/A'}</span>
+                <span className="font-bold">{safeFormatDate(user.lastActive, 'MMM dd, HH:mm')}</span>
               </div>
             </CardContent>
           </Card>
@@ -166,7 +179,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                     {expenses.map((exp) => (
                       <TableRow key={exp.id} className="hover:bg-muted/10 border-b border-black/5">
                         <TableCell className="pl-6 text-xs font-medium">
-                          {format(new Date(exp.date), 'MMM dd, yyyy')}
+                          {safeFormatDate(exp.date)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-primary/5 text-primary border-none text-[9px] font-bold uppercase py-0 px-1.5 h-5">
