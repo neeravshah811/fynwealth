@@ -1,0 +1,501 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile within the FynWealth application. This entity stores core user information linked to their authentication.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The user's phone number, used for authentication (handled externally by Firebase)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating the last time the user profile was updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "phoneNumber",
+        "createdAt"
+      ]
+    },
+    "Bill": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Bill",
+      "type": "object",
+      "description": "Represents a recurring bill or subscription that a user needs to track and manage.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Bill entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile this bill belongs to. (Relationship: UserProfile 1:N Bill)"
+        },
+        "name": {
+          "type": "string",
+          "description": "A descriptive name for the bill (e.g., 'Electricity Bill', 'Netflix Subscription')."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the bill."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the bill amount (e.g., 'USD', 'EUR'). Defaults to a primary currency if not specified by user."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "The date when the bill is due.",
+          "format": "date"
+        },
+        "frequency": {
+          "type": "string",
+          "description": "How often the bill recurs (e.g., 'monthly', 'annually', 'weekly', 'one-time')."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the bill (e.g., 'Utility', 'Subscription', 'Rent', 'EMI')."
+        },
+        "isPaid": {
+          "type": "boolean",
+          "description": "Indicates whether the current instance of the bill has been paid."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional notes or details about the bill."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the bill record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating the last time the user profile was updated.",
+          "format": "date-time"
+        },
+        "lastPaidDate": {
+          "type": "string",
+          "description": "The date when the bill was last paid.",
+          "format": "date"
+        },
+        "nextDueDate": {
+          "type": "string",
+          "description": "The calculated next due date for the recurring bill.",
+          "format": "date"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "amount",
+        "currency",
+        "dueDate",
+        "frequency",
+        "category",
+        "isPaid",
+        "createdAt"
+      ]
+    },
+    "ExpenseCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExpenseCategory",
+      "type": "object",
+      "description": "Defines categories for expenses, allowing users to organize and analyze their spending.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ExpenseCategory entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the expense category (e.g., 'Groceries', 'Transport', 'Dining Out')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of what expenses fall under this category."
+        },
+        "isDefault": {
+          "type": "boolean",
+          "description": "Indicates if this is a system-provided default category."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Optional reference to the UserProfile who created this custom category. (Relationship: UserProfile 1:N ExpenseCategory)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "isDefault"
+      ]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Represents an individual expenditure recorded by the user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile this expense belongs to. (Relationship: UserProfile 1:N Expense)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the expense."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the expense amount (e.g., 'USD', 'EUR'). Defaults to a primary currency if not specified by user."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the expense."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date when the expense occurred.",
+          "format": "date"
+        },
+        "expenseCategoryId": {
+          "type": "string",
+          "description": "Reference to the ExpenseCategory this expense belongs to. (Relationship: ExpenseCategory 1:N Expense)"
+        },
+        "captureMethod": {
+          "type": "string",
+          "description": "The method used to capture the expense (e.g., 'manual', 'scan', 'voice')."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional notes about the expense."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the expense record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating the last time the expense record was updated.",
+          "format": "date-time"
+        },
+        "billImageUrl": {
+          "type": "string",
+          "description": "URL to the image of the scanned bill or invoice, if applicable.",
+          "format": "uri"
+        },
+        "voiceNoteUrl": {
+          "type": "string",
+          "description": "URL to the audio recording of the voice-captured expense, if applicable.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "amount",
+        "currency",
+        "description",
+        "date",
+        "expenseCategoryId",
+        "captureMethod",
+        "createdAt"
+      ]
+    },
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Represents a spending budget set by the user for a specific category or period.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile this budget belongs to. (Relationship: UserProfile 1:N Budget)"
+        },
+        "name": {
+          "type": "string",
+          "description": "A descriptive name for the budget (e.g., 'Monthly Food Budget')."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The total monetary limit set for this budget."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the budget amount (e.g., 'USD', 'EUR'). Defaults to a primary currency if not specified by user."
+        },
+        "expenseCategoryId": {
+          "type": "string",
+          "description": "Reference to the ExpenseCategory this budget applies to. (Relationship: ExpenseCategory 1:N Budget)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The start date of the budget period.",
+          "format": "date"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The end date of the budget period.",
+          "format": "date"
+        },
+        "frequency": {
+          "type": "string",
+          "description": "How often the budget recurs (e.g., 'monthly', 'weekly', 'annually')."
+        },
+        "alertThreshold": {
+          "type": "number",
+          "description": "A percentage (e.g., 80 for 80%) at which an alert should be triggered if the budget is nearing its limit."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the budget record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating the last time the budget record was updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "amount",
+        "currency",
+        "expenseCategoryId",
+        "startDate",
+        "endDate",
+        "frequency",
+        "createdAt"
+      ]
+    },
+    "Insight": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Insight",
+      "type": "object",
+      "description": "Stores AI-generated financial insights and suggestions for the user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Insight entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile this insight is for. (Relationship: UserProfile 1:N Insight)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of insight provided (e.g., 'Upcoming Heavy Month', 'Repeating Unnecessary Expense', 'Bill Prioritization')."
+        },
+        "title": {
+          "type": "string",
+          "description": "A brief title summarizing the insight."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed explanation of the insight and any smart suggestions."
+        },
+        "generatedDate": {
+          "type": "string",
+          "description": "Timestamp indicating when the insight was generated.",
+          "format": "date-time"
+        },
+        "isDismissed": {
+          "type": "boolean",
+          "description": "Indicates if the user has viewed and dismissed this insight."
+        },
+        "relatedBillIds": {
+          "type": "array",
+          "description": "An array of Bill IDs related to this insight, if applicable. (Relationship: Insight N:N Bill)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "relatedExpenseIds": {
+          "type": "array",
+          "description": "An array of Expense IDs related to this insight, if applicable. (Relationship: Insight N:N Expense)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "type",
+        "title",
+        "description",
+        "generatedDate"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous",
+      "phone"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles, where the document ID matches the Firebase Authentication UID. Access is restricted to the user matching `userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user, which is also the Firebase Authentication UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/bills/{billId}",
+        "definition": {
+          "entityName": "Bill",
+          "schema": {
+            "$ref": "#/backend/entities/Bill"
+          },
+          "description": "Stores recurring bills for a specific user. Each document includes the `userId` field, which must match the path's `userId` for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this bill."
+            },
+            {
+              "name": "billId",
+              "description": "The unique identifier for the bill."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/default_expense_categories/{categoryId}",
+        "definition": {
+          "entityName": "ExpenseCategory",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseCategory"
+          },
+          "description": "Stores system-provided, read-only default expense categories accessible by all authenticated users.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the default expense category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/expense_categories/{categoryId}",
+        "definition": {
+          "entityName": "ExpenseCategory",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseCategory"
+          },
+          "description": "Stores custom expense categories defined by a specific user. Each document includes the `userId` field, which must match the path's `userId` for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who created this custom category."
+            },
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the custom expense category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Expense",
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Stores individual expenditures recorded by a specific user. Each document includes the `userId` field, which must match the path's `userId` for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who recorded this expense."
+            },
+            {
+              "name": "expenseId",
+              "description": "The unique identifier for the expense."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/budgets/{budgetId}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Stores spending budgets set by a specific user. Each document includes the `userId` field, which must match the path's `userId` for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who created this budget."
+            },
+            {
+              "name": "budgetId",
+              "description": "The unique identifier for the budget."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/insights/{insightId}",
+        "definition": {
+          "entityName": "Insight",
+          "schema": {
+            "$ref": "#/backend/entities/Insight"
+          },
+          "description": "Stores AI-generated financial insights and suggestions for a specific user. Each document includes the `userId` field, which must match the path's `userId` for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user for whom this insight was generated."
+            },
+            {
+              "name": "insightId",
+              "description": "The unique identifier for the insight."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure for FynWealth is designed to prioritize security, scalability, and debuggability in alignment with the core design principles. All user-specific data is organized under a top-level `/users/{userId}` collection, followed by subcollections for individual user entities such as `bills`, `expenses`, `budgets`, and `insights`. This approach leverages path-based ownership, a highly secure and efficient pattern for managing private user data.\n\n**Authorization Independence (CRITICAL):** Authorization independence is primarily achieved by structuring all user-owned data directly under the user's unique ID (`/users/{userId}/...`). For entities like `Bill`, `Expense`, `Budget`, and `Insight`, the document's `userId` field will always store the `uid` of the owning user. This `userId` field in the document itself, coupled with the `{userId}` wildcard in the path, ensures that security rules do not need to perform expensive or complex `get()` operations on parent documents to determine ownership. A rule can simply check `request.auth.uid == userId` (from the path wildcard) and `resource.data.userId == userId` (from the document's content). This makes authorization checks atomic and highly performant, directly satisfying the Authorization Independence mandate.\n\n**QAPs (Rules are not Filters):** The structural segregation inherently supports Queries as Authorization Policies (QAPs). For example, to retrieve all bills for the authenticated user, the client would query `firestore.collection('users').doc(request.auth.uid).collection('bills')`. The security rules for this path would then simply verify that `request.auth.uid` matches the `{userId}` in the path. This ensures that the client's query is implicitly authorized by its path, preventing over-fetching or unauthorized access attempts. Similarly, default expense categories are stored in a separate top-level collection (`/default_expense_categories`), allowing authenticated users to read them via a simple query without needing complex filtering rules.\n\n**Structural Segregation:** Data with different security postures is strictly separated. For instance, system-wide `default_expense_categories` are in a top-level collection, readable by all authenticated users. In contrast, user-defined `expense_categories` are nested under `/users/{userId}/expense_categories`, ensuring only the owner can modify them. This clear separation simplifies security rules significantly by removing conditional logic based on data content within a single collection.\n\n**Access Modeling:** Path-Based ownership (`/users/{userId}/...`) is consistently applied for all private user data (`UserProfile`, `Bill`, `Expense`, `Budget`, `Insight`, and user-defined `ExpenseCategory`). This makes ownership explicit and rules straightforward to write and debug. There is no collaborative data or custom claims based roles required by the current features, simplifying the model further."
+  }
+}
