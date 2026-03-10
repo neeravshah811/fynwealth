@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -38,7 +37,7 @@ import {
   Zap, 
   MessageSquare,
   ChevronRight,
-  Phone,
+  Mail,
   AlertCircle,
   Lock
 } from "lucide-react";
@@ -65,10 +64,23 @@ export function ProfileDialog() {
         lastName: profile.lastName || "",
         email: profile.email || "",
       });
+    } else if (user) {
+      const names = user.displayName?.split(' ') || [];
+      setFormData({
+        firstName: names[0] || "",
+        lastName: names.slice(1).join(' ') || "",
+        email: user.email || "",
+      });
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const hasProfile = !!(profile?.firstName && profile?.email);
+  
+  const displayName = profile?.firstName 
+    ? `${profile.firstName} ${profile.lastName}` 
+    : (user?.displayName || "User Profile");
+    
+  const displayEmail = user?.email || profile?.email || "No email available";
 
   const handleSave = () => {
     if (!formData.firstName || !formData.email) {
@@ -107,7 +119,7 @@ export function ProfileDialog() {
     }
   };
 
-  const initial = profile?.firstName?.[0] || profile?.lastName?.[0];
+  const initial = profile?.firstName?.[0] || user?.displayName?.[0] || user?.email?.[0] || "?";
 
   const MenuButton = ({ icon: Icon, label, onClick, variant = "default" }: { icon: any, label: string, onClick?: () => void, variant?: "default" | "destructive" }) => (
     <button 
@@ -128,26 +140,26 @@ export function ProfileDialog() {
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <button className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-base hover:bg-primary/20 transition-colors border border-primary/20 overflow-hidden">
-            {initial ? initial.toUpperCase() : <User className="w-5 h-5" />}
+          <button className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-base hover:bg-primary/20 transition-colors border border-primary/20 overflow-hidden uppercase">
+            {initial}
           </button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden gap-0 border-none shadow-2xl">
           <DialogHeader className="p-8 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-3xl font-bold shadow-lg shadow-primary/20">
-                {initial ? initial.toUpperCase() : <User className="w-8 h-8" />}
+              <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-3xl font-bold shadow-lg shadow-primary/20 uppercase">
+                {initial}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="font-headline text-2xl truncate">
-                    {profile?.firstName ? `${profile.firstName} ${profile.lastName}` : "User Profile"}
+                    {displayName}
                   </DialogTitle>
                   {hasProfile && <Lock className="w-4 h-4 text-muted-foreground shrink-0" title="Profile Details Locked" />}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1.5 font-medium">
-                  <Phone className="w-4 h-4 text-primary shrink-0" />
-                  <span className="truncate">{user?.phoneNumber || "Anonymous Guest"}</span>
+                  <Mail className="w-4 h-4 text-primary shrink-0" />
+                  <span className="truncate">{displayEmail}</span>
                 </div>
               </div>
             </div>
@@ -316,7 +328,7 @@ export function ProfileDialog() {
                 <>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">1. Data Collection</h3>
-                    <p>FynWealth collects information you provide directly: your phone number for secure authentication, and your expense records, categories, and descriptions.</p>
+                    <p>FynWealth collects information you provide directly through your account and your expense records, categories, and descriptions.</p>
                   </section>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">2. Data Usage</h3>
@@ -328,11 +340,11 @@ export function ProfileDialog() {
                   </section>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">4. Security Measures</h3>
-                    <p>All data is stored in Firebase with industry-standard encryption. Access is restricted via strict Security Rules tied to your authenticated unique ID.</p>
+                    <p>All data is stored in Firebase with industry-standard encryption. Access is restricted via strict Security Rules tied to your authenticated unique account ID.</p>
                   </section>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">5. Data Deletion</h3>
-                    <p>You can delete all your data at any time via the "Reset System" option. This action is permanent and immediate.</p>
+                    <p>You can delete all your data at any time via the "Reset App Data" option. This action is permanent and immediate.</p>
                   </section>
                 </>
               )}

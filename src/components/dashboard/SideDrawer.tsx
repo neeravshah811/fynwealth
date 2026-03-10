@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -105,7 +104,18 @@ export function SideDrawer() {
   };
 
   const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(viewYear, viewMonth));
-  const initial = profile?.firstName?.[0] || user?.phoneNumber?.[2];
+  
+  // Dynamic identity resolution
+  const displayName = profile?.firstName 
+    ? `${profile.firstName} ${profile.lastName}` 
+    : (user?.displayName || "My Profile");
+  
+  const displayEmail = user?.email || profile?.email || "Anonymous Guest";
+  
+  const initial = profile?.firstName?.[0] 
+    || user?.displayName?.[0] 
+    || user?.email?.[0] 
+    || "?";
 
   return (
     <div className="sticky top-0 z-30 w-full bg-background/80 backdrop-blur-md border-b px-4 h-14 flex items-center justify-between">
@@ -123,15 +133,15 @@ export function SideDrawer() {
                 <ThemeToggle />
               </div>
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-2xl shadow-md">
-                  {initial ? initial.toUpperCase() : <User className="w-7 h-7" />}
+                <div className="w-14 h-14 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-2xl shadow-md uppercase">
+                  {initial}
                 </div>
                 <div className="min-w-0">
                   <SheetTitle className="text-base font-headline font-bold truncate">
-                    {profile?.firstName ? `${profile.firstName} ${profile.lastName}` : "My Profile"}
+                    {displayName}
                   </SheetTitle>
                   <SheetDescription className="text-xs font-medium truncate opacity-70">
-                    {user?.phoneNumber || "Anonymous Guest"}
+                    {displayEmail}
                   </SheetDescription>
                 </div>
               </div>
@@ -313,10 +323,12 @@ export function SideDrawer() {
       </div>
 
       <div className="flex items-center gap-2">
-        {profile?.firstName && (
+        {displayName && (
           <div className="px-3.5 py-1.5 rounded-full bg-primary/5 border border-primary/10 flex items-center gap-2 shadow-sm">
             <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-            <span className="text-[10px] md:text-xs font-bold text-primary uppercase tracking-tight">{profile.firstName}</span>
+            <span className="text-[10px] md:text-xs font-bold text-primary uppercase tracking-tight truncate max-w-[100px]">
+              {profile?.firstName || user?.displayName?.split(' ')[0] || "User"}
+            </span>
           </div>
         )}
       </div>
@@ -359,7 +371,7 @@ export function SideDrawer() {
                 <>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">1. Data Storage</h3>
-                    <p>FynWealth utilizes Firebase for secure data storage. Your transaction records, categories, and profile details are encrypted and stored in private cloud instances tied directly to your authenticated UID.</p>
+                    <p>FynWealth utilizes Firebase for secure data storage. Your transaction records, categories, and profile details are encrypted and stored in private cloud instances tied directly to your authenticated account.</p>
                   </section>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">2. AI Processing</h3>
