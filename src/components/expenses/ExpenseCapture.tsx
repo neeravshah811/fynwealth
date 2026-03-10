@@ -281,17 +281,15 @@ export function ExpenseCapture() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="amount" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
-                  <div className="relative">
-                    <Input 
-                      id="amount" 
-                      type="number" 
-                      placeholder="0.00" 
-                      required
-                      className="h-12 text-sm md:text-base font-bold rounded-xl bg-background border-input focus:ring-primary shadow-sm"
-                      value={manual.amount}
-                      onChange={(e) => setManual({...manual, amount: e.target.value})}
-                    />
-                  </div>
+                  <Input 
+                    id="amount" 
+                    type="number" 
+                    placeholder="0.00" 
+                    required
+                    className="h-12 text-sm md:text-base font-bold rounded-xl bg-background border-input focus:ring-primary shadow-sm"
+                    value={manual.amount}
+                    onChange={(e) => setManual({...manual, amount: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="date" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Date</Label>
@@ -305,7 +303,8 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              {/* Responsive layout for Category and Sub-Category to prevent overlap */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="category" className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Category</Label>
                   <div className="flex gap-2">
@@ -313,7 +312,7 @@ export function ExpenseCapture() {
                       value={manual.category} 
                       onValueChange={(v) => setManual({...manual, category: v, subCategory: ''})}
                     >
-                      <SelectTrigger id="category" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background">
+                      <SelectTrigger id="category" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background flex-1">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[250px] rounded-xl">
@@ -340,7 +339,7 @@ export function ExpenseCapture() {
                       value={manual.subCategory} 
                       onValueChange={(v) => setManual({...manual, subCategory: v})}
                     >
-                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background">
+                      <SelectTrigger id="subCategory" className="h-12 text-sm md:text-base rounded-xl font-bold border-input bg-background flex-1">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px] rounded-xl">
