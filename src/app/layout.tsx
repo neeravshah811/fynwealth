@@ -5,13 +5,9 @@ import './globals.css';
 import { ThemeProvider } from 'next-themes';
 import { SplashScreen } from '@/components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
-import { Sidebar } from "@/components/dashboard/Sidebar";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { ProfileDialog } from "@/components/profile/ProfileDialog";
-import { HelpButton } from "@/components/HelpButton";
+import { BottomNav } from "@/components/dashboard/BottomNav";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthGuard } from '@/components/auth/AuthGuard';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { TutorialTrigger } from '@/components/TutorialTrigger';
 import { NotificationManager } from '@/components/NotificationManager';
 
@@ -44,28 +40,17 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <FirebaseClientProvider>
             <AuthGuard>
-              <SidebarProvider>
-                <SplashScreen />
-                <TutorialTrigger />
-                <NotificationManager />
-                <div className="flex min-h-screen bg-background w-full">
-                  <Sidebar />
-                  <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
-                    <header className="h-16 border-b bg-card/50 backdrop-blur-md sticky top-0 z-30 flex items-center px-4 md:px-8 gap-4">
-                      <SidebarTrigger />
-                      <div className="flex-1" />
-                      <div className="flex items-center gap-4">
-                        <HelpButton />
-                        <ThemeToggle />
-                        <ProfileDialog />
-                      </div>
-                    </header>
-                    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
-                      {children}
-                    </div>
-                  </main>
-                </div>
-              </SidebarProvider>
+              <SplashScreen />
+              <TutorialTrigger />
+              <NotificationManager />
+              <div className="flex flex-col min-h-screen bg-background">
+                <main className="flex-1 pb-24 overflow-y-auto">
+                  <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+                    {children}
+                  </div>
+                </main>
+                <BottomNav />
+              </div>
             </AuthGuard>
             <Toaster />
           </FirebaseClientProvider>
