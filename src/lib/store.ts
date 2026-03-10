@@ -31,6 +31,7 @@ export interface Expense {
   purchaseDate?: string;
   warrantyExpiryDate?: string;
   invoiceUrl?: string;
+  billImageData?: string; // Base64 data URI of the scanned bill
   serviceCenterContact?: string;
   notes?: string;
   billId?: string; // Linked bill ID
@@ -338,7 +339,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       }),
     }),
     {
-      name: 'fynwealth_persistent_storage_v2',
+      name: 'fynwealth_persistent_storage_v3',
     }
   )
 );

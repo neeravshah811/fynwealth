@@ -67,7 +67,6 @@ export function ExpenseCapture() {
     if (!manual.amount) return;
     
     const amount = Math.abs(parseFloat(manual.amount));
-    // Description is now optional, fallback to category name if empty
     const description = manual.description.trim() || `${manual.category} Expense`;
     
     addExpense({
@@ -106,21 +105,6 @@ export function ExpenseCapture() {
     showSuccess();
   };
 
-  const handleAddCustom = () => {
-    if (newCustomCategory) {
-      addCustomCategory(newCustomCategory);
-      setNewCustomCategory("");
-      setIsCustomDialogOpen(false);
-      toast({ title: "Category added", description: `Added "${newCustomCategory}"` });
-    } else if (newCustomSubCategory && customParent) {
-      addCustomSubCategory(customParent, newCustomSubCategory);
-      setNewCustomSubCategory("");
-      setCustomParent("");
-      setIsCustomDialogOpen(false);
-      toast({ title: "Sub-category added", description: `Added to "${customParent}"` });
-    }
-  };
-
   const showSuccess = () => {
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2000);
@@ -155,6 +139,7 @@ export function ExpenseCapture() {
             category: detectedCategory,
             date,
             status: 'paid',
+            billImageData: base64String, // Store the document image
             isRecurring: isRecurringGlobal,
             frequency: isRecurringGlobal ? 'Monthly' : undefined,
             reminderDate: isRecurringGlobal ? date : undefined,
@@ -230,6 +215,21 @@ export function ExpenseCapture() {
       setLoading(false);
       if (micInputRef.current) micInputRef.current.value = "";
       if (audioUploadRef.current) audioUploadRef.current.value = "";
+    }
+  };
+
+  const handleAddCustom = () => {
+    if (newCustomCategory) {
+      addCustomCategory(newCustomCategory);
+      setNewCustomCategory("");
+      setIsCustomDialogOpen(false);
+      toast({ title: "Category added", description: `Added "${newCustomCategory}"` });
+    } else if (newCustomSubCategory && customParent) {
+      addCustomSubCategory(customParent, newCustomSubCategory);
+      setNewCustomSubCategory("");
+      setCustomParent("");
+      setIsCustomDialogOpen(false);
+      toast({ title: "Sub-category added", description: `Added to "${customParent}"` });
     }
   };
 

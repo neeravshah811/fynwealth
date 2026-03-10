@@ -7,7 +7,7 @@ import {
   LayoutDashboard, 
   Receipt, 
   PieChart, 
-  Sparkles,
+  Files,
   Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export function BottomNav() {
     { name: "Reminders", icon: Bell, href: "/bills" },
     { name: "Expenses", icon: Receipt, href: "/expenses", isCenter: true },
     { name: "Budgets", icon: PieChart, href: "/budgets" },
-    { name: "AI Insights", icon: Sparkles, href: "/insights" },
+    { name: "Documents", icon: Files, href: "/documents" },
   ];
 
   return (
