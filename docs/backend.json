@@ -357,8 +357,7 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous",
-      "phone"
+      "google.com"
     ]
   },
   "firestore": {
@@ -495,7 +494,6 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore data structure for FynWealth is designed to prioritize security, scalability, and debuggability in alignment with the core design principles. All user-specific data is organized under a top-level `/users/{userId}` collection, followed by subcollections for individual user entities such as `bills`, `expenses`, `budgets`, and `insights`. This approach leverages path-based ownership, a highly secure and efficient pattern for managing private user data.\n\n**Authorization Independence (CRITICAL):** Authorization independence is primarily achieved by structuring all user-owned data directly under the user's unique ID (`/users/{userId}/...`). For entities like `Bill`, `Expense`, `Budget`, and `Insight`, the document's `userId` field will always store the `uid` of the owning user. This `userId` field in the document itself, coupled with the `{userId}` wildcard in the path, ensures that security rules do not need to perform expensive or complex `get()` operations on parent documents to determine ownership. A rule can simply check `request.auth.uid == userId` (from the path wildcard) and `resource.data.userId == userId` (from the document's content). This makes authorization checks atomic and highly performant, directly satisfying the Authorization Independence mandate.\n\n**QAPs (Rules are not Filters):** The structural segregation inherently supports Queries as Authorization Policies (QAPs). For example, to retrieve all bills for the authenticated user, the client would query `firestore.collection('users').doc(request.auth.uid).collection('bills')`. The security rules for this path would then simply verify that `request.auth.uid` matches the `{userId}` in the path. This ensures that the client's query is implicitly authorized by its path, preventing over-fetching or unauthorized access attempts. Similarly, default expense categories are stored in a separate top-level collection (`/default_expense_categories`), allowing authenticated users to read them via a simple query without needing complex filtering rules.\n\n**Structural Segregation:** Data with different security postures is strictly separated. For instance, system-wide `default_expense_categories` are in a top-level collection, readable by all authenticated users. In contrast, user-defined `expense_categories` are nested under `/users/{userId}/expense_categories`, ensuring only the owner can modify them. This clear separation simplifies security rules significantly by removing conditional logic based on data content within a single collection.\n\n**Access Modeling:** Path-Based ownership (`/users/{userId}/...`) is consistently applied for all private user data (`UserProfile`, `Bill`, `Expense`, `Budget`, `Insight`, and user-defined `ExpenseCategory`). This makes ownership explicit and rules straightforward to write and debug. There is no collaborative data or custom claims based roles required by the current features, simplifying the model further."
+    ]
   }
 }

@@ -1,261 +1,238 @@
+
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/firebase';
 import { 
-  RecaptchaVerifier, 
-  signInWithPhoneNumber, 
-  ConfirmationResult,
-  signInAnonymously
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  updateProfile as updateFirebaseProfile
 } from 'firebase/auth';
+import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
-import { Loader2, Phone, ShieldCheck, ArrowRight, AlertCircle, UserCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ArrowRight, Chrome } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function LoginPage() {
   const auth = useAuth();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const { updateProfile: updateStoreProfile } = useFynWealthStore();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [mode, setStep] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
-  const [billingError, setBillingError] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  useEffect(() => {
-    if (!recaptchaVerifier.current && recaptchaRef.current) {
-      recaptchaVerifier.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => {
-          // reCAPTCHA solved
-        }
-      });
-    }
-    return () => {
-      if (recaptchaVerifier.current) {
-        recaptchaVerifier.current.clear();
-        recaptchaVerifier.current = null;
-      }
-    };
-  }, [auth]);
-
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber.startsWith('+')) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Format',
-        description: 'Please include country code (e.g., +919876543210)',
-      });
-      return;
-    }
-
     setLoading(true);
-    setBillingError(false);
     try {
-      const result = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier.current!);
-      setConfirmationResult(result);
-      setStep('otp');
-      toast({
-        title: 'OTP Sent',
-        description: `We've sent a code to ${phoneNumber}`,
-      });
-    } catch (error: any) {
-      console.error('Phone Sign In Error:', error);
-      if (error.code === 'auth/billing-not-enabled') {
-        setBillingError(true);
+      if (mode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Update Firebase Display Name
+        await updateFirebaseProfile(user, { displayName: name });
+        
+        // Update Local Store Profile
+        const [firstName = '', ...rest] = name.split(' ');
+        updateStoreProfile({
+          firstName,
+          lastName: rest.join(' '),
+          email: user.email || email
+        });
+
         toast({
-          variant: 'destructive',
-          title: 'Billing Required',
-          description: 'Phone authentication requires a billing account to be linked in the Firebase Console.',
+          title: 'Welcome to FynWealth!',
+          description: 'Your account has been created successfully.',
         });
       } else {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Sync display name if not in store
+        if (user.displayName) {
+          const [firstName = '', ...rest] = user.displayName.split(' ');
+          updateStoreProfile({
+            firstName,
+            lastName: rest.join(' '),
+            email: user.email || email
+          });
+        }
+
         toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: error.message || 'Could not send verification code.',
+          title: 'Welcome Back!',
+          description: 'Successfully signed in.',
         });
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!confirmationResult) return;
-
-    setLoading(true);
-    try {
-      await confirmationResult.confirm(otp);
-      toast({
-        title: 'Welcome Back!',
-        description: 'Successfully authenticated.',
-      });
     } catch (error: any) {
-      console.error('OTP Verification Error:', error);
+      console.error('Auth Error:', error);
       toast({
         variant: 'destructive',
-        title: 'Verification Failed',
-        description: 'Invalid OTP code. Please try again.',
+        title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed',
+        description: error.message || 'Could not authenticate. Please check your credentials.',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGuestLogin = async () => {
-    setGuestLoading(true);
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
     try {
-      await signInAnonymously(auth);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (user.displayName) {
+        const [firstName = '', ...rest] = user.displayName.split(' ');
+        updateStoreProfile({
+          firstName,
+          lastName: rest.join(' '),
+          email: user.email || ''
+        });
+      }
+
       toast({
-        title: 'Guest Access Enabled',
-        description: 'Welcome! You can now explore the app.',
+        title: 'Welcome!',
+        description: 'Signed in with Google.',
       });
     } catch (error: any) {
-      console.error('Guest Sign In Error:', error);
+      console.error('Google Sign In Error:', error);
       toast({
         variant: 'destructive',
-        title: 'Guest Login Failed',
-        description: error.message || 'Could not initiate guest session.',
+        title: 'Google Login Failed',
+        description: error.message || 'Could not complete Google sign in.',
       });
     } finally {
-      setGuestLoading(false);
+      setGoogleLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
-      <div id="recaptcha-container" ref={recaptchaRef}></div>
-      
-      <Card className="w-full max-w-md border-none shadow-2xl bg-card/80 backdrop-blur-xl">
-        <CardHeader className="space-y-4 pb-8 text-center">
+      <Card className="w-full max-w-md border-none shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden">
+        <CardHeader className="space-y-4 pb-8 text-center pt-10">
           <div className="flex justify-center mb-2">
             <Logo className="scale-125" />
           </div>
           <CardTitle className="text-2xl font-bold font-headline tracking-tight">
-            {step === 'phone' ? 'Secure Sign In' : 'Verify Identity'}
+            {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
           </CardTitle>
           <CardDescription className="text-sm">
-            {step === 'phone' 
-              ? 'Enter your phone number to access your financial dashboard.' 
-              : `We've sent a 6-digit code to ${phoneNumber}`}
+            {mode === 'signin' 
+              ? 'Manage your wealth with smart tracking and AI insights.' 
+              : 'Join FynWealth to start your journey to financial freedom.'}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {billingError && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Action Required</AlertTitle>
-              <AlertDescription className="text-[10px]">
-                Firebase Phone Auth requires a billing account. Please go to the Firebase Console &gt; Project Settings &gt; Usage &amp; Billing to link a billing account.
-              </AlertDescription>
-            </Alert>
-          )}
+        <CardContent className="px-8 pb-10">
+          <div className="space-y-6">
+            <Button 
+              variant="outline"
+              className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5 rounded-xl shadow-sm"
+              onClick={handleGoogleLogin}
+              disabled={loading || googleLoading}
+            >
+              {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Chrome className="w-4 h-4 mr-2 text-primary" />}
+              Continue with Google
+            </Button>
 
-          {step === 'phone' ? (
-            <div className="space-y-6">
-              <form onSubmit={handleSendOtp} className="space-y-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-muted" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
+                <span className="bg-card px-2 text-muted-foreground">Or with Email</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              {mode === 'signup' && (
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                    Phone Number
+                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                    Full Name
                   </Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                     <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 9876543210"
-                      className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      required
+                      id="name"
+                      type="text"
+                      placeholder="Jane Doe"
+                      className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required={mode === 'signup'}
                     />
                   </div>
-                  <p className="text-[10px] text-muted-foreground ml-1">
-                    Include country code (e.g. +91 for India)
-                  </p>
                 </div>
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
-                  disabled={loading || guestLoading}
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-                  Send Verification Code
-                </Button>
-              </form>
+              )}
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-muted" />
-                </div>
-                <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
-                  <span className="bg-card px-2 text-muted-foreground">Or</span>
-                </div>
-              </div>
-
-              <Button 
-                variant="outline"
-                className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5"
-                onClick={handleGuestLogin}
-                disabled={loading || guestLoading}
-              >
-                {guestLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserCircle className="w-4 h-4 mr-2 text-muted-foreground" />}
-                Continue as Guest
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="otp" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                  Verification Code
+                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                  Email Address
                 </Label>
                 <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                   <Input
-                    id="otp"
-                    type="text"
-                    placeholder="123456"
-                    maxLength={6}
-                    className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary tracking-[0.5em] text-center font-bold"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    id="email"
+                    type="email"
+                    placeholder="jane@example.com"
+                    className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-3">
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
-                  disabled={loading}
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                  Verify & Sign In
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  className="w-full text-xs"
-                  onClick={() => setStep('phone')}
-                >
-                  Change Phone Number
-                </Button>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
+
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl"
+                disabled={loading || googleLoading}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
+                {mode === 'signin' ? 'Sign In' : 'Create Account'}
+              </Button>
             </form>
-          )}
+
+            <div className="text-center">
+              <button 
+                type="button"
+                className="text-xs font-bold text-primary hover:underline transition-all"
+                onClick={() => setStep(mode === 'signin' ? 'signup' : 'signin')}
+              >
+                {mode === 'signin' ? "Don't have an account? Create one" : "Already have an account? Sign in"}
+              </button>
+            </div>
+          </div>
           
           <div className="mt-8 pt-6 border-t border-muted/50 text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-              Trusted by users for smart wealth management
+              Secure Cloud Storage • AES-256 Encryption
             </p>
           </div>
         </CardContent>
