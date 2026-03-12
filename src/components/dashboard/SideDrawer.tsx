@@ -117,14 +117,16 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         status: 'pending'
       });
 
-      // 2. Open Mailto for direct email to admin
+      // 2. Open Mailto using a method that doesn't trigger "refused to connect" 
+      // by ensuring it doesn't try to navigate the current restricted window/iframe.
       const subject = encodeURIComponent("FynWealth Feature Request");
       const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
       const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
       
-      window.location.href = mailtoUrl;
+      // Using window.open with _blank is safer for mailto links in restricted environments
+      window.open(mailtoUrl, '_blank');
 
-      toast({ title: "Request Sent", description: "Your request has been logged and your mail client is opening." });
+      toast({ title: "Request Sent", description: "Your request has been logged and your mail client should open." });
       setFeatureText("");
       setLegalDialog(null);
     } catch (err) {

@@ -115,12 +115,15 @@ export function ProfileDialog() {
         status: 'pending'
       });
 
-      // 2. Prepare Direct Email
+      // 2. Prepare Direct Email with a safer method for opening external handlers
       const subject = encodeURIComponent("FynWealth Feature Request");
       const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
-      window.location.href = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
+      const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
+      
+      // Using window.open with _blank avoids frame-blocking connection errors
+      window.open(mailtoUrl, '_blank');
 
-      toast({ title: "Request Logged", description: "Your feedback was saved and email prepared." });
+      toast({ title: "Request Logged", description: "Your feedback was saved and your mail client should open." });
       setFeatureText("");
       setActiveLegal(null);
     } catch (e) {
