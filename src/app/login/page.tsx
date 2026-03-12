@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -8,7 +7,8 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  updateProfile as updateFirebaseProfile
+  updateProfile as updateFirebaseProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
-import { Loader2, Mail, Lock, User, ArrowRight, Chrome } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ArrowRight, Chrome, ChevronLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -25,7 +25,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [mode, setStep] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -37,10 +37,8 @@ export default function LoginPage() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        // Update Firebase Display Name
         await updateFirebaseProfile(user, { displayName: name });
         
-        // Update Local Store Profile
         const [firstName = '', ...rest] = name.split(' ');
         updateStoreProfile({
           firstName,
@@ -52,11 +50,10 @@ export default function LoginPage() {
           title: 'Welcome to FynWealth!',
           description: 'Your account has been created successfully.',
         });
-      } else {
+      } else if (mode === 'signin') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        // Sync display name if not in store
         if (user.displayName) {
           const [firstName = '', ...rest] = user.displayName.split(' ');
           updateStoreProfile({
@@ -77,6 +74,31 @@ export default function LoginPage() {
         variant: 'destructive',
         title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed',
         description: error.message || 'Could not authenticate. Please check your credentials.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter your email to reset password.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: 'Reset Link Sent',
+        description: `Check your inbox at ${email} for instructions.`,
+      });
+      setMode('signin');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Reset Failed',
+        description: error.message || 'Could not send reset email.',
       });
     } finally {
       setLoading(false);
@@ -123,36 +145,42 @@ export default function LoginPage() {
             <Logo className="scale-125" />
           </div>
           <CardTitle className="text-2xl font-bold font-headline tracking-tight">
-            {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
+            {mode === 'signin' && 'Welcome Back'}
+            {mode === 'signup' && 'Create Account'}
+            {mode === 'reset' && 'Reset Password'}
           </CardTitle>
           <CardDescription className="text-sm">
-            {mode === 'signin' 
-              ? 'Manage your wealth with smart tracking and AI insights.' 
-              : 'Join FynWealth to start your journey to financial freedom.'}
+            {mode === 'signin' && 'Manage your wealth with smart tracking and AI insights.'}
+            {mode === 'signup' && 'Join FynWealth to start your journey to financial freedom.'}
+            {mode === 'reset' && 'We\'ll send a recovery link to your email address.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-10">
           <div className="space-y-6">
-            <Button 
-              variant="outline"
-              className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5 rounded-xl shadow-sm"
-              onClick={handleGoogleLogin}
-              disabled={loading || googleLoading}
-            >
-              {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Chrome className="w-4 h-4 mr-2 text-primary" />}
-              Continue with Google
-            </Button>
+            {mode !== 'reset' && (
+              <>
+                <Button 
+                  variant="outline"
+                  className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5 rounded-xl shadow-sm"
+                  onClick={handleGoogleLogin}
+                  disabled={loading || googleLoading}
+                >
+                  {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Chrome className="w-4 h-4 mr-2 text-primary" />}
+                  Continue with Google
+                </Button>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-muted" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
-                <span className="bg-card px-2 text-muted-foreground">Or with Email</span>
-              </div>
-            </div>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-muted" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
+                    <span className="bg-card px-2 text-muted-foreground">Or with Email</span>
+                  </div>
+                </div>
+              </>
+            )}
 
-            <form onSubmit={handleEmailAuth} className="space-y-4">
+            <form onSubmit={mode === 'reset' ? handleResetPassword : handleEmailAuth} className="space-y-4">
               {mode === 'signup' && (
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
@@ -191,23 +219,36 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
+              {mode !== 'reset' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Password
+                    </Label>
+                    {mode === 'signin' && (
+                      <button 
+                        type="button"
+                        onClick={() => setMode('reset')}
+                        className="text-[10px] font-bold text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required={mode !== 'reset'}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <Button 
                 type="submit" 
@@ -215,18 +256,31 @@ export default function LoginPage() {
                 disabled={loading || googleLoading}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-                {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                {mode === 'signin' && 'Sign In'}
+                {mode === 'signup' && 'Create Account'}
+                {mode === 'reset' && 'Send Reset Link'}
               </Button>
             </form>
 
-            <div className="text-center">
-              <button 
-                type="button"
-                className="text-xs font-bold text-primary hover:underline transition-all"
-                onClick={() => setStep(mode === 'signin' ? 'signup' : 'signin')}
-              >
-                {mode === 'signin' ? "Don't have an account? Create one" : "Already have an account? Sign in"}
-              </button>
+            <div className="text-center space-y-4">
+              {mode === 'reset' ? (
+                <button 
+                  type="button"
+                  className="text-xs font-bold text-muted-foreground hover:text-primary transition-all flex items-center justify-center mx-auto"
+                  onClick={() => setMode('signin')}
+                >
+                  <ChevronLeft className="w-3 h-3 mr-1" />
+                  Back to Sign In
+                </button>
+              ) : (
+                <button 
+                  type="button"
+                  className="text-xs font-bold text-primary hover:underline transition-all"
+                  onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                >
+                  {mode === 'signin' ? "Don't have an account? Create one" : "Already have an account? Sign in"}
+                </button>
+              )}
             </div>
           </div>
           
