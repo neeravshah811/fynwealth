@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useFynWealthStore } from "@/lib/store";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   User, 
   LogOut, 
@@ -43,13 +45,16 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
+import { collection, addDoc } from "firebase/firestore";
 
 export function ProfileDialog() {
   const { profile, updateProfile, clearAllData } = useFynWealthStore();
   const { user } = useUser();
   const auth = useAuth();
+  const db = useFirestore();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeLegal, setActiveLegal] = useState<"terms" | "privacy" | "faq" | null>(null);
+  const [activeLegal, setActiveLegal] = useState<"terms" | "privacy" | "faq" | "feature" | null>(null);
+  const [featureText, setFeatureText] = useState("");
   
   const [formData, setFormData] = useState({
     firstName: profile?.firstName || "",
@@ -96,6 +101,31 @@ export function ProfileDialog() {
       title: "Profile Captured", 
       description: "Your details have been locked and saved successfully." 
     });
+  };
+
+  const submitFeatureRequest = async () => {
+    if (!featureText.trim()) return;
+    
+    try {
+      // 1. Log to Firestore
+      await addDoc(collection(db, 'featureRequests'), {
+        email: displayEmail,
+        request: featureText,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      });
+
+      // 2. Prepare Direct Email
+      const subject = encodeURIComponent("FynWealth Feature Request");
+      const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
+      window.location.href = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
+
+      toast({ title: "Request Logged", description: "Your feedback was saved and email prepared." });
+      setFeatureText("");
+      setActiveLegal(null);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to submit feedback." });
+    }
   };
 
   const handleAction = (label: string) => {
@@ -243,7 +273,7 @@ export function ProfileDialog() {
 
               <div className="space-y-1">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1 mb-2">App Maintenance</h4>
-                <MenuButton icon={Zap} label="Request a Feature" />
+                <MenuButton icon={Zap} label="Request a Feature" onClick={() => setActiveLegal("feature")} />
                 <MenuButton icon={MessageSquare} label="Send Feedback" />
                 <MenuButton icon={LogOut} label="Reset All Data" variant="destructive" onClick={handleResetData} />
               </div>
@@ -288,6 +318,7 @@ export function ProfileDialog() {
               {activeLegal === "terms" && <><FileText className="w-6 h-6 text-primary" /> Terms of Service</>}
               {activeLegal === "privacy" && <><Shield className="w-6 h-6 text-emerald-600" /> Privacy Policy</>}
               {activeLegal === "faq" && <><HelpCircle className="w-6 h-6 text-accent" /> App Help & FAQs</>}
+              {activeLegal === "feature" && <><Zap className="w-6 h-6 text-purple-500" /> Feature Request</>}
             </DialogTitle>
             <DialogDescription className="text-xs font-medium mt-1">
               Last updated: March 2026
@@ -309,18 +340,6 @@ export function ProfileDialog() {
                       <p className="text-sm text-amber-800 dark:text-amber-400 font-semibold leading-normal">FynWealth is a tracking and visualization tool. It does not provide professional financial, investment, or legal advice. AI-generated insights are automated suggestions based on provided data and should be verified independently.</p>
                     </div>
                   </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">3. User Responsibility</h3>
-                    <p>You are responsible for maintaining the confidentiality of your account. You agree to provide accurate financial information for the best experience.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">4. Data Ownership</h3>
-                    <p>You retain full ownership of all data you input. We do not sell your personal financial data to third parties.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">5. Limitation of Liability</h3>
-                    <p>FynWealth shall not be liable for any financial losses resulting from the use of the application or reliance on its AI-generated forecasts.</p>
-                  </section>
                 </>
               )}
 
@@ -328,23 +347,7 @@ export function ProfileDialog() {
                 <>
                   <section>
                     <h3 className="font-bold text-foreground text-lg mb-2">1. Data Collection</h3>
-                    <p>FynWealth collects information you provide directly through your account and your expense records, categories, and descriptions.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">2. Data Usage</h3>
-                    <p>Your data is used solely to provide core app features: tracking expenses, monitoring budget targets, and using AI models to identify spending patterns and forecast heavy spending months.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">3. Data Processing & AI</h3>
-                    <p>FynWealth utilizes Firebase for secure storage and Google GenAI for expense extraction. Data processed by AI is used only for your specific insights and is not used to train global AI models without consent.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">4. Security Measures</h3>
-                    <p>All data is stored in Firebase with industry-standard encryption. Access is restricted via strict Security Rules tied to your authenticated unique account ID.</p>
-                  </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">5. Data Deletion</h3>
-                    <p>You can delete all your data at any time via the "Reset App Data" option. This action is permanent and immediate.</p>
+                    <p>FynWealth collects information you provide directly through your account and your expense records.</p>
                   </section>
                 </>
               )}
@@ -353,27 +356,28 @@ export function ProfileDialog() {
                 <>
                   <div className="space-y-10">
                     <div>
-                      <h3 className="font-bold text-foreground text-lg mb-2">How does the AI scan my bills?</h3>
-                      <p>Our AI identifies the merchant name, total amount, and date from your uploaded photos and populates your expense entry automatically. For best results, ensure the bill is flat and well-lit.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-foreground text-lg mb-2">Is my voice recording stored?</h3>
-                      <p>No. Your voice is transcribed in real-time. Once the extraction is complete, the audio processing is discarded, and only the resulting text data is saved to your history.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-foreground text-lg mb-2">What is "Privacy Mode"?</h3>
-                      <p>Located in the sidebar, Privacy Mode blurs all sensitive financial figures across the dashboard. It's designed for use in public places to keep your balances private.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-foreground text-lg mb-2">How do I manage recurring expenses?</h3>
-                      <p>Mark any expense as "Monthly Recurring" when creating it. You can then use the "Rollover" button on the dashboard to automatically copy these to a new month with one click.</p>
-                    </div>
-                    <div>
                       <h3 className="font-bold text-foreground text-lg mb-2">How secure is my data?</h3>
-                      <p>We use Firebase Authentication and Firestore Security Rules. This means your data is only accessible to you. Not even our system administrators can view your private transaction data.</p>
+                      <p>We use Firebase Authentication and Firestore Security Rules to ensure your data is private.</p>
                     </div>
                   </div>
                 </>
+              )}
+
+              {activeLegal === "feature" && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Feedback</Label>
+                    <Textarea 
+                      placeholder="Describe the improvement..." 
+                      className="min-h-[150px] rounded-xl text-base"
+                      value={featureText}
+                      onChange={(e) => setFeatureText(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={submitFeatureRequest} className="w-full h-12 font-bold rounded-xl shadow-lg">
+                    Submit Feedback
+                  </Button>
+                </div>
               )}
             </div>
           </div>

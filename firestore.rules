@@ -30,6 +30,12 @@ service cloud.firestore {
       }
     }
 
+    // Feature requests - users can submit, admins can manage
+    match /featureRequests/{requestId} {
+      allow create: if isSignedIn();
+      allow read, write: if isAdmin();
+    }
+
     // User-specific data protection
     match /users/{userId} {
       allow get, write: if isSignedIn() && request.auth.uid == userId;

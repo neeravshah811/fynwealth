@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -21,8 +22,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { signOut } from "firebase/auth";
+import { collection, addDoc } from "firebase/firestore";
 import {
   Sheet,
   SheetContent,
@@ -66,6 +68,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
  */
 export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const auth = useAuth();
+  const db = useFirestore();
   const { user } = useUser();
   const { 
     clearAllData, 
@@ -100,11 +103,33 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     window.location.reload();
   };
 
-  const submitFeatureRequest = () => {
+  const submitFeatureRequest = async () => {
     if (!featureText.trim()) return;
-    toast({ title: "Request Received", description: "Thank you! Our team will review your suggestion." });
-    setFeatureText("");
-    setLegalDialog(null);
+    
+    const displayEmail = user?.email || profile?.email || "Anonymous Guest";
+
+    try {
+      // 1. Log to Firestore for admin record
+      await addDoc(collection(db, 'featureRequests'), {
+        email: displayEmail,
+        request: featureText,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      });
+
+      // 2. Open Mailto for direct email to admin
+      const subject = encodeURIComponent("FynWealth Feature Request");
+      const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
+      const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
+      
+      window.location.href = mailtoUrl;
+
+      toast({ title: "Request Sent", description: "Your request has been logged and your mail client is opening." });
+      setFeatureText("");
+      setLegalDialog(null);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Submission Failed", description: "Could not log request. Please try again." });
+    }
   };
 
   const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(viewYear, viewMonth));
