@@ -22,17 +22,27 @@ import {
   CalendarDays,
   Upload,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  HelpCircle,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
+import { TutorialDialog } from "@/components/TutorialDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 const REMINDER_FREQUENCIES: Frequency[] = ['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Half-yearly', 'Annually'];
 
 export default function BillsPage() {
-  const { bills, addBill, deleteBill, markBillPaid, currency, customCategories } = useFynWealthStore();
+  const { bills, addBill, deleteBill, markBillPaid, currency, customCategories, viewMonth, viewYear, setViewDate } = useFynWealthStore();
   const [showForm, setShowForm] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [billDoc, setBillDoc] = useState<{ data: string; type: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -63,6 +73,12 @@ export default function BillsPage() {
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setViewDate(date.getMonth(), date.getFullYear());
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,18 +121,59 @@ export default function BillsPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24">
+      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-headline mb-2 text-primary tracking-tight">Custom Reminders</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Manage your upcoming payments and subscriptions in one place.</p>
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
+          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
-        <Button 
-          onClick={() => setShowForm(!showForm)} 
-          className="rounded-xl h-12 md:h-14 px-8 shadow-lg shadow-primary/20 text-sm md:text-base font-bold transition-all"
-        >
-          {showForm ? <X className="w-5 h-5 mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
-          {showForm ? "Cancel" : "Add New Reminder"}
-        </Button>
+        
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+              onClick={() => setShowTutorial(true)}
+              title="Show Tutorial"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+                  title="Select Date"
+                >
+                  <CalendarIcon className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
+                <Calendar
+                  mode="single"
+                  selected={new Date(viewYear, viewMonth)}
+                  onSelect={handleCalendarSelect}
+                  initialFocus
+                  captionLayout="dropdown"
+                  fromYear={2020}
+                  toYear={2035}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <Button 
+            onClick={() => setShowForm(!showForm)} 
+            className="rounded-xl h-11 md:h-12 px-6 shadow-lg shadow-primary/20 text-sm font-bold transition-all"
+          >
+            {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            {showForm ? "Cancel" : "New Reminder"}
+          </Button>
+        </div>
       </div>
 
       {showForm && (

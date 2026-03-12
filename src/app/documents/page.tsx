@@ -20,7 +20,9 @@ import {
   ChevronRight,
   MoreVertical,
   ArrowRightLeft,
-  X
+  X,
+  HelpCircle,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -41,12 +43,20 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { TutorialDialog } from "@/components/TutorialDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 
 export default function DocumentsPage() {
-  const { expenses, currency, deleteExpense, folders, addFolder, deleteFolder, moveExpenseToFolder } = useFynWealthStore();
+  const { expenses, currency, deleteExpense, folders, addFolder, deleteFolder, moveExpenseToFolder, viewMonth, viewYear, setViewDate } = useFynWealthStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<{ data: string; type: string } | null>(null);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
@@ -55,17 +65,20 @@ export default function DocumentsPage() {
   const filteredExpenses = useMemo(() => {
     return expenses
       .filter(e => e.billImageData || e.invoiceUrl)
+      .filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+      })
       .filter(e => 
         e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
         e.category.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      // Fix: Normalize undefined/null folderId to null for reliable comparison at Root level
       .filter(e => (e.folderId ?? null) === currentFolderId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, searchTerm, currentFolderId]);
+  }, [expenses, searchTerm, currentFolderId, viewMonth, viewYear]);
 
   const rootFolders = useMemo(() => {
-    if (currentFolderId) return []; // Don't show folders inside folders for now
+    if (currentFolderId) return []; 
     return folders.filter(f => 
       f.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -78,6 +91,12 @@ export default function DocumentsPage() {
   const getDocType = (dataUri: string) => {
     if (dataUri.startsWith('data:application/pdf')) return 'pdf';
     return 'image';
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setViewDate(date.getMonth(), date.getFullYear());
+    }
   };
 
   const handleCreateFolder = () => {
@@ -95,56 +114,100 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto pb-24 px-1">
+      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-headline mb-2 text-primary">Document Safe</h1>
-          <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground font-medium">
+          <h1 className="text-2xl md:text-3xl font-bold font-headline mb-1 text-primary">Document Safe</h1>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-wider">
             <button onClick={() => setCurrentFolderId(null)} className="hover:text-primary transition-colors">Root</button>
             {activeFolder && (
               <>
                 <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-foreground font-bold">{activeFolder.name}</span>
+                <span className="text-foreground">{activeFolder.name}</span>
               </>
             )}
+            <span className="mx-2 text-muted-foreground/30">•</span>
+            <span>{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</span>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search safe..." 
-              className="pl-9 h-11 rounded-xl bg-card border-none shadow-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+              onClick={() => setShowTutorial(true)}
+              title="Show Tutorial"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+                  title="Select Date"
+                >
+                  <CalendarIcon className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
+                <CalendarPicker
+                  mode="single"
+                  selected={new Date(viewYear, viewMonth)}
+                  onSelect={handleCalendarSelect}
+                  initialFocus
+                  captionLayout="dropdown"
+                  fromYear={2020}
+                  toYear={2035}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
+
           <Button 
             onClick={() => setIsFolderDialogOpen(true)}
             className="h-11 rounded-xl font-bold shadow-lg shadow-primary/10"
           >
-            <FolderPlus className="w-5 h-5 mr-2" />
+            <FolderPlus className="w-4 h-4 mr-2" />
             New Folder
           </Button>
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search safe by description or category..." 
+            className="pl-9 h-12 rounded-xl bg-card border-none shadow-sm font-medium"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <div className="space-y-10">
-        {/* Folders Section (Only in Root or if searching) */}
+        {/* Folders Section */}
         {rootFolders.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <FolderIcon className="w-4 h-4 text-primary" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Folders</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Storage Folders</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {rootFolders.map((folder) => (
                 <Card 
                   key={folder.id} 
-                  className="group border-none bg-card hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer shadow-sm relative"
+                  className="group border-none bg-card hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer shadow-sm relative ring-1 ring-black/5"
                   onClick={() => setCurrentFolderId(folder.id)}
                 >
                   <CardContent className="p-4 flex flex-col items-center text-center gap-3">
-                    <div className="p-4 rounded-2xl bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <div className="p-4 rounded-2xl bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shadow-inner">
                       <FolderIcon className="w-8 h-8 fill-current" />
                     </div>
                     <span className="text-xs font-bold truncate w-full px-1">{folder.name}</span>
@@ -177,19 +240,19 @@ export default function DocumentsPage() {
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                {activeFolder ? 'Files in Folder' : 'Recent Documents'}
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {activeFolder ? `Files in ${activeFolder.name}` : 'Recent Vault Documents'}
               </h2>
             </div>
-            <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px] font-bold">
-              {filteredExpenses.length} Items
+            <Badge variant="secondary" className="bg-primary/5 text-primary text-[10px] font-bold px-3 py-1">
+              {filteredExpenses.length} Items Found
             </Badge>
           </div>
 
           {filteredExpenses.length === 0 && rootFolders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 bg-muted/10 rounded-3xl border-2 border-dashed border-muted">
               <Files className="w-16 h-16 text-muted-foreground opacity-20 mb-4" />
-              <p className="text-sm font-medium text-muted-foreground">No documents found here.</p>
+              <p className="text-sm font-bold text-muted-foreground italic">No matching documents in this view.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -223,9 +286,9 @@ export default function DocumentsPage() {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Button variant="secondary" size="sm" className="rounded-full shadow-lg">
+                        <Button variant="secondary" size="sm" className="rounded-full shadow-lg font-bold">
                           <Eye className="w-4 h-4 mr-2" />
-                          View Full
+                          Full View
                         </Button>
                       </div>
                     </div>
@@ -234,7 +297,7 @@ export default function DocumentsPage() {
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-sm truncate leading-tight" title={expense.description}>{expense.description}</h4>
                           <div className="flex items-center gap-1.5 mt-1.5">
-                            <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0 h-5 border-none">
+                            <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0 h-5 border-none font-bold uppercase">
                               {expense.category}
                             </Badge>
                             {isPdf && (
@@ -266,10 +329,10 @@ export default function DocumentsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start" className="w-48 rounded-xl">
-                            <DropdownMenuLabel className="text-[10px] font-bold uppercase text-muted-foreground">Select Folder</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-[10px] font-bold uppercase text-muted-foreground">Move to Folder</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => moveExpenseToFolder(expense.id, null)} className="text-xs font-medium">
-                              <FolderIcon className="w-3.5 h-3.5 mr-2 opacity-50" /> Root / Safe
+                              <FolderIcon className="w-3.5 h-3.5 mr-2 opacity-50" /> Main Safe
                             </DropdownMenuItem>
                             {folders.filter(f => f.id !== expense.folderId).map(folder => (
                               <DropdownMenuItem key={folder.id} onClick={() => moveExpenseToFolder(expense.id, folder.id)} className="text-xs font-medium">
@@ -283,6 +346,7 @@ export default function DocumentsPage() {
                           variant="outline" 
                           size="icon" 
                           className="h-9 w-9 rounded-lg border-primary/20 text-primary"
+                          title="Download"
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = docUri;
@@ -312,31 +376,31 @@ export default function DocumentsPage() {
 
       {/* New Folder Dialog */}
       <Dialog open={isFolderDialogOpen} onOpenChange={setIsFolderDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-2xl">
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Folder</DialogTitle>
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Create Folder</DialogTitle>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">Folder Name</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Folder Name</label>
               <Input 
-                placeholder="e.g. Travel Receipts" 
+                placeholder="e.g. Travel Receipts 2026" 
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                className="h-12 rounded-xl text-sm md:text-base font-bold shadow-sm"
+                className="h-12 rounded-xl text-sm font-bold shadow-sm"
                 autoFocus
               />
             </div>
           </div>
           <DialogFooter>
-            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleCreateFolder}>Create Folder</Button>
+            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleCreateFolder}>Create Now</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Document Preview Dialog */}
       <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
-        <DialogContent className="max-w-4xl h-[85vh] p-0 overflow-hidden bg-background flex flex-col rounded-2xl border-none shadow-2xl">
+        <DialogContent className="max-w-4xl h-[85vh] p-0 overflow-hidden bg-background flex flex-col rounded-3xl border-none shadow-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Document Preview</DialogTitle>
           </DialogHeader>
