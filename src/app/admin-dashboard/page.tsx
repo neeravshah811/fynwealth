@@ -1,8 +1,10 @@
+
 'use client';
 
 import { useFirestore, useUser } from '@/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Users, 
@@ -15,10 +17,18 @@ import {
   TrendingUp,
   Globe
 } from 'lucide-react';
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { cn } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+
+// Lazy load Recharts for better performance
+const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
 
 export default function AdminDashboardPage() {
   const db = useFirestore();
@@ -36,7 +46,6 @@ export default function AdminDashboardPage() {
         if (snapshot.exists()) {
           setStats(snapshot.data());
         } else {
-          // Initialize with 0s if doc doesn't exist
           setStats({
             totalUsers: 0,
             totalExpenses: 0,

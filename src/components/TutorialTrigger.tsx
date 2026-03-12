@@ -20,10 +20,10 @@ export function TutorialTrigger() {
 
   useEffect(() => {
     if (mounted && !hasSeenTutorial) {
-      // Delay slightly to appear after the splash screen (2s)
+      // Delay reduced to 1s to match faster splash screen
       const timer = setTimeout(() => {
         setIsOpen(true);
-      }, 2500);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [hasSeenTutorial, mounted]);
