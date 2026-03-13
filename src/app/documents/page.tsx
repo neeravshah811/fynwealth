@@ -18,7 +18,7 @@ import {
   FolderPlus,
   Folder as FolderIcon,
   ChevronRight,
-  MoreVertical,
+  MoreHorizontal,
   ArrowRightLeft,
   X,
   HelpCircle,
@@ -215,7 +215,7 @@ export default function DocumentsPage() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <button className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-muted transition-all">
-                          <MoreVertical className="w-3.5 h-3.5" />
+                          <MoreHorizontal className="w-4 h-4" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl">

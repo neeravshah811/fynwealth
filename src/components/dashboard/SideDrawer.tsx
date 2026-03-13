@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -18,7 +17,7 @@ import {
   Zap,
   MessageSquare,
   AlertCircle,
-  MoreVertical
+  MoreHorizontal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
@@ -109,7 +108,6 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     const displayEmail = user?.email || profile?.email || "Anonymous Guest";
 
     try {
-      // 1. Log to Firestore for admin record
       await addDoc(collection(db, 'featureRequests'), {
         email: displayEmail,
         request: featureText,
@@ -117,13 +115,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         status: 'pending'
       });
 
-      // 2. Open Mailto using a method that doesn't trigger "refused to connect" 
-      // by ensuring it doesn't try to navigate the current restricted window/iframe.
       const subject = encodeURIComponent("FynWealth Feature Request");
       const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
       const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
       
-      // Using window.open with _blank is safer for mailto links in restricted environments
       window.open(mailtoUrl, '_blank');
 
       toast({ title: "Request Sent", description: "Your request has been logged and your mail client should open." });
@@ -153,10 +148,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         <button className={cn(
           "rounded-lg flex items-center justify-center transition-colors shadow-sm",
           standalone 
-            ? "w-9 h-9 text-muted-foreground hover:text-primary hover:bg-primary/5" 
-            : "w-10 h-10 bg-primary/10 text-primary hover:bg-primary/20"
+            ? "w-12 h-10 text-muted-foreground hover:text-primary hover:bg-primary/5" 
+            : "w-12 h-10 bg-primary/10 text-primary hover:bg-primary/20"
         )}>
-          <MoreVertical className={standalone ? "w-5 h-5" : "w-6 h-6"} />
+          <MoreHorizontal className="w-6 h-6" />
         </button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[320px] p-0 border-r-none flex flex-col">
@@ -387,7 +382,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
             {legalDialog === "privacy" && (
               <>
                 <section>
-                  <h3 className="font-bold text-foreground text-lg mb-2">1. Data Storage</h3>
+                  <h3 className="font-bold text-foreground text-lg mb-2">1. Data Collection</h3>
                   <p>FynWealth utilizes Firebase for secure storage. Your data is encrypted and tied to your account.</p>
                 </section>
               </>
