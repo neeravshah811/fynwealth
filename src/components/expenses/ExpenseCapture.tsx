@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -23,7 +24,8 @@ import {
   Tag,
   Paperclip,
   FileText,
-  X
+  X,
+  ShieldCheck
 } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
@@ -41,7 +43,6 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Required state structure for dynamic taxonomy
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -55,7 +56,14 @@ export function ExpenseCapture() {
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
-  // Load categories on mount
+  // Warranty specialized states
+  const [warrantyData, setWarrantyData] = useState({
+    productName: "",
+    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+    expiryDate: format(new Date(new Date().getFullYear() + 1, new Date().getMonth(), new Date().getDate()), 'yyyy-MM-dd'),
+    contact: ""
+  });
+
   useEffect(() => {
     async function loadCategories() {
       if (!db) return;
@@ -69,7 +77,6 @@ export function ExpenseCapture() {
     loadCategories();
   }, [db]);
 
-  // Load subcategories when category changes
   async function loadSubcategories(categoryId: string) {
     if (!db || !categoryId) {
       setSubcategories([]);
@@ -96,6 +103,8 @@ export function ExpenseCapture() {
     loadSubcategories(categoryId);
   };
 
+  const isWarrantyCategory = categories.find(c => c.id === selectedCategory)?.name === "Warranties";
+
   const resetForm = () => {
     setAmount("");
     setNote("");
@@ -107,6 +116,12 @@ export function ExpenseCapture() {
     setFrequency('Monthly');
     setAttachmentData(null);
     setAttachmentName(null);
+    setWarrantyData({
+      productName: "",
+      purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+      expiryDate: format(new Date(new Date().getFullYear() + 1, new Date().getMonth(), new Date().getDate()), 'yyyy-MM-dd'),
+      contact: ""
+    });
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -128,7 +143,7 @@ export function ExpenseCapture() {
       const categoryObj = categories.find(c => c.id === selectedCategory);
       const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
 
-      const payload = {
+      const payload: any = {
         userId: user.uid,
         amount: Math.abs(parseFloat(amount)),
         categoryId: selectedCategory,
@@ -137,15 +152,40 @@ export function ExpenseCapture() {
         subcategoryName: subcategoryObj?.name || "Unknown",
         note: note.trim() || "No note provided",
         date: date,
-        billImageData: attachmentData, // Store as part of the expense for the vault
+        billImageData: attachmentData,
         createdAt: serverTimestamp()
       };
+
+      if (isWarrantyCategory) {
+        payload.productName = warrantyData.productName;
+        payload.purchaseDate = warrantyData.purchaseDate;
+        payload.warrantyExpiryDate = warrantyData.expiryDate;
+        payload.serviceCentreContact = warrantyData.contact;
+
+        // Auto-create reminder for warranty expiry
+        await addDoc(collection(db, 'users', user.uid, 'bills'), {
+          name: `Warranty Expiry: ${warrantyData.productName}`,
+          amount: 0,
+          dueDate: warrantyData.expiryDate,
+          dueTime: '09:00',
+          frequency: 'One-time',
+          categoryId: selectedCategory,
+          categoryName: 'Warranties',
+          subcategoryId: selectedSubcategory,
+          subcategoryName: subcategoryObj?.name || "Unknown",
+          userId: user.uid,
+          status: 'pending',
+          notified: false,
+          createdAt: serverTimestamp(),
+          note: `Warranty reminder for ${warrantyData.productName}. Contact: ${warrantyData.contact}`
+        });
+      }
 
       await addDoc(collection(db, 'users', user.uid, 'expenses'), payload);
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Expense Added", description: "Your expense has been saved to your cloud vault." });
+      toast({ title: "Expense Added", description: isWarrantyCategory ? "Warranty recorded and reminder scheduled." : "Expense saved to cloud vault." });
       resetForm();
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not sync with cloud." });
@@ -322,6 +362,60 @@ export function ExpenseCapture() {
                   </Select>
                 </div>
               </div>
+
+              {isWarrantyCategory && (
+                <div className="p-5 bg-primary/5 rounded-2xl border border-primary/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Warranty Details</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold uppercase opacity-70">Product Name</Label>
+                      <Input 
+                        placeholder="e.g. MacBook Pro" 
+                        value={warrantyData.productName} 
+                        onChange={(e) => setWarrantyData({...warrantyData, productName: e.target.value})}
+                        className="h-10 bg-background"
+                        required={isWarrantyCategory}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-[9px] font-bold uppercase opacity-70">Purchase Date</Label>
+                        <Input 
+                          type="date" 
+                          value={warrantyData.purchaseDate} 
+                          onChange={(e) => setWarrantyData({...warrantyData, purchaseDate: e.target.value})}
+                          className="h-10 bg-background text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[9px] font-bold uppercase opacity-70">Expiry Date</Label>
+                        <Input 
+                          type="date" 
+                          value={warrantyData.expiryDate} 
+                          onChange={(e) => setWarrantyData({...warrantyData, expiryDate: e.target.value})}
+                          className="h-10 bg-background text-xs"
+                          required={isWarrantyCategory}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold uppercase opacity-70">Service Centre Contact</Label>
+                      <Input 
+                        placeholder="Email or Phone Number" 
+                        value={warrantyData.contact} 
+                        onChange={(e) => setWarrantyData({...warrantyData, contact: e.target.value})}
+                        className="h-10 bg-background"
+                      />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground italic">
+                      A reminder will be automatically set for {format(new Date(warrantyData.expiryDate), 'MMM dd, yyyy')}.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Note</Label>

@@ -41,7 +41,12 @@
         "subcategoryId": { "type": "string" },
         "subcategoryName": { "type": "string" },
         "date": { "type": "string", "format": "date", "description": "Transaction date in YYYY-MM-DD format." },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "billImageData": { "type": "string", "description": "Base64 encoded image or PDF data." },
+        "productName": { "type": "string" },
+        "purchaseDate": { "type": "string", "format": "date" },
+        "warrantyExpiryDate": { "type": "string", "format": "date" },
+        "serviceCentreContact": { "type": "string" }
       },
       "required": ["userId", "amount", "categoryId", "categoryName", "subcategoryId", "subcategoryName", "date"]
     },

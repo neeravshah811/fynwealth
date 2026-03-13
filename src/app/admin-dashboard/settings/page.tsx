@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirestore, useUser } from '@/firebase';
@@ -181,7 +182,7 @@ export default function AdminSettingsPage() {
       
       await batch.commit();
       await fetchData();
-      toast({ title: "Taxonomy Seeded", description: "13 categories and their subcategories added." });
+      toast({ title: "Taxonomy Seeded", description: `${Object.keys(SYSTEM_CATEGORIES).length} categories and their subcategories added.` });
     } catch (err) {
       toast({ variant: "destructive", title: "Seeding Failed" });
     } finally {
