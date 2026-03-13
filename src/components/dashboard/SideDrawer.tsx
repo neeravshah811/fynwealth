@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
 import { useAuth, useUser, useFirestore } from "@/firebase";
 import { signOut } from "firebase/auth";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
 import {
   Sheet,
   SheetContent,
@@ -61,6 +61,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 /**
  * SideDrawer manages the sliding dashboard content.
@@ -72,7 +73,6 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const { user } = useUser();
   const { 
     clearAllData, 
-    clearMonthlyExpenses, 
     privacyMode, 
     togglePrivacyMode, 
     profile, 
@@ -99,8 +99,36 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const handleClearAllData = () => {
     clearAllData();
     setIsOpen(false);
-    toast({ title: "System Reset", description: "All data cleared successfully." });
+    toast({ title: "System Reset", description: "All local preferences cleared successfully." });
     window.location.reload();
+  };
+
+  const handleClearMonthlyData = async () => {
+    if (!db || !user?.uid) return;
+    
+    try {
+      const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+      const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+      
+      const q = query(
+        collection(db, 'users', user.uid, 'expenses'),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate)
+      );
+      
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      setIsOpen(false);
+      toast({ title: "Data Cleared", description: `Successfully removed all records for ${monthName}.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to clear cloud data. Please check permissions." });
+    }
   };
 
   const submitFeatureRequest = async () => {
@@ -245,12 +273,12 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-base md:text-lg">Clear {monthName} Data?</AlertDialogTitle>
                     <AlertDialogDescription className="text-sm">
-                      This removes all expenses recorded for this specific month.
+                      This removes all expenses recorded for this specific month from your cloud vault.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel className="text-sm h-10">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { clearMonthlyExpenses(); setIsOpen(false); }} className="bg-amber-600 text-sm h-10">
+                    <AlertDialogAction onClick={handleClearMonthlyData} className="bg-amber-600 text-sm h-10">
                       Clear Data
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -271,7 +299,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-base md:text-lg">Permanent Reset?</AlertDialogTitle>
                     <AlertDialogDescription className="text-sm">
-                      This deletes everything. This cannot be undone.
+                      This resets your local preferences and UI state. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

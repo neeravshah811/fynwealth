@@ -40,7 +40,7 @@
         "categoryName": { "type": "string" },
         "subcategoryId": { "type": "string" },
         "subcategoryName": { "type": "string" },
-        "date": { "type": "object", "description": "Firestore Timestamp object." },
+        "date": { "type": "string", "format": "date", "description": "Transaction date in YYYY-MM-DD format." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "amount", "categoryId", "categoryName", "subcategoryId", "subcategoryName", "date"]

@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -137,7 +137,7 @@ export function ExpenseCapture() {
         subcategoryId: selectedSubcategory,
         subcategoryName: subcategoryObj?.name || "Unknown",
         note: note.trim() || "No note provided",
-        date: Timestamp.fromDate(new Date(date)),
+        date: date, // Using string 'yyyy-MM-dd' for easier range queries
         createdAt: serverTimestamp()
       };
 
@@ -145,10 +145,10 @@ export function ExpenseCapture() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Expense Added", description: "Your expense has been saved." });
+      toast({ title: "Expense Added", description: "Your expense has been saved to your cloud vault." });
       resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not save expense to Firestore." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not sync with cloud. Please check connection." });
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export function ExpenseCapture() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable mic access." });
+      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable microphone access in your browser settings." });
     }
   };
 
@@ -205,14 +205,15 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result && user?.uid) {
-          toast({ title: "Voice Capture", description: "Please verify details in the manual form." });
+          toast({ title: "Voice Capture", description: "Review the extracted details and click 'Add Expense'." });
           setAmount(result.amount.toString());
           setNote(result.description);
+          if (result.date) setDate(result.date);
         }
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
-      toast({ variant: "destructive", title: "Processing Error", description: "AI failed to transcribe." });
+      toast({ variant: "destructive", title: "AI Processing Failed", description: "Could not transcribe audio. Please try again or type manually." });
     } finally {
       setLoading(false);
     }
@@ -230,12 +231,12 @@ export function ExpenseCapture() {
         if (result.totalAmount) {
           setAmount(Math.abs(result.totalAmount).toString());
           setNote(result.merchantName || "");
-          toast({ title: "Bill Scanned", description: "Extracted details populated below." });
+          toast({ title: "Bill Scanned", description: "Successfully extracted amount and merchant details." });
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "destructive", title: "Scan Error", description: "AI failed to read bill." });
+      toast({ variant: "destructive", title: "Scan Failed", description: "AI could not read the receipt clearly. Please ensure good lighting." });
     } finally {
       setLoading(false);
     }
