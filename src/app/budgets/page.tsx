@@ -26,7 +26,8 @@ import {
   PieChart, 
   Calendar as CalendarIcon, 
   Loader2,
-  HelpCircle
+  HelpCircle,
+  Tag
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
