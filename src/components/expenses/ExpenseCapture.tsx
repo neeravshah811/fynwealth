@@ -208,6 +208,7 @@ export function ExpenseCapture() {
         description: finalNote,
         date: date,
         billImageData: attachmentData,
+        status: 'paid',
         createdAt: serverTimestamp()
       };
 
@@ -225,10 +226,8 @@ export function ExpenseCapture() {
           frequency: 'One-time',
           categoryId: selectedCategory,
           categoryName: 'Warranties',
-          category: 'Warranties',
           subcategoryId: selectedSubcategory,
           subcategoryName: subcategoryObj?.name || "Unknown",
-          subCategory: subcategoryObj?.name || "Unknown",
           userId: user.uid,
           status: 'pending',
           notified: false,
@@ -367,7 +366,7 @@ export function ExpenseCapture() {
                       value={amount} 
                       onChange={(e) => setAmount(e.target.value)} 
                       required 
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm font-bold shadow-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm font-bold shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -413,7 +412,7 @@ export function ExpenseCapture() {
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                   <Select 
-                    key={`sub-${selectedCategory}`}
+                    key={`sub-exp-${selectedCategory}`}
                     value={selectedSubcategory} 
                     onValueChange={setSelectedSubcategory}
                     disabled={!selectedCategory || isSubLoading}
@@ -616,7 +615,6 @@ export function ExpenseCapture() {
         </Tabs>
       </CardContent>
 
-      {/* New Category Dialog */}
       <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
         <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
           <DialogHeader>

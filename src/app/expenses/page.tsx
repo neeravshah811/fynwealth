@@ -46,7 +46,6 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Firestore Expenses Query - Filters by current view date
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -118,7 +117,7 @@ export default function ExpensesPage() {
       e.categoryName || e.category,
       e.subcategoryName || e.subCategory || "Others",
       e.amount,
-      e.status
+      e.status || 'paid'
     ]);
 
     const csvContent = [
@@ -184,7 +183,7 @@ export default function ExpensesPage() {
               subcategoryName: sub || "Others",
               subCategory: sub || "Others",
               amount: parsedAmount,
-              status: (status?.toLowerCase() === 'paid' ? 'paid' : 'unpaid') as 'paid' | 'unpaid',
+              status: (status?.toLowerCase() === 'unpaid' ? 'unpaid' : 'paid') as 'paid' | 'unpaid',
               createdAt: serverTimestamp()
             });
             successCount++;
@@ -322,10 +321,10 @@ export default function ExpensesPage() {
                           <button 
                             onClick={() => handleToggleStatus(expense.id, expense.status)}
                             className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-colors ${
-                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
+                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
                             }`}
                           >
-                            {(expense.status || 'unpaid').toUpperCase()}
+                            {(expense.status || 'paid').toUpperCase()}
                           </button>
                         </TableCell>
                         <TableCell className="text-xs font-medium">{format(new Date(expense.date), 'MMM dd')}</TableCell>

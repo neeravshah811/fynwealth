@@ -20,13 +20,11 @@ export function OverviewCards() {
     setMounted(true);
   }, []);
 
-  // Firestore Budgets Query
   const budgetsQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return collection(db, 'users', user.uid, 'budgets');
   }, [db, user?.uid]);
 
-  // Firestore Expenses Query - for current month totals
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -53,14 +51,14 @@ export function OverviewCards() {
   }
 
   const paidSpend = (expenses || [])
-    .filter(e => e.status === 'paid')
-    .reduce((sum, e) => sum + e.amount, 0);
+    .filter(e => e.status === 'paid' || !e.status)
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const pendingBills = (expenses || [])
     .filter(e => e.status === 'unpaid')
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  const totalBudgetAmount = (budgets || []).reduce((sum, b) => sum + (b.limit || 0), 0);
+  const totalBudgetAmount = (budgets || []).reduce((sum, b) => sum + (Number(b.limit) || 0), 0);
   const totalBalance = totalBudgetAmount - (paidSpend + pendingBills);
 
   const formatAmount = (amount: number) => {

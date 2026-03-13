@@ -406,7 +406,6 @@ export default function BillsPage() {
         </Card>
       )}
 
-      {/* New Category Dialog */}
       <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
         <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
           <DialogHeader>

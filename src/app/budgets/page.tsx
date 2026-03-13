@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -50,7 +51,6 @@ export default function BudgetsPage() {
   const [mounted, setMounted] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
 
-  // Load system categories from Firestore
   useEffect(() => {
     async function loadCategories() {
       if (!firestore) return;
@@ -64,7 +64,6 @@ export default function BudgetsPage() {
     loadCategories();
   }, [firestore]);
 
-  // Firestore Budgets Query
   const budgetsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return collection(firestore, 'users', user.uid, 'budgets');
@@ -72,7 +71,6 @@ export default function BudgetsPage() {
 
   const { data: budgetsData, isLoading: budgetsLoading } = useCollection(budgetsQuery);
 
-  // Firestore Expenses Query - Filters by current view date
   const expensesQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -92,10 +90,10 @@ export default function BudgetsPage() {
     setMounted(true);
   }, []);
 
-  const getMonthlySpendByCategory = (categoryId: string) => {
+  const getMonthlySpendByCategory = (categoryId: string, categoryName: string) => {
     return expenses
-      .filter(e => e.categoryId === categoryId)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .filter(e => e.categoryId === categoryId || e.categoryName === categoryName || e.category === categoryName)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   };
 
   const formatAmount = (amount: number, decimals: number = 2) => {
@@ -154,8 +152,8 @@ export default function BudgetsPage() {
     }
   };
 
-  const totalSpent = categories.reduce((sum, cat) => sum + getMonthlySpendByCategory(cat.id), 0);
-  const totalBudget = budgetsData?.reduce((sum, b) => sum + (b.limit || 0), 0) || 0;
+  const totalSpent = categories.reduce((sum, cat) => sum + getMonthlySpendByCategory(cat.id, cat.name), 0);
+  const totalBudget = budgetsData?.reduce((sum, b) => sum + (Number(b.limit) || 0), 0) || 0;
   const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
 
   if (!mounted || budgetsLoading || expensesLoading) {
@@ -286,8 +284,8 @@ export default function BudgetsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {categories.map((cat) => {
           const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
-          const limit = budgetDoc?.limit || 0;
-          const spent = getMonthlySpendByCategory(cat.id);
+          const limit = Number(budgetDoc?.limit) || 0;
+          const spent = getMonthlySpendByCategory(cat.id, cat.name);
           const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
           const isOver = limit > 0 && spent > limit;
           
