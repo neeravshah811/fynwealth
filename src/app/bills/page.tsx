@@ -96,7 +96,7 @@ export default function BillsPage() {
         category: 'Miscellaneous',
       });
       setShowForm(false);
-      toast({ title: "Reminder Set", description: "Saved to cloud vault." });
+      toast({ title: "Reminder Set", description: "Saved to your vault." });
     } catch (err) {
       toast({ variant: "destructive", title: "Error", description: "Could not sync bill." });
     } finally {
@@ -107,7 +107,7 @@ export default function BillsPage() {
   const handleMarkPaid = async (id: string) => {
     if (!db || !user?.uid) return;
     await updateDoc(doc(db, 'users', user.uid, 'bills', id), { status: 'paid' });
-    toast({ title: "Settled", description: "Bill marked as paid across devices." });
+    toast({ title: "Settled", description: "Bill marked as paid." });
   };
 
   const handleDelete = async (id: string) => {
@@ -124,7 +124,7 @@ export default function BillsPage() {
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Cloud Reminders</h1>
+          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
           <p className="text-xs text-muted-foreground font-bold uppercase">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
@@ -187,7 +187,7 @@ export default function BillsPage() {
                 </div>
               </div>
               <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Cloud Reminder"}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Custom Reminder"}
               </Button>
             </form>
           </CardContent>

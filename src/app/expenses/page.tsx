@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
@@ -91,14 +90,14 @@ export default function ExpensesPage() {
         amount: Math.abs(parseFloat(editingExpense.amount))
       });
       setEditingExpense(null);
-      toast({ title: "Updated", description: "Cloud record synchronized." });
+      toast({ title: "Updated", description: "Record synchronized." });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!db || !user?.uid) return;
     await deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
-    toast({ title: "Deleted", description: "Record removed from cloud." });
+    toast({ title: "Deleted", description: "Record removed." });
   };
 
   const formatAmount = (amount: number) => {
@@ -123,7 +122,7 @@ export default function ExpensesPage() {
           <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5 bg-card">
             <CardHeader className="pb-6 bg-muted/20">
               <div className="flex flex-col gap-6">
-                <CardTitle className="text-base md:text-lg font-headline font-bold">Cloud Transaction History</CardTitle>
+                <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
                 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   <div className="md:col-span-5 relative">
@@ -214,7 +213,7 @@ export default function ExpensesPage() {
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete Record?</AlertDialogTitle>
-                                  <AlertDialogDescription>This will permanently remove the record from your cloud profile.</AlertDialogDescription>
+                                  <AlertDialogDescription>This will permanently remove the record from your vault.</AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
