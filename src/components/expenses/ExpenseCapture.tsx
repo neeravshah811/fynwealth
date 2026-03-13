@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -205,8 +205,6 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result && user?.uid) {
-          // Note: Voice processing might need to map AI labels to DB IDs
-          // For simplicity, we stick to the required manual form logic for manual entries.
           toast({ title: "Voice Capture", description: "Please verify details in the manual form." });
           setAmount(result.amount.toString());
           setNote(result.description);
