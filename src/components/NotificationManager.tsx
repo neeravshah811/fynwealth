@@ -59,11 +59,14 @@ export function NotificationManager() {
   };
 
   useEffect(() => {
-    if (!bills || bills.length === 0) return;
+    if (!bills || !Array.isArray(bills) || bills.length === 0) return;
 
     const checkReminders = () => {
       const now = new Date();
       
+      // Secondary safety check for array integrity
+      if (!bills || !Array.isArray(bills)) return;
+
       bills.forEach((bill) => {
         if (!bill.notified) {
           try {

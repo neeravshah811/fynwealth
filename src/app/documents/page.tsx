@@ -1,7 +1,8 @@
-
 "use client";
 
-import { useFynWealthStore, Folder, Expense } from "@/lib/store";
+import { useFynWealthStore } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, where, deleteDoc, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,8 @@ import {
   ArrowRightLeft,
   X,
   HelpCircle,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -52,7 +54,10 @@ import {
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 
 export default function DocumentsPage() {
-  const { expenses, currency, deleteExpense, folders, addFolder, deleteFolder, moveExpenseToFolder, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { user } = useUser();
+  const db = useFirestore();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<{ data: string; type: string } | null>(null);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
@@ -60,22 +65,42 @@ export default function DocumentsPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
+  // Firestore Expenses (Documents) Query
+  const expensesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+    
+    return query(
+      collection(db, 'users', user.uid, 'expenses'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      orderBy('date', 'desc')
+    );
+  }, [db, user?.uid, viewMonth, viewYear]);
+
+  // Firestore Folders Query
+  const foldersQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'folders');
+  }, [db, user?.uid]);
+
+  const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
+  const { data: foldersData, isLoading: foldersLoading } = useCollection(foldersQuery);
+
+  const folders = foldersData || [];
+  const expenses = (expensesData || []).filter(e => e.billImageData);
+
   const activeFolder = folders.find(f => f.id === currentFolderId);
 
   const filteredExpenses = useMemo(() => {
     return expenses
-      .filter(e => e.billImageData || e.invoiceUrl)
-      .filter(e => {
-        const d = new Date(e.date);
-        return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-      })
       .filter(e => 
         e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
         e.category.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      .filter(e => (e.folderId ?? null) === currentFolderId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, searchTerm, currentFolderId, viewMonth, viewYear]);
+      .filter(e => (e.folderId ?? null) === currentFolderId);
+  }, [expenses, searchTerm, currentFolderId]);
 
   const rootFolders = useMemo(() => {
     if (currentFolderId) return []; 
@@ -99,17 +124,52 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleCreateFolder = () => {
-    if (!newFolderName.trim()) return;
-    addFolder(newFolderName.trim());
-    setNewFolderName("");
-    setIsFolderDialogOpen(false);
-    toast({ title: "Folder Created", description: `Added "${newFolderName}" to your safe.` });
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim() || !db || !user?.uid) return;
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'folders'), {
+        name: newFolderName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+      setNewFolderName("");
+      setIsFolderDialogOpen(false);
+      toast({ title: "Folder Created", description: `Added "${newFolderName}" to your safe.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create folder." });
+    }
   };
 
-  const handleDeleteFolder = (id: string, name: string) => {
-    deleteFolder(id);
-    toast({ title: "Folder Deleted", description: `Removed "${name}". Documents moved to Root.` });
+  const handleDeleteFolder = async (id: string, name: string) => {
+    if (!db || !user?.uid) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'folders', id));
+      toast({ title: "Folder Deleted", description: `Removed "${name}".` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete folder." });
+    }
+  };
+
+  const moveExpenseToFolder = async (expenseId: string, folderId: string | null) => {
+    if (!db || !user?.uid) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'expenses', expenseId), {
+        folderId: folderId
+      });
+      toast({ title: "Moved", description: "Document location updated." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to move document." });
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!db || !user?.uid) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
+      toast({ title: "Deleted", description: "Document removed from vault." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete document." });
+    }
   };
 
   return (
@@ -249,7 +309,9 @@ export default function DocumentsPage() {
             </Badge>
           </div>
 
-          {filteredExpenses.length === 0 && rootFolders.length === 0 ? (
+          {expensesLoading ? (
+            <div className="flex items-center justify-center py-24"><Loader2 className="w-10 h-10 animate-spin text-primary/30" /></div>
+          ) : filteredExpenses.length === 0 && rootFolders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 bg-muted/10 rounded-3xl border-2 border-dashed border-muted">
               <Files className="w-16 h-16 text-muted-foreground opacity-20 mb-4" />
               <p className="text-sm font-bold text-muted-foreground italic">No matching documents in this view.</p>
@@ -257,7 +319,7 @@ export default function DocumentsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredExpenses.map((expense) => {
-                const docUri = expense.billImageData || expense.invoiceUrl || "";
+                const docUri = expense.billImageData || "";
                 const isPdf = getDocType(docUri) === 'pdf';
                 
                 return (

@@ -1,8 +1,9 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useFynWealthStore } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,24 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
 export default function InsightsPage() {
-  const { expenses, currency, insights, setInsights } = useFynWealthStore();
+  const { currency, insights, setInsights } = useFynWealthStore();
+  const { user } = useUser();
+  const db = useFirestore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Firestore Expenses Query - Use all expenses for better insights
+  const expensesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return query(
+      collection(db, 'users', user.uid, 'expenses'),
+      orderBy('date', 'desc')
+    );
+  }, [db, user?.uid]);
+
+  const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
+  const expenses = expensesData || [];
 
   useEffect(() => {
     setMounted(true);
@@ -86,10 +101,10 @@ export default function InsightsPage() {
   }, [expenses, insights, setInsights]);
 
   useEffect(() => {
-    if (mounted) {
+    if (mounted && expenses.length > 0 && !expensesLoading) {
       loadInsights();
     }
-  }, [mounted, loadInsights]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights]);
 
   if (!mounted) {
     return (
@@ -138,7 +153,7 @@ export default function InsightsPage() {
     );
   }
 
-  if (expenses.length === 0) {
+  if (expenses.length === 0 && !expensesLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center max-w-sm mx-auto px-4">
         <div className="p-5 bg-primary/5 rounded-2xl">

@@ -35,30 +35,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * @description Verifies ownership and ensures the document exists for state-changing operations.
-     */
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
     // --- Collection Rules ---
 
     /**
-     * @description User Profiles and all private sub-data (expenses, budgets, bills, etc.)
+     * @description User Profiles and all private sub-data (expenses, budgets, bills, folders, etc.)
+     * Uses recursive matching to ensure all nested paths are covered by owner-only logic.
      */
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
 
-      // Recursive match for all user-owned subcollections (expenses, budgets, categories, billDefinitions)
-      // This ensures that any sub-path correctly inherits ownership logic.
       match /{allUserData=**} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId);
-        allow update, delete: if isExistingOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
@@ -72,7 +59,6 @@ service cloud.firestore {
 
     /**
      * @description Application-wide analytics and statistics.
-     * @path /analytics/{docId}
      */
     match /analytics/{docId} {
       allow read, write: if isAdmin();
@@ -80,7 +66,6 @@ service cloud.firestore {
 
     /**
      * @description Registry of authorized administrators.
-     * @path /admins/{adminId}
      */
     match /admins/{adminId} {
       allow get, list: if isSignedIn();
@@ -89,7 +74,6 @@ service cloud.firestore {
 
     /**
      * @description User-submitted feature requests.
-     * @path /featureRequests/{requestId}
      */
     match /featureRequests/{requestId} {
       allow create: if isSignedIn();

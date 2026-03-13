@@ -6,35 +6,13 @@
       "type": "object",
       "description": "Represents a user's profile and general settings within the FynWealth application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile entity."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address.",
-          "format": "email"
-        },
-        "preferredCurrency": {
-          "type": "string",
-          "description": "The user's preferred currency (e.g., 'USD', 'INR')."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "preferredCurrency": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "email",
-        "preferredCurrency",
-        "createdAt",
-        "updatedAt"
-      ]
+      "required": ["id", "email", "createdAt", "updatedAt"]
     },
     "AppStats": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -48,263 +26,79 @@
         "activeUsers24h": { "type": "number" }
       }
     },
-    "AdminRecord": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AdminRecord",
-      "type": "object",
-      "description": "Record of a user with administrative privileges.",
-      "properties": {
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["admin", "super-admin"] }
-      }
-    },
-    "FeatureRequest": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FeatureRequest",
-      "type": "object",
-      "description": "A user-submitted suggestion for a new feature.",
-      "properties": {
-        "email": { "type": "string" },
-        "request": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["pending", "reviewed", "implemented"] }
-      }
-    },
-    "Category": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Category",
-      "type": "object",
-      "description": "Defines categories for organizing bills and expenses.",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "isSystemDefined": { "type": "boolean" },
-        "userId": { "type": "string" },
-        "iconName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": [
-        "id",
-        "name",
-        "description",
-        "isSystemDefined",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "BillDefinition": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "BillDefinition",
-      "type": "object",
-      "description": "Defines the recurring aspects and details of a bill.",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "name": { "type": "string" },
-        "initialAmount": { "type": "number" },
-        "currency": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "frequency": { "type": "string" },
-        "startDate": { "type": "string", "format": "date" },
-        "notes": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": [
-        "id",
-        "userId",
-        "name",
-        "initialAmount",
-        "currency",
-        "categoryId",
-        "frequency",
-        "startDate",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "BillPayment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "BillPayment",
-      "type": "object",
-      "description": "Records individual instances of bill payments.",
-      "properties": {
-        "id": { "type": "string" },
-        "billDefinitionId": { "type": "string" },
-        "amountPaid": { "type": "number" },
-        "dueDate": { "type": "string", "format": "date" },
-        "paidDate": { "type": "string", "format": "date-time" },
-        "status": { "type": "string" },
-        "notes": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": [
-        "id",
-        "billDefinitionId",
-        "amountPaid",
-        "dueDate",
-        "status",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
     "Expense": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Expense",
       "type": "object",
       "description": "Records individual spending transactions.",
       "properties": {
-        "id": { "type": "string" },
         "userId": { "type": "string" },
         "amount": { "type": "number" },
-        "currency": { "type": "string" },
         "description": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "expenseDate": { "type": "string", "format": "date" },
-        "captureMethod": { "type": "string" },
-        "originalDocumentUrl": { "type": "string", "format": "uri" },
-        "notes": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["paid", "unpaid"] },
+        "billImageData": { "type": "string", "description": "Base64 encoded receipt image." },
+        "folderId": { "type": "string", "description": "ID of the folder this document is in." },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "userId",
-        "amount",
-        "currency",
-        "description",
-        "categoryId",
-        "expenseDate",
-        "captureMethod",
-        "createdAt",
-        "updatedAt"
-      ]
+      "required": ["userId", "amount", "description", "category", "date", "status"]
     },
-    "Budget": {
+    "Bill": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Budget",
+      "title": "Bill",
       "type": "object",
-      "description": "Category-specific spending limits.",
+      "description": "Recurring bill reminders.",
       "properties": {
-        "id": { "type": "string" },
         "userId": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "periodType": { "type": "string" },
-        "periodStart": { "type": "string", "format": "date" },
-        "periodEnd": { "type": "string", "format": "date" },
-        "amountLimit": { "type": "number" },
-        "alertThresholdPercentage": { "type": "number" },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": [
-        "id",
-        "userId",
-        "categoryId",
-        "periodType",
-        "periodStart",
-        "periodEnd",
-        "amountLimit",
-        "isActive",
-        "createdAt",
-        "updatedAt"
-      ]
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date" },
+        "dueTime": { "type": "string" },
+        "frequency": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "notified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Folder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Folder",
+      "type": "object",
+      "description": "Folders for organizing documents in the vault.",
+      "properties": {
+        "name": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "google.com",
-      "anonymous"
-    ]
+    "providers": ["password", "google.com", "anonymous"]
   },
   "firestore": {
     "structure": [
       {
         "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": { "$ref": "#/backend/entities/UserProfile" },
-          "description": "User profiles. Owner access + Admin read/delete."
-        }
-      },
-      {
-        "path": "/analytics/{docId}",
-        "definition": {
-          "entityName": "AppStats",
-          "schema": { "$ref": "#/backend/entities/AppStats" },
-          "description": "Global statistics. Restricted to administrators."
-        }
-      },
-      {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "AdminRecord",
-          "schema": { "$ref": "#/backend/entities/AdminRecord" },
-          "description": "Registry of administrators. Globally searchable for auth verification."
-        }
-      },
-      {
-        "path": "/featureRequests/{requestId}",
-        "definition": {
-          "entityName": "FeatureRequest",
-          "schema": { "$ref": "#/backend/entities/FeatureRequest" },
-          "description": "User feedback. Public create, Admin read."
-        }
-      },
-      {
-        "path": "/system_categories/{categoryId}",
-        "definition": {
-          "entityName": "Category",
-          "schema": { "$ref": "#/backend/entities/Category" },
-          "description": "Default categories. Globally readable."
-        }
-      },
-      {
-        "path": "/users/{userId}/categories/{categoryId}",
-        "definition": {
-          "entityName": "Category",
-          "schema": { "$ref": "#/backend/entities/Category" },
-          "description": "User-defined categories."
-        }
-      },
-      {
-        "path": "/users/{userId}/billDefinitions/{billDefinitionId}",
-        "definition": {
-          "entityName": "BillDefinition",
-          "schema": { "$ref": "#/backend/entities/BillDefinition" },
-          "description": "Recurring bill definitions."
-        }
-      },
-      {
-        "path": "/users/{userId}/billDefinitions/{billDefinitionId}/billPayments/{billPaymentId}",
-        "definition": {
-          "entityName": "BillPayment",
-          "schema": { "$ref": "#/backend/entities/BillPayment" },
-          "description": "Bill payment history."
-        }
+        "definition": { "entityName": "UserProfile", "description": "User profiles." }
       },
       {
         "path": "/users/{userId}/expenses/{expenseId}",
-        "definition": {
-          "entityName": "Expense",
-          "schema": { "$ref": "#/backend/entities/Expense" },
-          "description": "Spending records."
-        }
+        "definition": { "entityName": "Expense", "description": "Spending records." }
+      },
+      {
+        "path": "/users/{userId}/bills/{billId}",
+        "definition": { "entityName": "Bill", "description": "Recurring bill reminders." }
       },
       {
         "path": "/users/{userId}/budgets/{budgetId}",
-        "definition": {
-          "entityName": "Budget",
-          "schema": { "$ref": "#/backend/entities/Budget" },
-          "description": "Spending limits."
-        }
+        "definition": { "description": "Category specific budget limits." }
+      },
+      {
+        "path": "/users/{userId}/folders/{folderId}",
+        "definition": { "entityName": "Folder", "description": "Document vault folders." }
       }
-    ],
-    "reasoning": "The structure maintains strict multi-tenancy for user data while introducing global collections for administration. The rules now support the Admin Dashboard features by authorizing the super-admin email and allowing cross-user list operations for authorized personnel."
+    ]
   }
 }
