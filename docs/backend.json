@@ -1,95 +1,497 @@
-
 {
   "entities": {
-    "Admin": {
-      "title": "Admin",
-      "type": "object",
-      "properties": {
-        "email": { "type": "string" },
-        "role": { "type": "string" }
-      },
-      "required": ["email", "role"]
-    },
-    "AppStats": {
-      "title": "AppStats",
-      "type": "object",
-      "properties": {
-        "totalUsers": { "type": "number" },
-        "totalExpenses": { "type": "number" },
-        "totalReminders": { "type": "number" },
-        "activeUsers24h": { "type": "number" }
-      }
-    },
     "UserProfile": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Represents a user profile within the FynWealth application.",
+      "description": "Represents a user's profile and general settings within the FynWealth application.",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "email": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "lastActive": { "type": "string", "format": "date-time" },
-        "stats": {
-          "type": "object",
-          "properties": {
-            "totalExpenses": { "type": "number" },
-            "totalReminders": { "type": "number" }
-          }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, primarily for identification and communication purposes (external authentication is assumed).",
+          "format": "email"
+        },
+        "preferredCurrency": {
+          "type": "string",
+          "description": "The user's preferred currency for displaying financial information (e.g., 'USD', 'EUR', 'GBP')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was last updated.",
+          "format": "date-time"
         }
       },
-      "required": ["id", "email", "createdAt"]
+      "required": [
+        "id",
+        "email",
+        "preferredCurrency",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Defines categories for organizing bills and expenses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The descriptive name of the category (e.g., 'Groceries', 'Utilities', 'Rent')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of what this category represents."
+        },
+        "isSystemDefined": {
+          "type": "boolean",
+          "description": "Flag indicating if this is a default, system-provided category."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who created or customized this category. Null if it's a pure system-defined category. (Relationship: UserProfile 1:N Category)"
+        },
+        "iconName": {
+          "type": "string",
+          "description": "A textual identifier or name for an icon associated with this category, for UI representation."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the category was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the category was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "isSystemDefined",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BillDefinition": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BillDefinition",
+      "type": "object",
+      "description": "Defines the recurring aspects and details of a bill, such as subscriptions, rent, or EMIs.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BillDefinition entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who owns this bill definition. (Relationship: UserProfile 1:N BillDefinition)"
+        },
+        "name": {
+          "type": "string",
+          "description": "A descriptive name for the recurring bill (e.g., 'Electricity Bill', 'Netflix Subscription', 'Mortgage EMI')."
+        },
+        "initialAmount": {
+          "type": "number",
+          "description": "The typical or initial payment amount for this recurring bill."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the bill amount (e.g., 'USD', 'EUR', 'GBP')."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the Category this bill belongs to. (Relationship: Category 1:N BillDefinition)"
+        },
+        "frequency": {
+          "type": "string",
+          "description": "The recurrence pattern of the bill (e.g., 'monthly', 'annually', 'weekly', 'one-time')."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The initial date when the recurring bill commenced or is set to commence.",
+          "format": "date"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional descriptive notes pertaining to this bill definition."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the bill definition was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the bill definition was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "initialAmount",
+        "currency",
+        "categoryId",
+        "frequency",
+        "startDate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BillPayment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BillPayment",
+      "type": "object",
+      "description": "Records individual instances of bill payments, tracking their due dates, paid status, and actual amounts.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BillPayment entity."
+        },
+        "billDefinitionId": {
+          "type": "string",
+          "description": "Reference to the BillDefinition this payment instance is associated with. (Relationship: BillDefinition 1:N BillPayment)"
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "The actual amount paid for this specific bill instance."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "The specific due date for this particular bill payment cycle.",
+          "format": "date"
+        },
+        "paidDate": {
+          "type": "string",
+          "description": "The date and time when the payment was actually made.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current payment status of this bill instance (e.g., 'due', 'paid', 'overdue', 'scheduled')."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional notes or details pertaining to this specific bill payment."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this bill payment instance was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this bill payment instance was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "billDefinitionId",
+        "amountPaid",
+        "dueDate",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Expense",
       "type": "object",
+      "description": "Records individual spending transactions made by a user.",
       "properties": {
-        "id": { "type": "string" },
-        "amount": { "type": "number" },
-        "category": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "note": { "type": "string" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who recorded this expense. (Relationship: UserProfile 1:N Expense)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the expense."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency of the expense amount (e.g., 'USD', 'EUR', 'GBP')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief textual description or purpose of the expense."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the Category this expense falls under. (Relationship: Category 1:N Expense)"
+        },
+        "expenseDate": {
+          "type": "string",
+          "description": "The date when the expense actually occurred.",
+          "format": "date"
+        },
+        "captureMethod": {
+          "type": "string",
+          "description": "The method used to record the expense (e.g., 'manual', 'scan', 'voice')."
+        },
+        "originalDocumentUrl": {
+          "type": "string",
+          "description": "URL or path to the original scanned bill, invoice, or voice recording, if applicable.",
+          "format": "uri"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any additional notes or contextual information about the expense."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the expense record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the expense record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "amount",
+        "currency",
+        "description",
+        "categoryId",
+        "expenseDate",
+        "captureMethod",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Enables users to set spending limits for specific categories over defined periods.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who created this budget. (Relationship: UserProfile 1:N Budget)"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the Category this budget applies to. (Relationship: Category 1:N Budget)"
+        },
+        "periodType": {
+          "type": "string",
+          "description": "The type of recurrence period for the budget (e.g., 'monthly', 'weekly', 'annually')."
+        },
+        "periodStart": {
+          "type": "string",
+          "description": "The start date of the current budget period.",
+          "format": "date"
+        },
+        "periodEnd": {
+          "type": "string",
+          "description": "The end date of the current budget period.",
+          "format": "date"
+        },
+        "amountLimit": {
+          "type": "number",
+          "description": "The maximum spending amount allowed for the associated category within this budget period."
+        },
+        "alertThresholdPercentage": {
+          "type": "number",
+          "description": "An optional percentage (0-100) of the amountLimit at which the user should receive an alert."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates whether this budget is currently active and being monitored."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the budget was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the budget was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "categoryId",
+        "periodType",
+        "periodStart",
+        "periodEnd",
+        "amountLimit",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "auth": {
-    "providers": ["password", "google.com"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
     "structure": [
       {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "Admin",
-          "schema": { "$ref": "#/backend/entities/Admin" },
-          "description": "Stores authorized admin emails."
-        }
-      },
-      {
         "path": "/users/{userId}",
         "definition": {
           "entityName": "UserProfile",
-          "schema": { "$ref": "#/backend/entities/UserProfile" },
-          "description": "Stores user profiles and stats."
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles. Access restricted to the owner, where `request.auth.uid` must match `userId` in the path."
+        }
+      },
+      {
+        "path": "/system_categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores system-defined categories (e.g., 'Groceries', 'Utilities'). These are globally readable by all authenticated users. Documents in this collection will have `isSystemDefined: true` and `userId: null`.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the system-defined category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores user-defined categories. Private to the owning user. Access restricted to the owner (`request.auth.uid == userId`). Documents in this collection will have `isSystemDefined: false` and include the `userId` field for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this category."
+            },
+            {
+              "name": "categoryId",
+              "description": "The unique identifier for the user-defined category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/billDefinitions/{billDefinitionId}",
+        "definition": {
+          "entityName": "BillDefinition",
+          "schema": {
+            "$ref": "#/backend/entities/BillDefinition"
+          },
+          "description": "Stores definitions for recurring bills (e.g., Netflix, Rent). Private to the owning user. Access restricted to the owner (`request.auth.uid == userId`). Each document includes the `userId` field for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this bill definition."
+            },
+            {
+              "name": "billDefinitionId",
+              "description": "The unique identifier for the bill definition."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/billDefinitions/{billDefinitionId}/billPayments/{billPaymentId}",
+        "definition": {
+          "entityName": "BillPayment",
+          "schema": {
+            "$ref": "#/backend/entities/BillPayment"
+          },
+          "description": "Records individual instances of bill payments associated with a specific BillDefinition. Private to the owning user. Access restricted to the owner (`request.auth.uid == userId`). CRITICAL: Each document *must* include the denormalized `userId` field (copied from its parent BillDefinition) to ensure authorization independence and avoid `get()` calls in security rules.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent bill definition and this bill payment."
+            },
+            {
+              "name": "billDefinitionId",
+              "description": "The unique identifier of the parent bill definition."
+            },
+            {
+              "name": "billPaymentId",
+              "description": "The unique identifier for this specific bill payment instance."
+            }
+          ]
         }
       },
       {
         "path": "/users/{userId}/expenses/{expenseId}",
         "definition": {
           "entityName": "Expense",
-          "schema": { "$ref": "#/backend/entities/Expense" },
-          "description": "User expense subcollection."
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Records individual spending transactions made by a user. Private to the owning user. Access restricted to the owner (`request.auth.uid == userId`). Each document includes the `userId` field for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who recorded this expense."
+            },
+            {
+              "name": "expenseId",
+              "description": "The unique identifier for the expense record."
+            }
+          ]
         }
       },
       {
-        "path": "/analytics/appStats",
+        "path": "/users/{userId}/budgets/{budgetId}",
         "definition": {
-          "entityName": "AppStats",
-          "schema": { "$ref": "#/backend/entities/AppStats" },
-          "description": "Global application metrics."
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Enables users to set spending limits for specific categories over defined periods. Private to the owning user. Access restricted to the owner (`request.auth.uid == userId`). Each document includes the `userId` field for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who created this budget."
+            },
+            {
+              "name": "budgetId",
+              "description": "The unique identifier for the budget."
+            }
+          ]
         }
       }
-    ]
+    ],
+    "reasoning": "The Firestore data structure for FynWealth is designed with security, scalability, and debuggability as core priorities, strictly adhering to the mandated design principles.\n\n**Authorization Independence via Denormalization (Strategy A):**\nThis structure primarily achieves authorization independence by embedding the `userId` directly within every document that requires user-specific ownership checks. For instance, `BillDefinition`, `Expense`, and `Budget` documents each contain a `userId` field. Crucially, for `BillPayment` documents, which are nested under `BillDefinition`s, the `userId` of the owning `UserProfile` is explicitly denormalized into each `BillPayment` document itself. This eliminates the need for `get()` calls in security rules to check parent document ownership, thereby supporting atomic operations (transactions/batches) and preventing security rule failures or performance bottlenecks due to cascading reads. Rules can simply compare `request.auth.uid` with the `userId` field present in the document itself or derived from its direct path, ensuring atomicity and straightforward debugging.\n\n**Structural Segregation for Homogeneous Security Posture (Strategy B):**\nData is segregated based on its security posture. For example, `Category` entities are split into two distinct collections:\n1.  `/system_categories/{categoryId}`: These are read-only for all authenticated users (and effectively immutable by users), containing `isSystemDefined: true` and `userId: null`. This provides a consistent security profile where no `userId` check is needed for read access.\n2.  `/users/{userId}/categories/{categoryId}`: These are user-defined and private, containing `isSystemDefined: false` and `userId: {userId}`. Access is strictly controlled by the `userId` in the path, ensuring privacy.\nSimilarly, all other private, user-owned data (`UserProfile`, `BillDefinition`, `Expense`, `Budget`, `BillPayment`) resides under `/users/{userId}/...` paths, creating a homogeneous security posture within each segment and greatly simplifying rule logic.\n\n**QAPs (Queries are not Filters) Support:**\nBy using structural segregation and embedding ownership (`userId`) directly into documents, `list` operations inherently respect security rules without relying on inefficient and insecure filtering. \n*   When a user queries `/users/{userId}/billDefinitions`, the security rules can enforce `request.auth.uid == userId` directly on the path, allowing a secure and performant list of *only* their own bill definitions.\n*   Similarly, for `/users/{userId}/expenses` and `/users/{userId}/budgets`, `list` operations will only return documents owned by the authenticated user.\n*   For `/system_categories`, `list` operations will return all system-defined categories, which are intended to be publicly readable by all authenticated users, requiring no filtering based on `userId`.\nThis design ensures that any query issued by a client will only return data that the client is explicitly authorized to access, making rules simple, robust, and debuggable."
   }
 }

@@ -1,58 +1,149 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /**
+     * CORE PHILOSOPHY:
+     * This ruleset enforces a strict user-ownership model designed for the FynWealth application. 
+     * Security is managed through structural segregation and data denormalization to ensure 
+     * authorization logic is performant, independent, and secure.
+     *
+     * DATA STRUCTURE:
+     * - Private user data is nested under the `/users/{userId}` prefix.
+     * - System-wide configurations, such as default categories, are stored in `/system_categories`.
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. Ownership Enforcement: All writes and most reads are restricted to the owner identified 
+     *    by the `userId` in the document path, which must match the `request.auth.uid`.
+     * 2. Denormalization for Authorization: Essential fields like `userId` are denormalized 
+     *    (copied) into deeply nested documents (e.g., BillPayments) to allow for flat, fast 
+     *    security checks without recursive lookups (get() calls).
+     * 3. Prototyping Flexibility: These rules strictly enforce "Who" can access data based 
+     *    on identity but allow for flexibility in "What" data is sent, facilitating rapid 
+     *    UI development without strict schema validation of content fields.
+     * 4. Relational Integrity: On creation, the rules verify that internal link fields 
+     *    (like `userId`) match the security context of the request.
+     */
+
+    // --- Global Helper Functions ---
+
+    /**
+     * @description Checks if a user is authenticated with a valid Firebase Auth token.
+     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'admin@fynwealth.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Core application metrics - readable by all authenticated users
-    match /analytics/appStats {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+    /**
+     * @description Verifies ownership and ensures the document exists for state-changing operations.
+     */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
     }
 
-    // Admins registry - users can query to verify their own role
-    match /admins {
-      allow list: if isSignedIn();
-      
-      match /{adminId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-      }
-    }
+    // --- Collection Rules ---
 
-    // Feature requests - users can submit, admins can manage
-    match /featureRequests/{requestId} {
-      allow create: if isSignedIn();
-      allow read, write: if isAdmin();
-    }
-
-    // User-specific data protection
+    /**
+     * @description Stores individual user profiles. Access restricted to the owner.
+     * @path /users/{userId}
+     * @allow (create) if auth.uid is 'user123' and path is /users/user123
+     * @deny (read) if auth.uid is 'userA' and path is /users/userB
+     * @principle Validates that users can only manage their own root profile and ensures ID consistency.
+     */
     match /users/{userId} {
-      allow get, write: if isSignedIn() && request.auth.uid == userId;
-      allow list: if isAdmin();
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
 
-      match /expenses/{expenseId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      /**
+       * @description User-defined categories. Private to the owning user.
+       * @path /users/{userId}/categories/{categoryId}
+       * @allow (create) if auth.uid matches path and data.userId matches auth.uid
+       * @deny (update) if attempting to change the userId field
+       * @principle Ensures private categories are strictly owner-accessible and immutable regarding ownership.
+       */
+      match /categories/{categoryId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
       }
-      
-      match /bills/{billId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+
+      /**
+       * @description Recurring bill definitions. Private to the owning user.
+       * @path /users/{userId}/billDefinitions/{billDefinitionId}
+       * @allow (list) if auth.uid matches userId in path
+       * @deny (create) if data.userId does not match the authenticated user
+       * @principle Restricts access to user's bill configurations.
+       */
+      match /billDefinitions/{billDefinitionId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description Individual bill payment records. Uses denormalized userId for security.
+         * @path /users/{userId}/billDefinitions/{billDefinitionId}/billPayments/{billPaymentId}
+         * @allow (get) if auth.uid matches the path userId
+         * @deny (create) if the denormalized userId field is missing or incorrect
+         * @principle Leverages denormalized ownership data to avoid expensive parent-lookups.
+         */
+        match /billPayments/{billPaymentId} {
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && request.resource.data.userId == userId;
+          allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+
+      /**
+       * @description Individual spending transactions. Private to the owner.
+       * @path /users/{userId}/expenses/{expenseId}
+       * @allow (create) if auth.uid matches userId in path
+       * @deny (list) if user is not signed in
+       * @principle Ownership model for financial transaction records.
+       */
+      match /expenses/{expenseId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description User-set spending limits for categories. Private to the owner.
+       * @path /users/{userId}/budgets/{budgetId}
+       * @allow (update) if budget exists and belongs to the user
+       * @deny (delete) if user is not the owner
+       * @principle Protects budget settings from unauthorized modification.
+       */
+      match /budgets/{budgetId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
       }
     }
 
-    // Catch-all for analytics and other paths for admins
-    match /{document=**} {
-      allow read: if isAdmin();
+    /**
+     * @description System-defined categories. Globally readable by authenticated users, immutable by clients.
+     * @path /system_categories/{categoryId}
+     * @allow (list) for any authenticated user
+     * @deny (write) for all users (system-managed)
+     * @principle Public-read pattern for shared system data, protecting against user modification.
+     */
+    match /system_categories/{categoryId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
   }
 }

@@ -1,10 +1,7 @@
 'use client';
 import { getAuth, type User } from 'firebase/auth';
 
-/**
- * Defines the context for a Firestore security rule failure.
- */
-export type SecurityRuleContext = {
+type SecurityRuleContext = {
   path: string;
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'write';
   requestResourceData?: any;
