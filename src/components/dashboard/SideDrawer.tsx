@@ -85,6 +85,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [legalDialog, setLegalDialog] = useState<"terms" | "privacy" | "faq" | "feature" | null>(null);
   const [featureText, setFeatureText] = useState("");
+  const [isClearing, setIsRecording] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -96,16 +97,36 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     }
   };
 
-  const handleClearAllData = () => {
-    clearAllData();
-    setIsOpen(false);
-    toast({ title: "System Reset", description: "All local preferences cleared successfully." });
-    window.location.reload();
+  const handleClearAllData = async () => {
+    if (!db || !user?.uid) return;
+    
+    setIsRecording(true);
+    try {
+      const collectionsToClear = ['expenses', 'budgets', 'bills', 'folders'];
+      const batch = writeBatch(db);
+      
+      for (const collName of collectionsToClear) {
+        const snapshot = await getDocs(collection(db, 'users', user.uid, collName));
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      }
+      
+      await batch.commit();
+      clearAllData();
+      setIsOpen(false);
+      toast({ title: "App Reset", description: "All cloud data and local preferences have been cleared." });
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Reset Failed", description: "Could not clear all cloud data." });
+    } finally {
+      setIsRecording(false);
+    }
   };
 
   const handleClearMonthlyData = async () => {
     if (!db || !user?.uid) return;
     
+    setIsRecording(true);
     try {
       const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
       const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
@@ -125,9 +146,11 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       
       await batch.commit();
       setIsOpen(false);
-      toast({ title: "Data Cleared", description: `Successfully removed all records for ${monthName}.` });
+      toast({ title: "Monthly Data Cleared", description: `Successfully removed all records for ${monthName}.` });
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to clear cloud data. Please check permissions." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to clear cloud data." });
+    } finally {
+      setIsRecording(false);
     }
   };
 
@@ -299,7 +322,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-base md:text-lg">Permanent Reset?</AlertDialogTitle>
                     <AlertDialogDescription className="text-sm">
-                      This resets your local preferences and UI state. This cannot be undone.
+                      This will clear ALL expenses, budgets, reminders, and documents for ALL months from the whole app. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
