@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -30,112 +31,133 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleEmailAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      if (mode === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        await updateFirebaseProfile(user, { displayName: name });
-        
-        const [firstName = '', ...rest] = name.split(' ');
-        updateStoreProfile({
-          firstName,
-          lastName: rest.join(' '),
-          email: user.email || email
-        });
 
-        toast({
-          title: 'Welcome to FynWealth!',
-          description: 'Your account has been created successfully.',
-        });
-      } else if (mode === 'signin') {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        if (user.displayName) {
-          const [firstName = '', ...rest] = user.displayName.split(' ');
+    if (mode === 'signup') {
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(async (userCredential) => {
+          const user = userCredential.user;
+          // Non-blocking update of profile
+          updateFirebaseProfile(user, { displayName: name });
+          
+          const [firstName = '', ...rest] = name.split(' ');
           updateStoreProfile({
             firstName,
             lastName: rest.join(' '),
             email: user.email || email
           });
-        }
 
-        toast({
-          title: 'Welcome Back!',
-          description: 'Successfully signed in.',
+          toast({
+            title: 'Welcome to FynWealth!',
+            description: 'Your account has been created successfully.',
+          });
+          setLoading(false);
+        })
+        .catch((error: any) => {
+          console.error('Sign Up Error:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Sign Up Failed',
+            description: error.message || 'Could not create account.',
+          });
+          setLoading(false);
         });
-      }
-    } catch (error: any) {
-      console.error('Auth Error:', error);
-      toast({
-        variant: 'destructive',
-        title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed',
-        description: error.message || 'Could not authenticate. Please check your credentials.',
-      });
-    } finally {
-      setLoading(false);
+    } else if (mode === 'signin') {
+      signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          const user = userCredential.user;
+          
+          if (user.displayName) {
+            const [firstName = '', ...rest] = user.displayName.split(' ');
+            updateStoreProfile({
+              firstName,
+              lastName: rest.join(' '),
+              email: user.email || email
+            });
+          }
+
+          toast({
+            title: 'Welcome Back!',
+            description: 'Successfully signed in.',
+          });
+          setLoading(false);
+        })
+        .catch((error: any) => {
+          console.error('Sign In Error:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Sign In Failed',
+            description: error.message || 'Check your email and password.',
+          });
+          setLoading(false);
+        });
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter your email to reset password.' });
       return;
     }
     setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      toast({
-        title: 'Reset Link Sent',
-        description: `Check your inbox at ${email} for instructions.`,
+    sendPasswordResetEmail(auth, email)
+      .then(() => {
+        toast({
+          title: 'Reset Link Sent',
+          description: `Check your inbox at ${email} for instructions.`,
+        });
+        setMode('signin');
+        setLoading(false);
+      })
+      .catch((error: any) => {
+        toast({
+          variant: 'destructive',
+          title: 'Reset Failed',
+          description: error.message || 'Could not send reset email.',
+        });
+        setLoading(false);
       });
-      setMode('signin');
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Reset Failed',
-        description: error.message || 'Could not send reset email.',
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = () => {
     setGoogleLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+    const provider = new GoogleAuthProvider();
+    
+    // Add scopes if necessary, but default is usually fine
+    provider.addScope('profile');
+    provider.addScope('email');
 
-      if (user.displayName) {
-        const [firstName = '', ...rest] = user.displayName.split(' ');
-        updateStoreProfile({
-          firstName,
-          lastName: rest.join(' '),
-          email: user.email || ''
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        const user = result.user;
+
+        if (user.displayName) {
+          const [firstName = '', ...rest] = user.displayName.split(' ');
+          updateStoreProfile({
+            firstName,
+            lastName: rest.join(' '),
+            email: user.email || ''
+          });
+        }
+
+        toast({
+          title: 'Welcome!',
+          description: 'Signed in with Google.',
         });
-      }
-
-      toast({
-        title: 'Welcome!',
-        description: 'Signed in with Google.',
+        setGoogleLoading(false);
+      })
+      .catch((error: any) => {
+        console.error('Google Sign In Error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Google Login Failed',
+          description: error.message || 'Could not complete Google sign in. Ensure popups are allowed.',
+        });
+        setGoogleLoading(false);
       });
-    } catch (error: any) {
-      console.error('Google Sign In Error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Google Login Failed',
-        description: error.message || 'Could not complete Google sign in.',
-      });
-    } finally {
-      setGoogleLoading(false);
-    }
   };
 
   return (
