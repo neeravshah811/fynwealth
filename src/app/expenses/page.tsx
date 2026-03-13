@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Download, Edit2, Trash2, X, ShieldCheck, Upload, Repeat, Loader2 } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, Filter } from "lucide-react";
 import { useState, useMemo } from "react";
 import { ExpenseCapture } from "@/components/expenses/ExpenseCapture";
 import {
@@ -16,7 +17,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -32,7 +32,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 
 export default function ExpensesPage() {
@@ -68,7 +67,8 @@ export default function ExpensesPage() {
     return expenses
       .filter(e => {
         const matchesSearch = e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             e.category.toLowerCase().includes(searchTerm.toLowerCase());
+                             e.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             (e.subCategory || "").toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "all" || e.status === statusFilter;
         const matchesCategory = categoryFilter === "all" || e.category === categoryFilter;
         return matchesSearch && matchesStatus && matchesCategory;
@@ -122,7 +122,12 @@ export default function ExpensesPage() {
           <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5 bg-card">
             <CardHeader className="pb-6 bg-muted/20">
               <div className="flex flex-col gap-6">
-                <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px] uppercase font-bold">
+                    <Filter className="w-3 h-3 mr-1.5" /> Filter
+                  </Button>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   <div className="md:col-span-5 relative">
@@ -140,7 +145,7 @@ export default function ExpensesPage() {
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
                         <SelectItem value="unpaid">Unpaid</SelectItem>
                       </SelectContent>
@@ -151,7 +156,7 @@ export default function ExpensesPage() {
                       <SelectTrigger className="h-12 rounded-xl">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[300px]">
                         <SelectItem value="all">All Categories</SelectItem>
                         {categoriesList.map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -167,11 +172,11 @@ export default function ExpensesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/10 border-none">
-                      <TableHead className="text-[10px] uppercase font-bold tracking-widest">Status</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold tracking-widest pl-6">Status</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold tracking-widest">Date</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold tracking-widest">Description</TableHead>
                       <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest">Amount</TableHead>
-                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest">Actions</TableHead>
+                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest pr-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -180,12 +185,12 @@ export default function ExpensesPage() {
                         <TableCell colSpan={5} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell>
                       </TableRow>
                     ) : filteredExpenses.map((expense) => (
-                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors">
-                        <TableCell>
+                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-b border-muted/30">
+                        <TableCell className="pl-6">
                           <button 
                             onClick={() => handleToggleStatus(expense.id, expense.status)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border ${
-                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-colors ${
+                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
                             }`}
                           >
                             {expense.status.toUpperCase()}
@@ -193,31 +198,38 @@ export default function ExpensesPage() {
                         </TableCell>
                         <TableCell className="text-xs font-medium">{format(new Date(expense.date), 'MMM dd')}</TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm truncate max-w-[150px]">{expense.description}</span>
-                            <span className="text-[10px] text-muted-foreground uppercase font-bold">{expense.category}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm truncate max-w-[180px]">{expense.description}</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] py-0 h-4 border-none font-bold uppercase">
+                                {expense.category}
+                              </Badge>
+                              {expense.subCategory && expense.subCategory !== 'Others' && (
+                                <span className="text-[8px] text-muted-foreground uppercase font-medium">/ {expense.subCategory}</span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-bold text-sm">
+                        <TableCell className="text-right font-bold text-sm text-foreground">
                           {currency.symbol}{formatAmount(expense.amount)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right pr-6">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setEditingExpense(expense)}>
+                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-primary/10" onClick={() => setEditingExpense(expense)}>
                               <Edit2 className="w-4 h-4 text-muted-foreground" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-destructive/10 group"><Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" /></Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent>
+                              <AlertDialogContent className="rounded-2xl">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete Record?</AlertDialogTitle>
-                                  <AlertDialogDescription>This will permanently remove the record from your vault.</AlertDialogDescription>
+                                  <AlertDialogDescription>This will permanently remove this expense from your vault.</AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive">Delete</AlertDialogAction>
+                                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive rounded-xl shadow-lg shadow-destructive/20">Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -225,6 +237,13 @@ export default function ExpensesPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {filteredExpenses.length === 0 && !isLoading && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic text-sm">
+                          No transactions found for this period.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -235,16 +254,16 @@ export default function ExpensesPage() {
 
       {editingExpense && (
         <Dialog open={!!editingExpense} onOpenChange={(open) => !open && setEditingExpense(null)}>
-          <DialogContent className="sm:max-w-[450px] rounded-2xl">
-            <DialogHeader><DialogTitle className="font-headline text-2xl font-bold">Edit Transaction</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-[450px] rounded-3xl p-8 border-none shadow-2xl">
+            <DialogHeader><DialogTitle className="font-headline text-2xl font-bold text-primary">Edit Transaction</DialogTitle></DialogHeader>
             <form onSubmit={handleSaveEdit} className="space-y-6 pt-4">
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase text-muted-foreground">Amount</Label>
-                <Input type="number" className="h-12 text-lg font-bold rounded-xl" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
+                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
+                <Input type="number" className="h-12 text-lg font-bold rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase text-muted-foreground">Description</Label>
-                <Input className="h-12 rounded-xl" value={editingExpense.description} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} required />
+                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Description</Label>
+                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.description} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} required />
               </div>
               <Button type="submit" className="w-full h-14 font-bold rounded-xl shadow-lg">Save Changes</Button>
             </form>

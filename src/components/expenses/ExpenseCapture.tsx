@@ -1,24 +1,40 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useFynWealthStore, Frequency, SYSTEM_CATEGORIES } from "@/lib/store";
-import { useFirestore, useUser } from "@/firebase";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, Upload, X, StopCircle } from "lucide-react";
+import { 
+  Camera, 
+  Mic, 
+  Plus, 
+  Loader2, 
+  CheckCircle2, 
+  Repeat, 
+  Upload, 
+  StopCircle,
+  Tag,
+  PlusCircle
+} from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-
-const FREQUENCIES: Frequency[] = ['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Half-yearly', 'Annually'];
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export function ExpenseCapture() {
   const { currency } = useFynWealthStore();
@@ -28,19 +44,38 @@ export function ExpenseCapture() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
   const [manual, setManual] = useState({
     amount: '',
     description: '',
     category: 'Miscellaneous',
+    subCategory: 'Others',
     date: format(new Date(), 'yyyy-MM-dd'),
     isRecurring: false,
     frequency: 'Monthly' as Frequency,
   });
 
-  const categoriesList = Object.keys(SYSTEM_CATEGORIES);
+  // Fetch custom categories from Firestore
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'categories');
+  }, [db, user?.uid]);
+
+  const { data: customCategories } = useCollection(categoriesQuery);
+
+  const allCategoriesList = useMemo(() => {
+    const system = Object.keys(SYSTEM_CATEGORIES);
+    const custom = (customCategories || []).map(c => c.name);
+    return [...new Set([...system, ...custom])];
+  }, [customCategories]);
+
+  const subCategories = useMemo(() => {
+    const subs = SYSTEM_CATEGORIES[manual.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
+    return subs;
+  }, [manual.category]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +91,7 @@ export function ExpenseCapture() {
         amount,
         description: manual.description.trim() || `${manual.category} Expense`,
         category: manual.category,
+        subCategory: manual.subCategory,
         date: manual.date,
         status: manual.date <= todayStr ? 'paid' : 'unpaid',
         isRecurring: manual.isRecurring,
@@ -70,17 +106,35 @@ export function ExpenseCapture() {
         amount: '', 
         description: '', 
         category: 'Miscellaneous', 
+        subCategory: 'Others',
         date: format(new Date(), 'yyyy-MM-dd'),
         isRecurring: false,
         frequency: 'Monthly',
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Success", description: "Expense added to your vault." });
+      toast({ title: "Success", description: "Expense added successfully." });
     } catch (err) {
       toast({ variant: "destructive", title: "Sync Failed", description: "Check your connection." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'categories'), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+      setManual(prev => ({ ...prev, category: newCategoryName.trim(), subCategory: 'Others' }));
+      setNewCategoryName("");
+      setIsCategoryDialogOpen(false);
+      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to save category." });
     }
   };
 
@@ -101,9 +155,8 @@ export function ExpenseCapture() {
 
       mediaRecorder.start();
       setIsRecording(true);
-      setAudioChunks([]);
     } catch (err) {
-      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable mic access to record." });
+      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable mic access." });
     }
   };
 
@@ -129,6 +182,7 @@ export function ExpenseCapture() {
             amount: result.amount,
             description: result.description || 'Voice Captured Expense',
             category: result.category,
+            subCategory: 'Others',
             date: result.date || todayStr,
             status: (result.date || todayStr) <= todayStr ? 'paid' : 'unpaid',
             createdAt: serverTimestamp()
@@ -141,7 +195,7 @@ export function ExpenseCapture() {
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      toast({ variant: "destructive", title: "Processing Error", description: "AI failed to transcribe your voice." });
+      toast({ variant: "destructive", title: "Processing Error", description: "AI failed to transcribe." });
     } finally {
       setLoading(false);
     }
@@ -167,6 +221,7 @@ export function ExpenseCapture() {
             amount,
             description: result.merchantName || 'Scanned Receipt',
             category: result.categorySuggestion || 'Miscellaneous',
+            subCategory: 'Others',
             date,
             status: date <= todayStr ? 'paid' : 'unpaid',
             billImageData: base64String,
@@ -203,39 +258,97 @@ export function ExpenseCapture() {
           </TabsList>
 
           <TabsContent value="manual">
-            <form onSubmit={handleManualSubmit} className="space-y-4">
+            <form onSubmit={handleManualSubmit} className="space-y-5">
+              {/* Row 1: Amount and Date */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Amount</Label>
-                  <Input type="number" placeholder="0.00" value={manual.amount} onChange={(e) => setManual({...manual, amount: e.target.value})} required className="h-11 rounded-xl font-bold" />
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
+                    <Input 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={manual.amount} 
+                      onChange={(e) => setManual({...manual, amount: e.target.value})} 
+                      required 
+                      className="pl-8 h-11 rounded-xl font-bold shadow-sm" 
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Date</Label>
-                  <Input type="date" value={manual.date} onChange={(e) => setManual({...manual, date: e.target.value})} className="h-11 rounded-xl" />
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Date</Label>
+                  <Input 
+                    type="date" 
+                    value={manual.date} 
+                    onChange={(e) => setManual({...manual, date: e.target.value})} 
+                    className="h-11 rounded-xl shadow-sm" 
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
-                <Select value={manual.category} onValueChange={(v) => setManual({...manual, category: v})}>
-                  <SelectTrigger className="h-11 rounded-xl font-bold">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              {/* Row 2: Category and Subcategory */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <Select value={manual.category} onValueChange={(v) => {
+                    if (v === 'ADD_NEW') {
+                      setIsCategoryDialogOpen(true);
+                    } else {
+                      setManual({...manual, category: v, subCategory: SYSTEM_CATEGORIES[v as keyof typeof SYSTEM_CATEGORIES]?.[0] || 'Others'});
+                    }
+                  }}>
+                    <SelectTrigger className="h-11 rounded-xl font-bold shadow-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {allCategoriesList.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                      <SelectSeparator />
+                      <SelectItem value="ADD_NEW" className="text-primary font-bold">
+                        <div className="flex items-center gap-2">
+                          <PlusCircle className="w-4 h-4" />
+                          Add New Category
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
+                  <Select value={manual.subCategory} onValueChange={(v) => setManual({...manual, subCategory: v})}>
+                    <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[250px]">
+                      {subCategories.map(sub => (
+                        <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Description</Label>
-                <Input placeholder="e.g. Weekly Coffee" value={manual.description} onChange={(e) => setManual({...manual, description: e.target.value})} className="h-11 rounded-xl" />
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description</Label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="e.g. Starbucks Latte" 
+                    value={manual.description} 
+                    onChange={(e) => setManual({...manual, description: e.target.value})} 
+                    className="pl-10 h-11 rounded-xl shadow-sm" 
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted">
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted/50">
                 <div className="flex items-center gap-3">
                   <Repeat className="w-4 h-4 text-primary" />
-                  <Label className="text-xs font-bold">Monthly Recurring</Label>
+                  <div>
+                    <Label className="text-xs font-bold block">Monthly Recurring</Label>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Auto-adds next month</p>
+                  </div>
                 </div>
                 <Switch checked={manual.isRecurring} onCheckedChange={(checked) => setManual({...manual, isRecurring: checked})} />
               </div>
@@ -253,10 +366,10 @@ export function ExpenseCapture() {
                 {isRecording ? <StopCircle className="w-12 h-12 text-destructive" /> : <Mic className="w-12 h-12 text-primary" />}
               </div>
               <h3 className="font-bold text-sm mb-1">{isRecording ? "Listening..." : "Voice Capture"}</h3>
-              <p className="text-xs text-muted-foreground px-6 mb-6">
+              <p className="text-xs text-muted-foreground px-6 mb-6 leading-relaxed">
                 {isRecording 
                   ? "Describe your expense now..." 
-                  : "Tap to record. Say: \"Spent 50 dollars on groceries today.\""}
+                  : "Say: \"Spent 50 dollars on groceries today.\""}
               </p>
               
               {!isRecording ? (
@@ -287,6 +400,30 @@ export function ExpenseCapture() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* New Category Dialog */}
+      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Category Name</label>
+              <Input 
+                placeholder="e.g. Pet Care" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleAddCustomCategory}>Create Now</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

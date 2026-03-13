@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -36,6 +37,7 @@
         "amount": { "type": "number" },
         "description": { "type": "string" },
         "category": { "type": "string" },
+        "subCategory": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["paid", "unpaid"] },
         "billImageData": { "type": "string", "description": "Base64 encoded receipt image." },
@@ -57,8 +59,20 @@
         "dueTime": { "type": "string" },
         "frequency": { "type": "string" },
         "category": { "type": "string" },
+        "subCategory": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "paid"] },
         "notified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Custom user-defined category.",
+      "properties": {
+        "name": { "type": "string" },
+        "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -90,6 +104,10 @@
       {
         "path": "/users/{userId}/bills/{billId}",
         "definition": { "entityName": "Bill", "description": "Recurring bill reminders." }
+      },
+      {
+        "path": "/users/{userId}/categories/{categoryId}",
+        "definition": { "entityName": "Category", "description": "Custom expense categories." }
       },
       {
         "path": "/users/{userId}/budgets/{budgetId}",
