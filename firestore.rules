@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -36,6 +37,19 @@ service cloud.firestore {
     }
 
     // --- Collection Rules ---
+
+    /**
+     * @description Global Categories and Subcategories. Globally readable.
+     */
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /subcategories/{subcategoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
 
     /**
      * @description User Profiles and all private sub-data (expenses, budgets, bills, folders, etc.)

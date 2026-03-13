@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -30,30 +31,25 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Expense",
       "type": "object",
-      "description": "Records individual spending transactions.",
+      "description": "Records individual spending transactions with specific category structure.",
       "properties": {
         "userId": { "type": "string" },
         "amount": { "type": "number" },
-        "description": { "type": "string" },
-        "category": { "type": "string" },
-        "subCategory": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["paid", "unpaid"] },
-        "billImageData": { "type": "string", "description": "Base64 encoded receipt image or PDF." },
-        "folderId": { "type": "string", "description": "ID of the folder this document is in." },
-        "productName": { "type": "string", "description": "Used for Warranty category items." },
-        "purchaseDate": { "type": "string", "format": "date" },
-        "warrantyExpiryDate": { "type": "string", "format": "date" },
-        "serviceCentreContact": { "type": "string" },
+        "note": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "subcategoryId": { "type": "string" },
+        "subcategoryName": { "type": "string" },
+        "date": { "type": "object", "description": "Firestore Timestamp object." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "amount", "description", "category", "date", "status"]
+      "required": ["userId", "amount", "categoryId", "categoryName", "subcategoryId", "subcategoryName", "date"]
     },
     "Bill": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Bill",
       "type": "object",
-      "description": "Recurring bill reminders.",
+      "description": "Recurring bill reminders with specific category structure.",
       "properties": {
         "userId": { "type": "string" },
         "name": { "type": "string" },
@@ -61,11 +57,13 @@
         "dueDate": { "type": "string", "format": "date" },
         "dueTime": { "type": "string" },
         "frequency": { "type": "string" },
-        "category": { "type": "string" },
-        "subCategory": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "subcategoryId": { "type": "string" },
+        "subcategoryName": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "paid"] },
         "notified": { "type": "boolean" },
-        "attachmentData": { "type": "string", "description": "Base64 encoded bill image or PDF." },
+        "attachmentData": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -73,11 +71,19 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Category",
       "type": "object",
-      "description": "Custom user-defined category.",
+      "description": "System category for expenses.",
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
+    "Subcategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Subcategory",
+      "type": "object",
+      "description": "System subcategory linked to a category.",
       "properties": {
         "name": { "type": "string" },
-        "userId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "categoryId": { "type": "string" }
       }
     },
     "Folder": {
@@ -98,6 +104,14 @@
   "firestore": {
     "structure": [
       {
+        "path": "/categories/{categoryId}",
+        "definition": { "entityName": "Category", "description": "Global categories." }
+      },
+      {
+        "path": "/subcategories/{subcategoryId}",
+        "definition": { "entityName": "Subcategory", "description": "Global subcategories." }
+      },
+      {
         "path": "/users/{userId}",
         "definition": { "entityName": "UserProfile", "description": "User profiles." }
       },
@@ -108,14 +122,6 @@
       {
         "path": "/users/{userId}/bills/{billId}",
         "definition": { "entityName": "Bill", "description": "Recurring bill reminders." }
-      },
-      {
-        "path": "/users/{userId}/categories/{categoryId}",
-        "definition": { "entityName": "Category", "description": "Custom expense categories." }
-      },
-      {
-        "path": "/users/{userId}/budgets/{budgetId}",
-        "definition": { "description": "Category specific budget limits." }
       },
       {
         "path": "/users/{userId}/folders/{folderId}",

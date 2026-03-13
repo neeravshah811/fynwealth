@@ -1,9 +1,10 @@
+
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import { useFynWealthStore, Frequency, SYSTEM_CATEGORIES } from "@/lib/store";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy, getDocs, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,6 @@ import {
   Loader2,
   HelpCircle,
   Calendar as CalendarIcon,
-  PlusCircle,
   Paperclip,
   FileText
 } from "lucide-react";
@@ -35,13 +35,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 export default function BillsPage() {
   const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
@@ -51,9 +44,13 @@ export default function BillsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Required state structure
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
   
   const [formData, setFormData] = useState({
     name: '',
@@ -61,28 +58,50 @@ export default function BillsPage() {
     dueDate: format(new Date(), 'yyyy-MM-dd'),
     dueTime: '09:00',
     frequency: 'Monthly' as Frequency,
-    category: 'Miscellaneous',
-    subCategory: 'Others',
     attachmentData: '' as string | null,
     attachmentName: '' as string | null,
   });
 
-  const categoriesQuery = useMemoFirebase(() => {
-    if (!db || !user?.uid) return null;
-    return collection(db, 'users', user.uid, 'categories');
-  }, [db, user?.uid]);
+  // Load categories
+  useEffect(() => {
+    async function loadCategories() {
+      if (!db) return;
+      try {
+        const snapshot = await getDocs(collection(db, "categories"));
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error("Failed to load categories", err);
+      }
+    }
+    loadCategories();
+  }, [db]);
 
-  const { data: customCategories } = useCollection(categoriesQuery);
+  // Load subcategories when category changes
+  async function loadSubcategories(categoryId: string) {
+    if (!db || !categoryId) {
+      setSubcategories([]);
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "subcategories"),
+        where("categoryId", "==", categoryId)
+      );
+      const snapshot = await getDocs(q);
+      setSubcategories(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+    } catch (err) {
+      console.error("Failed to load subcategories", err);
+    }
+  }
 
-  const allCategoriesList = useMemo(() => {
-    const system = Object.keys(SYSTEM_CATEGORIES);
-    const custom = (customCategories || []).map(c => c.name);
-    return Array.from(new Set([...system, ...custom])).sort((a, b) => {
-      if (a === 'Miscellaneous') return 1;
-      if (b === 'Miscellaneous') return -1;
-      return a.localeCompare(b);
-    });
-  }, [customCategories]);
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setSelectedSubcategory("");
+    loadSubcategories(categoryId);
+  };
 
   const billsQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -94,10 +113,6 @@ export default function BillsPage() {
 
   const { data: bills, isLoading } = useCollection(billsQuery);
 
-  const subCategories = useMemo(() => {
-    return SYSTEM_CATEGORIES[formData.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
-  }, [formData.category]);
-
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
       setViewDate(date.getMonth(), date.getFullYear());
@@ -107,18 +122,6 @@ export default function BillsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid File", description: "Please upload an image or PDF." });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
-      return;
-    }
-
     const reader = new FileReader();
     reader.onloadend = () => {
       setFormData(prev => ({
@@ -135,37 +138,45 @@ export default function BillsPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleAddCustomCategory = async () => {
-    if (!newCategoryName.trim() || !db || !user?.uid) return;
-    try {
-      await addDoc(collection(db, 'users', user.uid, 'categories'), {
-        name: newCategoryName.trim(),
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      setFormData(prev => ({ ...prev, category: newCategoryName.trim(), subCategory: 'Others' }));
-      setNewCategoryName("");
-      setIsCategoryDialogOpen(false);
-      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to save category." });
-    }
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      amount: '',
+      dueDate: format(new Date(), 'yyyy-MM-dd'),
+      dueTime: '09:00',
+      frequency: 'Monthly',
+      attachmentData: null,
+      attachmentName: null,
+    });
+    setSelectedCategory("");
+    setSelectedSubcategory("");
+    setSubcategories([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.amount || !db || !user?.uid) return;
 
+    if (!selectedCategory || !selectedSubcategory) {
+      toast({ variant: "destructive", title: "Missing Selection", description: "Please select both a category and subcategory." });
+      return;
+    }
+
     setLoading(true);
     try {
+      const categoryObj = categories.find(c => c.id === selectedCategory);
+      const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
+
       await addDoc(collection(db, 'users', user.uid, 'bills'), {
         name: formData.name,
         amount: Math.abs(parseFloat(formData.amount)),
         dueDate: formData.dueDate,
         dueTime: formData.dueTime,
         frequency: formData.frequency,
-        category: formData.category,
-        subCategory: formData.subCategory,
+        categoryId: selectedCategory,
+        categoryName: categoryObj?.name || "Unknown",
+        subcategoryId: selectedSubcategory,
+        subcategoryName: subcategoryObj?.name || "Unknown",
         attachmentData: formData.attachmentData,
         userId: user.uid,
         status: 'pending',
@@ -173,17 +184,7 @@ export default function BillsPage() {
         createdAt: serverTimestamp()
       });
 
-      setFormData({
-        name: '',
-        amount: '',
-        dueDate: format(new Date(), 'yyyy-MM-dd'),
-        dueTime: '09:00',
-        frequency: 'Monthly',
-        category: 'Miscellaneous',
-        subCategory: 'Others',
-        attachmentData: null,
-        attachmentName: null,
-      });
+      resetForm();
       setShowForm(false);
       toast({ title: "Reminder Set", description: "Saved successfully." });
     } catch (err) {
@@ -254,6 +255,7 @@ export default function BillsPage() {
                   </div>
                 </div>
               </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Due Date</Label>
@@ -269,26 +271,11 @@ export default function BillsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground">Category</Label>
-                    <button 
-                      type="button" 
-                      onClick={() => setIsCategoryDialogOpen(true)}
-                      className="text-primary hover:text-primary/80 transition-colors"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <Select 
-                    value={formData.category} 
-                    onValueChange={(v) => {
-                      const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
-                      setFormData({...formData, category: v, subCategory: newSubCategory});
-                    }}
-                  >
+                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px]">
-                      {allCategoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -296,10 +283,14 @@ export default function BillsPage() {
               
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
-                <Select value={formData.subCategory} onValueChange={(v) => setFormData({...formData, subCategory: v})}>
+                <Select 
+                  value={selectedSubcategory} 
+                  onValueChange={setSelectedSubcategory}
+                  disabled={!selectedCategory}
+                >
                   <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select Subcategory" /></SelectTrigger>
                   <SelectContent className="z-[100] max-h-[250px]">
-                    {subCategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
+                    {subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -364,9 +355,9 @@ export default function BillsPage() {
                     <div className="min-w-0">
                       <h4 className="font-bold text-lg truncate pr-2">{bill.name}</h4>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <Badge variant="secondary" className="text-[9px] font-bold uppercase">{bill.category}</Badge>
-                        {bill.subCategory && bill.subCategory !== 'Others' && (
-                          <span className="text-[9px] text-muted-foreground uppercase font-medium">/ {bill.subCategory}</span>
+                        <Badge variant="secondary" className="text-[9px] font-bold uppercase">{bill.categoryName}</Badge>
+                        {bill.subcategoryName && bill.subcategoryName !== 'Others' && (
+                          <span className="text-[9px] text-muted-foreground uppercase font-medium">/ {bill.subcategoryName}</span>
                         )}
                       </div>
                     </div>
@@ -420,29 +411,6 @@ export default function BillsPage() {
           )}
         </div>
       </div>
-
-      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl z-[150]">
-          <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Category Name</label>
-              <Input 
-                placeholder="e.g. Pet Care" 
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-12 rounded-xl text-sm font-bold shadow-sm"
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleAddCustomCategory}>Create Now</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

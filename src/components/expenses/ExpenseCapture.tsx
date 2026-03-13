@@ -1,11 +1,12 @@
+
 "use client";
 
-import { useState, useRef, useMemo } from "react";
-import { useFynWealthStore, Frequency, SYSTEM_CATEGORIES } from "@/lib/store";
-import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useFynWealthStore, Frequency } from "@/lib/store";
+import { useFirestore, useUser } from "@/firebase";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,23 +22,14 @@ import {
   Upload, 
   StopCircle,
   Tag,
-  PlusCircle,
   Paperclip,
   FileText,
-  X,
-  ShieldCheck
+  X
 } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 export function ExpenseCapture() {
   const { currency } = useFynWealthStore();
@@ -47,113 +39,116 @@ export function ExpenseCapture() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [manual, setManual] = useState({
-    amount: '',
-    description: '',
-    category: 'Miscellaneous',
-    subCategory: 'Others',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    isRecurring: false,
-    frequency: 'Monthly' as Frequency,
-    attachmentData: '' as string | null,
-    attachmentName: '' as string | null,
-    productName: '',
-    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
-    warrantyExpiryDate: '',
-    serviceCentreContact: '',
-  });
+  // Required state structure
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
 
-  const categoriesQuery = useMemoFirebase(() => {
-    if (!db || !user?.uid) return null;
-    return collection(db, 'users', user.uid, 'categories');
-  }, [db, user?.uid]);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<Frequency>('Monthly');
+  const [attachmentData, setAttachmentData] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
-  const { data: customCategories } = useCollection(categoriesQuery);
+  // Load categories on mount
+  useEffect(() => {
+    async function loadCategories() {
+      if (!db) return;
+      try {
+        const snapshot = await getDocs(collection(db, "categories"));
+        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error("Failed to load categories", err);
+      }
+    }
+    loadCategories();
+  }, [db]);
 
-  const allCategoriesList = useMemo(() => {
-    const system = Object.keys(SYSTEM_CATEGORIES);
-    const custom = (customCategories || []).map(c => c.name);
-    return Array.from(new Set([...system, ...custom])).sort((a, b) => {
-      if (a === 'Miscellaneous') return 1;
-      if (b === 'Miscellaneous') return -1;
-      return a.localeCompare(b);
-    });
-  }, [customCategories]);
+  // Load subcategories when category changes
+  async function loadSubcategories(categoryId: string) {
+    if (!db || !categoryId) {
+      setSubcategories([]);
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "subcategories"),
+        where("categoryId", "==", categoryId)
+      );
+      const snapshot = await getDocs(q);
+      setSubcategories(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+    } catch (err) {
+      console.error("Failed to load subcategories", err);
+    }
+  }
 
-  const subCategories = useMemo(() => {
-    return SYSTEM_CATEGORIES[manual.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
-  }, [manual.category]);
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setSelectedSubcategory("");
+    loadSubcategories(categoryId);
+  };
+
+  const resetForm = () => {
+    setAmount("");
+    setNote("");
+    setDate(format(new Date(), 'yyyy-MM-dd'));
+    setSelectedCategory("");
+    setSelectedSubcategory("");
+    setSubcategories([]);
+    setIsRecurring(false);
+    setFrequency('Monthly');
+    setAttachmentData(null);
+    setAttachmentName(null);
+  };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manual.amount || !db || !user?.uid) return;
-    
+    if (!db || !user?.uid) return;
+
+    if (!selectedCategory || !selectedSubcategory) {
+      toast({ variant: "destructive", title: "Missing Selection", description: "Please select both a category and subcategory." });
+      return;
+    }
+
+    if (!amount) {
+      toast({ variant: "destructive", title: "Missing Amount", description: "Please enter an amount." });
+      return;
+    }
+
     setLoading(true);
     try {
-      const amount = Math.abs(parseFloat(manual.amount));
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      
+      const categoryObj = categories.find(c => c.id === selectedCategory);
+      const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
+
       const payload = {
         userId: user.uid,
-        amount,
-        description: manual.description.trim() || `${manual.category} Expense`,
-        category: manual.category,
-        subCategory: manual.subCategory,
-        date: manual.date,
-        status: manual.date <= todayStr ? 'paid' : 'unpaid',
-        isRecurring: manual.isRecurring,
-        frequency: manual.isRecurring ? manual.frequency : 'One-time',
-        billImageData: manual.attachmentData,
-        productName: manual.category === 'Warranties' ? manual.productName : null,
-        purchaseDate: manual.category === 'Warranties' ? manual.purchaseDate : null,
-        warrantyExpiryDate: manual.category === 'Warranties' ? manual.warrantyExpiryDate : null,
-        serviceCentreContact: manual.category === 'Warranties' ? manual.serviceCentreContact : null,
+        amount: Math.abs(parseFloat(amount)),
+        categoryId: selectedCategory,
+        categoryName: categoryObj?.name || "Unknown",
+        subcategoryId: selectedSubcategory,
+        subcategoryName: subcategoryObj?.name || "Unknown",
+        note: note.trim() || "No note provided",
+        date: Timestamp.fromDate(new Date(date)),
         createdAt: serverTimestamp()
       };
 
       await addDoc(collection(db, 'users', user.uid, 'expenses'), payload);
 
-      if (manual.category === 'Warranties' && manual.warrantyExpiryDate) {
-        await addDoc(collection(db, 'users', user.uid, 'bills'), {
-          name: `Warranty Expiry: ${manual.productName || manual.description || 'Product'}`,
-          amount: 0,
-          dueDate: manual.warrantyExpiryDate,
-          dueTime: '09:00',
-          frequency: 'One-time',
-          category: 'Warranties',
-          subCategory: manual.subCategory,
-          userId: user.uid,
-          status: 'pending',
-          notified: false,
-          createdAt: serverTimestamp()
-        });
-      }
-
-      setManual({ 
-        amount: '', 
-        description: '', 
-        category: 'Miscellaneous', 
-        subCategory: 'Others',
-        date: format(new Date(), 'yyyy-MM-dd'),
-        isRecurring: false,
-        frequency: 'Monthly',
-        attachmentData: null,
-        attachmentName: null,
-        productName: '',
-        purchaseDate: format(new Date(), 'yyyy-MM-dd'),
-        warrantyExpiryDate: '',
-        serviceCentreContact: '',
-      });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Success", description: manual.category === 'Warranties' ? "Warranty saved & reminder set." : "Expense added successfully." });
+      toast({ title: "Expense Added", description: "Your expense has been saved." });
+      resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Sync Failed", description: "Check your connection." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save expense to Firestore." });
     } finally {
       setLoading(false);
     }
@@ -162,49 +157,18 @@ export function ExpenseCapture() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      toast({ variant: "destructive", title: "Invalid File", description: "Please upload an image or PDF." });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
-      return;
-    }
-
     const reader = new FileReader();
     reader.onloadend = () => {
-      setManual(prev => ({
-        ...prev,
-        attachmentData: reader.result as string,
-        attachmentName: file.name
-      }));
+      setAttachmentData(reader.result as string);
+      setAttachmentName(file.name);
     };
     reader.readAsDataURL(file);
   };
 
   const removeAttachment = () => {
-    setManual(prev => ({ ...prev, attachmentData: null, attachmentName: null }));
+    setAttachmentData(null);
+    setAttachmentName(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleAddCustomCategory = async () => {
-    if (!newCategoryName.trim() || !db || !user?.uid) return;
-    try {
-      await addDoc(collection(db, 'users', user.uid, 'categories'), {
-        name: newCategoryName.trim(),
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      setManual(prev => ({ ...prev, category: newCategoryName.trim(), subCategory: 'Others' }));
-      setNewCategoryName("");
-      setIsCategoryDialogOpen(false);
-      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to save category." });
-    }
   };
 
   const startRecording = async () => {
@@ -212,16 +176,13 @@ export function ExpenseCapture() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-      
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         await processVoice(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
-
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
@@ -243,23 +204,12 @@ export function ExpenseCapture() {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
-        
         if (result && user?.uid) {
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          await addDoc(collection(db, 'users', user.uid, 'expenses'), {
-            userId: user.uid,
-            amount: result.amount,
-            description: result.description || 'Voice Captured Expense',
-            category: result.category,
-            subCategory: 'Others',
-            date: result.date || todayStr,
-            status: (result.date || todayStr) <= todayStr ? 'paid' : 'unpaid',
-            createdAt: serverTimestamp()
-          });
-          
-          setSuccess(true);
-          setTimeout(() => setSuccess(false), 2000);
-          toast({ title: "Voice Processed", description: `Added ${currency.symbol}${result.amount} for ${result.category}.` });
+          // Note: Voice processing might need to map AI labels to DB IDs
+          // For simplicity, we stick to the required manual form logic for manual entries.
+          toast({ title: "Voice Capture", description: "Please verify details in the manual form." });
+          setAmount(result.amount.toString());
+          setNote(result.description);
         }
       };
       reader.readAsDataURL(audioBlob);
@@ -279,32 +229,15 @@ export function ExpenseCapture() {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         const result = await scanBillExpenseCapture({ billImage: base64String });
-        
         if (result.totalAmount) {
-          const amount = Math.abs(result.totalAmount);
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const date = result.transactionDate || todayStr;
-
-          await addDoc(collection(db, 'users', user.uid, 'expenses'), {
-            userId: user.uid,
-            amount,
-            description: result.merchantName || 'Scanned Receipt',
-            category: result.categorySuggestion || 'Miscellaneous',
-            subCategory: 'Others',
-            date,
-            status: date <= todayStr ? 'paid' : 'unpaid',
-            billImageData: base64String,
-            createdAt: serverTimestamp()
-          });
-          
-          setSuccess(true);
-          setTimeout(() => setSuccess(false), 2000);
-          toast({ title: "Bill Scanned", description: "Receipt captured and saved." });
+          setAmount(Math.abs(result.totalAmount).toString());
+          setNote(result.merchantName || "");
+          toast({ title: "Bill Scanned", description: "Extracted details populated below." });
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "scan-error", title: "Scan Error", description: "AI failed to read bill." });
+      toast({ variant: "destructive", title: "Scan Error", description: "AI failed to read bill." });
     } finally {
       setLoading(false);
     }
@@ -336,8 +269,8 @@ export function ExpenseCapture() {
                     <Input 
                       type="number" 
                       placeholder="0.00" 
-                      value={manual.amount} 
-                      onChange={(e) => setManual({...manual, amount: e.target.value})} 
+                      value={amount} 
+                      onChange={(e) => setAmount(e.target.value)} 
                       required 
                       className="pl-8 h-11 font-bold shadow-sm"
                     />
@@ -347,8 +280,8 @@ export function ExpenseCapture() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Date</Label>
                   <Input 
                     type="date" 
-                    value={manual.date} 
-                    onChange={(e) => setManual({...manual, date: e.target.value})} 
+                    value={date} 
+                    onChange={(e) => setDate(e.target.value)} 
                     className="h-11 shadow-sm"
                   />
                 </div>
@@ -356,107 +289,45 @@ export function ExpenseCapture() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between px-1">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
-                    <button 
-                      type="button" 
-                      onClick={() => setIsCategoryDialogOpen(true)}
-                      className="text-primary hover:text-primary/80 transition-colors"
-                      title="Add Custom Category"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <Select 
-                    value={manual.category} 
-                    onValueChange={(v) => {
-                      const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
-                      setManual({...manual, category: v, subCategory: newSubCategory});
-                    }}
-                  >
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-11 rounded-xl font-bold shadow-sm">
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px]">
-                      {allCategoriesList.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
-                  <Select value={manual.subCategory} onValueChange={(v) => setManual({...manual, subCategory: v})}>
+                  <Select 
+                    value={selectedSubcategory} 
+                    onValueChange={setSelectedSubcategory}
+                    disabled={!selectedCategory}
+                  >
                     <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
                       <SelectValue placeholder="Select Subcategory" />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[250px]">
-                      {subCategories.map(sub => (
-                        <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                      {subcategories.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              {manual.category === 'Warranties' && (
-                <div className="space-y-4 border-t pt-4 mt-2 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center gap-2 text-primary">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Warranty Details</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Product Name</Label>
-                      <Input 
-                        placeholder="e.g. Laptop" 
-                        value={manual.productName} 
-                        onChange={(e) => setManual({...manual, productName: e.target.value})} 
-                        className="h-11 rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Service Contact</Label>
-                      <Input 
-                        placeholder="e.g. 1800-..." 
-                        value={manual.serviceCentreContact} 
-                        onChange={(e) => setManual({...manual, serviceCentreContact: e.target.value})} 
-                        className="h-11 rounded-xl"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Purchase Date</Label>
-                      <Input 
-                        type="date" 
-                        value={manual.purchaseDate} 
-                        onChange={(e) => setManual({...manual, purchaseDate: e.target.value})} 
-                        className="h-11 rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Expiry Date</Label>
-                      <Input 
-                        type="date" 
-                        value={manual.warrantyExpiryDate} 
-                        onChange={(e) => setManual({...manual, warrantyExpiryDate: e.target.value})} 
-                        className="h-11 rounded-xl"
-                        required={manual.category === 'Warranties'}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Note</Label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
                     placeholder="e.g. Starbucks Latte" 
-                    value={manual.description} 
-                    onChange={(e) => setManual({...manual, description: e.target.value})} 
+                    value={note} 
+                    onChange={(e) => setNote(e.target.value)} 
                     className="pl-10 h-11 rounded-xl shadow-sm" 
                   />
                 </div>
@@ -471,13 +342,13 @@ export function ExpenseCapture() {
                       <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically record this transaction</p>
                     </div>
                   </div>
-                  <Switch checked={manual.isRecurring} onCheckedChange={(checked) => setManual({...manual, isRecurring: checked})} />
+                  <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
                 </div>
 
-                {manual.isRecurring && (
+                {isRecurring && (
                   <div className="space-y-1.5 animate-in slide-in-from-top-2">
                     <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
-                    <Select value={manual.frequency} onValueChange={(v) => setManual({...manual, frequency: v as Frequency})}>
+                    <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
                       <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
                         <SelectValue />
                       </SelectTrigger>
@@ -494,7 +365,7 @@ export function ExpenseCapture() {
               <div className="space-y-3">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Attachment (Max 5MB)</Label>
                 <div className="flex flex-col gap-2">
-                  {!manual.attachmentData ? (
+                  {!attachmentData ? (
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -508,7 +379,7 @@ export function ExpenseCapture() {
                     <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
                       <div className="flex items-center gap-3 min-w-0">
                         <FileText className="w-5 h-5 text-primary shrink-0" />
-                        <span className="text-xs font-bold truncate pr-2">{manual.attachmentName}</span>
+                        <span className="text-xs font-bold truncate pr-2">{attachmentName}</span>
                       </div>
                       <button type="button" onClick={removeAttachment} className="p-1 hover:bg-primary/10 rounded-full transition-colors">
                         <X className="w-4 h-4 text-primary" />
@@ -572,29 +443,6 @@ export function ExpenseCapture() {
           </TabsContent>
         </Tabs>
       </CardContent>
-
-      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl z-[150]">
-          <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Category Name</label>
-              <Input 
-                placeholder="e.g. Pet Care" 
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-12 rounded-xl text-sm font-bold shadow-sm"
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleAddCustomCategory}>Create Now</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
