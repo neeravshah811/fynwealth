@@ -1,8 +1,10 @@
-
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format } from "date-fns";
 import { 
   BarChart, 
   Bar, 
@@ -15,13 +17,36 @@ import {
 } from 'recharts';
 
 export function SpendingChart() {
-  const { expenses, budgets, currency, viewMonth, viewYear } = useFynWealthStore();
+  const { currency, viewMonth, viewYear } = useFynWealthStore();
+  const { user } = useUser();
+  const db = useFirestore();
+
+  // Fetch Expenses
+  const expensesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+    
+    return query(
+      collection(db, 'users', user.uid, 'expenses'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+  }, [db, user?.uid, viewMonth, viewYear]);
+
+  // Fetch Budgets
+  const budgetsQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'budgets');
+  }, [db, user?.uid]);
+
+  const { data: expensesData } = useCollection(expensesQuery);
+  const { data: budgetsData } = useCollection(budgetsQuery);
+
+  const expenses = expensesData || [];
+  const budgets = budgetsData || [];
 
   const data = expenses
-    .filter(e => {
-      const d = new Date(e.date);
-      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-    })
     .reduce((acc: any[], curr) => {
       const existing = acc.find(item => item.name === curr.category);
       if (existing) {
@@ -33,9 +58,6 @@ export function SpendingChart() {
     }, [])
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
-
-  const totalSpent = data.reduce((sum, item) => sum + item.value, 0);
-  const totalBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
 
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', '#10b981', '#3b82f6', '#f43f5e', '#8b5cf6'];
 

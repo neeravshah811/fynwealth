@@ -1,7 +1,9 @@
-
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where } from "firebase/firestore";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   PieChart, 
@@ -13,13 +15,27 @@ import {
 } from 'recharts';
 
 export function CategoryPieChart() {
-  const { expenses, currency, viewMonth, viewYear } = useFynWealthStore();
+  const { currency, viewMonth, viewYear } = useFynWealthStore();
+  const { user } = useUser();
+  const db = useFirestore();
+
+  // Fetch Expenses
+  const expensesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+    
+    return query(
+      collection(db, 'users', user.uid, 'expenses'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+  }, [db, user?.uid, viewMonth, viewYear]);
+
+  const { data: expensesData } = useCollection(expensesQuery);
+  const expenses = expensesData || [];
 
   const data = expenses
-    .filter(e => {
-      const d = new Date(e.date);
-      return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-    })
     .reduce((acc: any[], curr) => {
       const existing = acc.find(item => item.name === curr.category);
       if (existing) {

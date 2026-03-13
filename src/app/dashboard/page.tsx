@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { useFynWealthStore, Expense } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,6 @@ import { format } from "date-fns";
 import { 
   FileText, 
   CalendarRange, 
-  RefreshCcw, 
   Calendar as CalendarIcon, 
   Loader2,
   Sparkles,
@@ -20,7 +21,6 @@ import {
   HelpCircle
 } from "lucide-react";
 import Link from "next/link";
-import { toast } from "@/hooks/use-toast";
 import { TutorialDialog } from "@/components/TutorialDialog";
 import {
   Popover,
@@ -38,13 +38,32 @@ const CategoryPieChart = dynamic(() => import("@/components/dashboard/CategoryPi
 });
 
 export default function DashboardPage() {
-  const { expenses, currency, viewMonth, viewYear, setViewDate, rolloverRecurring, insights } = useFynWealthStore();
+  const { currency, viewMonth, viewYear, setViewDate, insights } = useFynWealthStore();
+  const { user } = useUser();
+  const db = useFirestore();
   const [mounted, setMounted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Firestore Expenses Query - Filters by current view date
+  const expensesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+    
+    return query(
+      collection(db, 'users', user.uid, 'expenses'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      orderBy('date', 'desc')
+    );
+  }, [db, user?.uid, viewMonth, viewYear]);
+
+  const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
+  const expenses = expensesData || [];
 
   if (!mounted) {
     return (
@@ -56,31 +75,17 @@ export default function DashboardPage() {
   
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
-  const filteredByView = expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
-  });
-
-  const recentExpenses = [...filteredByView]
+  const recentExpenses = [...expenses]
     .filter(e => e.date <= todayStr)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 3);
 
-  const upcomingExpenses = [...filteredByView]
+  const upcomingExpenses = [...expenses]
     .filter(e => e.date > todayStr)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
   const formatAmount = (amount: number) => {
     return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  const handleRollover = () => {
-    rolloverRecurring();
-    toast({
-      title: "Recurring Expenses Rolled Over",
-      description: "Copied active recurring items from previous months.",
-    });
   };
 
   const handleCalendarSelect = (date: Date | undefined) => {
@@ -209,10 +214,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="min-h-[200px]">
-              {recentExpenses.map((expense) => (
+              {expensesLoading ? (
+                <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary/30" /></div>
+              ) : recentExpenses.map((expense) => (
                 <ExpenseRow key={expense.id} expense={expense} />
               ))}
-              {recentExpenses.length === 0 && (
+              {!expensesLoading && recentExpenses.length === 0 && (
                 <div className="text-xs text-center text-muted-foreground py-16 italic">
                   No recent activity.
                 </div>
@@ -227,17 +234,15 @@ export default function DashboardPage() {
               <CalendarRange className="w-4 h-4 text-accent" />
               <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-wider">Upcoming</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-bold text-accent uppercase tracking-tight" onClick={handleRollover}>
-              <RefreshCcw className="w-3 h-3 mr-1.5" />
-              Rollover
-            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="min-h-[200px]">
-              {upcomingExpenses.map((expense) => (
+              {expensesLoading ? (
+                <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-accent/30" /></div>
+              ) : upcomingExpenses.map((expense) => (
                 <ExpenseRow key={expense.id} expense={expense} />
               ))}
-              {upcomingExpenses.length === 0 && (
+              {!expensesLoading && upcomingExpenses.length === 0 && (
                 <div className="text-xs text-center text-muted-foreground py-16 italic">
                   Nothing scheduled.
                 </div>
