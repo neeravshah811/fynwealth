@@ -33,6 +33,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 
 export default function BillsPage() {
@@ -50,6 +58,11 @@ export default function BillsPage() {
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+
+  // Custom Category Dialog State
+  const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -61,21 +74,20 @@ export default function BillsPage() {
     attachmentName: '' as string | null,
   });
 
-  // Load categories on mount
-  useEffect(() => {
-    async function loadCategories() {
-      if (!db) return;
-      try {
-        const snapshot = await getDocs(collection(db, "categories"));
-        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        console.error("Failed to load categories", err);
-      }
+  const loadCategories = async () => {
+    if (!db) return;
+    try {
+      const snapshot = await getDocs(query(collection(db, "categories"), orderBy("name", "asc")));
+      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error("Failed to load categories", err);
     }
+  };
+
+  useEffect(() => {
     loadCategories();
   }, [db]);
 
-  // Load subcategories when category changes
   async function loadSubcategories(categoryId: string) {
     if (!db || !categoryId) {
       setSubcategories([]);
@@ -84,7 +96,8 @@ export default function BillsPage() {
     try {
       const q = query(
         collection(db, "subcategories"),
-        where("categoryId", "==", categoryId)
+        where("categoryId", "==", categoryId),
+        orderBy("name", "asc")
       );
       const snapshot = await getDocs(q);
       setSubcategories(snapshot.docs.map(doc => ({
@@ -100,6 +113,36 @@ export default function BillsPage() {
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
     loadSubcategories(categoryId);
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    setIsCreatingCategory(true);
+    try {
+      const categoryRef = await addDoc(collection(db, "categories"), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, "subcategories"), {
+        name: "Others",
+        categoryId: categoryRef.id,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: "Category Created", description: `"${newCategoryName}" added.` });
+      setNewCategoryName("");
+      setIsCustomCategoryOpen(false);
+      
+      await loadCategories();
+      handleCategoryChange(categoryRef.id);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create category." });
+    } finally {
+      setIsCreatingCategory(false);
+    }
   };
 
   const billsQuery = useMemoFirebase(() => {
@@ -270,7 +313,16 @@ export default function BillsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCustomCategoryOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px]">
@@ -339,6 +391,40 @@ export default function BillsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* New Category Dialog */}
+      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
+            <DialogDescription className="text-xs font-medium mt-1">
+              Personalize your tracking by adding a custom category.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Name</label>
+              <Input 
+                placeholder="e.g. Side Hustle" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg" 
+              onClick={handleAddCustomCategory}
+              disabled={isCreatingCategory || !newCategoryName.trim()}
+            >
+              {isCreatingCategory ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className="space-y-6">

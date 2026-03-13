@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,14 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
@@ -43,10 +50,16 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Categories & Subcategories
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+
+  // Custom Category Dialog State
+  const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -64,16 +77,17 @@ export function ExpenseCapture() {
     contact: ""
   });
 
-  useEffect(() => {
-    async function loadCategories() {
-      if (!db) return;
-      try {
-        const snapshot = await getDocs(collection(db, "categories"));
-        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        console.error("Failed to load categories", err);
-      }
+  const loadCategories = async () => {
+    if (!db) return;
+    try {
+      const snapshot = await getDocs(query(collection(db, "categories"), orderBy("name", "asc")));
+      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error("Failed to load categories", err);
     }
+  };
+
+  useEffect(() => {
     loadCategories();
   }, [db]);
 
@@ -85,7 +99,8 @@ export function ExpenseCapture() {
     try {
       const q = query(
         collection(db, "subcategories"),
-        where("categoryId", "==", categoryId)
+        where("categoryId", "==", categoryId),
+        orderBy("name", "asc")
       );
       const snapshot = await getDocs(q);
       setSubcategories(snapshot.docs.map(doc => ({
@@ -101,6 +116,39 @@ export function ExpenseCapture() {
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
     loadSubcategories(categoryId);
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    setIsCreatingCategory(true);
+    try {
+      // 1. Create the category
+      const categoryRef = await addDoc(collection(db, "categories"), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Create a default "Others" subcategory for it
+      await addDoc(collection(db, "subcategories"), {
+        name: "Others",
+        categoryId: categoryRef.id,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: "Category Created", description: `"${newCategoryName}" added to your list.` });
+      setNewCategoryName("");
+      setIsCustomCategoryOpen(false);
+      
+      // 3. Refresh and select
+      await loadCategories();
+      handleCategoryChange(categoryRef.id);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create category." });
+    } finally {
+      setIsCreatingCategory(false);
+    }
   };
 
   const isWarrantyCategory = categories.find(c => c.id === selectedCategory)?.name === "Warranties";
@@ -162,7 +210,6 @@ export function ExpenseCapture() {
         payload.warrantyExpiryDate = warrantyData.expiryDate;
         payload.serviceCentreContact = warrantyData.contact;
 
-        // Auto-create reminder for warranty expiry
         await addDoc(collection(db, 'users', user.uid, 'bills'), {
           name: `Warranty Expiry: ${warrantyData.productName}`,
           amount: 0,
@@ -305,13 +352,13 @@ export function ExpenseCapture() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
-                    <Input 
+                    <input 
                       type="number" 
                       placeholder="0.00" 
                       value={amount} 
                       onChange={(e) => setAmount(e.target.value)} 
                       required 
-                      className="pl-8 h-11 font-bold shadow-sm"
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm font-bold shadow-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -328,7 +375,17 @@ export function ExpenseCapture() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCustomCategoryOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors p-0.5 rounded-full hover:bg-primary/5"
+                      title="Add Custom Category"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-11 rounded-xl font-bold shadow-sm">
                       <SelectValue placeholder="Select Category" />
@@ -540,6 +597,40 @@ export function ExpenseCapture() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* New Category Dialog */}
+      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
+            <DialogDescription className="text-xs font-medium mt-1">
+              Add a personalized category to your financial command center.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Category Name</label>
+              <Input 
+                placeholder="e.g. Personal Projects" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg" 
+              onClick={handleAddCustomCategory}
+              disabled={isCreatingCategory || !newCategoryName.trim()}
+            >
+              {isCreatingCategory ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Add Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

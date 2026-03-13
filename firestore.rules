@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -39,16 +38,21 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     /**
-     * @description Global Categories and Subcategories. Globally readable.
+     * @description Global Categories and Subcategories. 
+     * Users can create their own entries marked with their UID.
      */
     match /categories/{categoryId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin(); // Global admin fallback
     }
 
     match /subcategories/{subcategoryId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin(); // Global admin fallback
     }
 
     /**
