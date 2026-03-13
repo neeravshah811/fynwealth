@@ -3,14 +3,14 @@
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, updateDoc, query, orderBy, where } from "firebase/firestore";
+import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Edit2, Trash2, Loader2, Filter } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Search, Edit2, Trash2, Loader2, Filter, Download, Upload } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
 import { ExpenseCapture } from "@/components/expenses/ExpenseCapture";
 import {
   Dialog,
@@ -38,11 +38,13 @@ export default function ExpensesPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
   const { user } = useUser();
   const db = useFirestore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Firestore Expenses Query - Filters by current view date
   const expensesQuery = useMemoFirebase(() => {
@@ -100,6 +102,105 @@ export default function ExpensesPage() {
     toast({ title: "Deleted", description: "Record removed." });
   };
 
+  const handleExport = () => {
+    if (filteredExpenses.length === 0) {
+      toast({ variant: "destructive", title: "Export Error", description: "No transactions to export." });
+      return;
+    }
+
+    const headers = ["Date", "Description", "Category", "Subcategory", "Amount", "Status"];
+    const rows = filteredExpenses.map(e => [
+      e.date,
+      `"${e.description.replace(/"/g, '""')}"`,
+      e.category,
+      e.subCategory || "Others",
+      e.amount,
+      e.status
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `fynwealth-expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Export Ready", description: "CSV file downloaded successfully." });
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !db || !user?.uid) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      
+      if (lines.length <= 1) {
+        toast({ variant: "destructive", title: "Import Error", description: "The file appears to be empty." });
+        setIsImporting(false);
+        return;
+      }
+
+      // Simple CSV parsing (skipping header)
+      const dataRows = lines.slice(1);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const row of dataRows) {
+        try {
+          // Naive split, but handles basics. For complex CSVs with quotes, regex is better.
+          const parts = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+          
+          if (parts.length >= 5) {
+            const [date, desc, cat, sub, amt, status] = parts.map(p => p.trim().replace(/^"|"$/g, ''));
+            
+            const parsedAmount = Math.abs(parseFloat(amt));
+            if (isNaN(parsedAmount)) throw new Error("Invalid amount");
+
+            await addDoc(collection(db, 'users', user.uid, 'expenses'), {
+              userId: user.uid,
+              date: date || format(new Date(), 'yyyy-MM-dd'),
+              description: desc || "Imported Expense",
+              category: cat || "Miscellaneous",
+              subCategory: sub || "Others",
+              amount: parsedAmount,
+              status: (status?.toLowerCase() === 'paid' ? 'paid' : 'unpaid') as 'paid' | 'unpaid',
+              createdAt: serverTimestamp()
+            });
+            successCount++;
+          }
+        } catch (err) {
+          failCount++;
+        }
+      }
+
+      toast({ 
+        title: "Import Complete", 
+        description: `Successfully added ${successCount} expenses.${failCount > 0 ? ` Failed to import ${failCount} rows.` : ''}` 
+      });
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    reader.readAsText(file);
+  };
+
   const formatAmount = (amount: number) => {
     return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
@@ -124,9 +225,36 @@ export default function ExpensesPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-8 text-[10px] uppercase font-bold">
-                    <Filter className="w-3 h-3 mr-1.5" /> Filter
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept=".csv" 
+                      onChange={handleFileImport} 
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-9 text-[10px] uppercase font-bold rounded-lg border-primary/20 text-primary"
+                      onClick={handleImportClick}
+                      disabled={isImporting}
+                    >
+                      {isImporting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Upload className="w-3 h-3 mr-1.5" />}
+                      Import
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-9 text-[10px] uppercase font-bold rounded-lg border-primary/20 text-primary"
+                      onClick={handleExport}
+                    >
+                      <Download className="w-3 h-3 mr-1.5" /> Export
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-9 text-[10px] uppercase font-bold rounded-lg">
+                      <Filter className="w-3 h-3 mr-1.5" /> Filter
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
