@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 
 export default function BudgetsPage() {
-  const { expenses, currency, customCategories, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
   const { user } = useUser();
   const firestore = useFirestore();
   
@@ -56,20 +56,33 @@ export default function BudgetsPage() {
 
   const { data: budgetsData, isLoading: budgetsLoading } = useCollection(budgetsQuery);
 
+  // Firestore Expenses Query - Filters by current view date
+  const expensesQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
+    const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
+    
+    return query(
+      collection(firestore, 'users', user.uid, 'expenses'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+  }, [firestore, user?.uid, viewMonth, viewYear]);
+
+  const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
+  const expenses = expensesData || [];
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const allCategoriesList = useMemo(() => {
-    return Object.keys({ ...SYSTEM_CATEGORIES, ...customCategories });
-  }, [customCategories]);
+    return Object.keys(SYSTEM_CATEGORIES);
+  }, []);
 
   const getMonthlySpendByCategory = (category: string) => {
     return expenses
-      .filter(e => {
-        const d = new Date(e.date);
-        return d.getMonth() === viewMonth && d.getFullYear() === viewYear && e.category === category;
-      })
+      .filter(e => e.category === category)
       .reduce((sum, e) => sum + e.amount, 0);
   };
 
@@ -133,7 +146,7 @@ export default function BudgetsPage() {
   const totalBudget = budgetsData?.reduce((sum, b) => sum + (b.limit || 0), 0) || 0;
   const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
 
-  if (!mounted || budgetsLoading) {
+  if (!mounted || budgetsLoading || expensesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
