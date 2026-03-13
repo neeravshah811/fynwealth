@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -54,7 +53,7 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic taxonomy state
+  // Taxonomy state
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -80,7 +79,18 @@ export default function BillsPage() {
     if (!db) return;
     try {
       const snapshot = await getDocs(query(collection(db, "categories"), orderBy("name", "asc")));
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const uniqueCategories: any[] = [];
+      const seenNames = new Set();
+      
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (!seenNames.has(data.name)) {
+          uniqueCategories.push({ id: doc.id, ...data });
+          seenNames.add(data.name);
+        }
+      });
+      
+      setCategories(uniqueCategories);
     } catch (err) {
       console.error("Failed to load categories", err);
     }
@@ -137,14 +147,14 @@ export default function BillsPage() {
         createdAt: serverTimestamp()
       });
 
-      toast({ title: "Category Created", description: `"${newCategoryName}" added.` });
+      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
       setNewCategoryName("");
       setIsCustomCategoryOpen(false);
       
       await loadCategories();
       handleCategoryChange(categoryRef.id);
     } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to create category." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to create custom category." });
     } finally {
       setIsCreatingCategory(false);
     }
@@ -205,7 +215,7 @@ export default function BillsPage() {
     if (!formData.name || !formData.amount || !db || !user?.uid) return;
 
     if (!selectedCategory || !selectedSubcategory) {
-      toast({ variant: "destructive", title: "Missing Selection", description: "Please select both a category and subcategory." });
+      toast({ variant: "destructive", title: "Selection Required", description: "Please pick both a category and subcategory." });
       return;
     }
 
@@ -233,9 +243,9 @@ export default function BillsPage() {
 
       resetForm();
       setShowForm(false);
-      toast({ title: "Reminder Set", description: "Saved successfully." });
+      toast({ title: "Reminder Sync", description: "Saved to your cloud vault." });
     } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Could not sync bill." });
+      toast({ variant: "destructive", title: "Error", description: "Could not save reminder." });
     } finally {
       setLoading(false);
     }
@@ -261,7 +271,7 @@ export default function BillsPage() {
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
+          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Cloud Reminders</h1>
           <p className="text-xs text-muted-foreground font-bold uppercase">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
@@ -275,7 +285,7 @@ export default function BillsPage() {
           </Popover>
           <Button onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-6 shadow-lg">
             {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-            {showForm ? "Cancel" : "New Reminder"}
+            {showForm ? "Cancel" : "Add Reminder"}
           </Button>
         </div>
       </div>
@@ -365,7 +375,7 @@ export default function BillsPage() {
               </div>
 
               <div className="space-y-3">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Bill Attachment (Max 5MB)</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Attachment (Optional)</Label>
                 <div className="flex flex-col gap-2">
                   {!formData.attachmentData ? (
                     <Button 
@@ -375,7 +385,7 @@ export default function BillsPage() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Paperclip className="w-4 h-4 mr-2" />
-                      Add attachment
+                      Add Bill / Invoice
                     </Button>
                   ) : (
                     <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
@@ -399,7 +409,7 @@ export default function BillsPage() {
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Custom Reminder"}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Cloud Reminder"}
               </Button>
             </form>
           </CardContent>
@@ -411,7 +421,7 @@ export default function BillsPage() {
           <DialogHeader>
             <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
             <DialogDescription className="text-xs font-medium mt-1">
-              Personalize your tracking by adding a custom category.
+              Add a personalized label to your dashboard.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
@@ -508,7 +518,7 @@ export default function BillsPage() {
           ))}
           {paidReminders.length === 0 && (
             <div className="text-center py-12 text-muted-foreground italic text-xs">
-              No payment history yet.
+              No recent settlements.
             </div>
           )}
         </div>

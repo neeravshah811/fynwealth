@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import { useFirestore, useUser } from '@/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, where, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
@@ -168,21 +167,34 @@ export default function AdminSettingsPage() {
   const seedDefaultTaxonomy = async () => {
     setSaving(true);
     try {
-      const batch = writeBatch(db);
+      // 1. Clear existing taxonomy to avoid duplication
+      const existingCats = await getDocs(collection(db, 'categories'));
+      const existingSubs = await getDocs(collection(db, 'subcategories'));
       
+      const clearBatch = writeBatch(db);
+      existingCats.docs.forEach(d => clearBatch.delete(d.ref));
+      existingSubs.docs.forEach(d => clearBatch.delete(d.ref));
+      await clearBatch.commit();
+
+      // 2. Seed new data
+      const seedBatch = writeBatch(db);
       for (const [catName, subs] of Object.entries(SYSTEM_CATEGORIES)) {
         const catRef = doc(collection(db, 'categories'));
-        batch.set(catRef, { name: catName });
+        seedBatch.set(catRef, { name: catName, createdAt: serverTimestamp() });
         
         subs.forEach(subName => {
           const subRef = doc(collection(db, 'subcategories'));
-          batch.set(subRef, { name: subName, categoryId: catRef.id });
+          seedBatch.set(subRef, { 
+            name: subName, 
+            categoryId: catRef.id,
+            createdAt: serverTimestamp()
+          });
         });
       }
       
-      await batch.commit();
+      await seedBatch.commit();
       await fetchData();
-      toast({ title: "Taxonomy Seeded", description: `${Object.keys(SYSTEM_CATEGORIES).length} categories and their subcategories added.` });
+      toast({ title: "Taxonomy Synchronized", description: `${Object.keys(SYSTEM_CATEGORIES).length} categories seeded successfully.` });
     } catch (err) {
       toast({ variant: "destructive", title: "Seeding Failed" });
     } finally {
@@ -203,18 +215,18 @@ export default function AdminSettingsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-2xl font-bold font-headline tracking-tight">System Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage administrative access and global application metrics.</p>
+          <p className="text-sm text-muted-foreground">Global application control and taxonomy management.</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={saving} className="h-10 rounded-xl font-bold">
           <RefreshCw className={cn("w-4 h-4 mr-2", saving && "animate-spin")} />
-          Refresh Registry
+          Refresh Data
         </Button>
       </div>
 
-      <Tabs defaultValue="registry" className="w-full">
+      <Tabs defaultValue="taxonomy" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="registry" className="font-bold text-xs uppercase">Admins</TabsTrigger>
           <TabsTrigger value="taxonomy" className="font-bold text-xs uppercase">Categories</TabsTrigger>
+          <TabsTrigger value="registry" className="font-bold text-xs uppercase">Admins</TabsTrigger>
           <TabsTrigger value="metrics" className="font-bold text-xs uppercase">Metrics</TabsTrigger>
         </TabsList>
 
@@ -225,12 +237,12 @@ export default function AdminSettingsPage() {
                 <Shield className="w-4 h-4 text-primary" />
                 Admin Registry
               </CardTitle>
-              <CardDescription className="text-xs">Authorize team members to access the Admin Dashboard.</CardDescription>
+              <CardDescription className="text-xs">Authorize specific emails to access the Admin Dashboard.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex gap-3">
                 <Input 
-                  placeholder="Enter email address..." 
+                  placeholder="Enter administrator email..." 
                   className="h-11 rounded-xl bg-muted/30 border-none text-sm"
                   value={newAdminEmail}
                   onChange={(e) => setNewAdminEmail(e.target.value)}
@@ -286,14 +298,14 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                  <Input placeholder="Category name..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="h-10" />
-                  <Button size="sm" onClick={handleAddCategory} disabled={saving}><Plus className="w-4 h-4" /></Button>
+                  <Input placeholder="Category name..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="h-10 rounded-xl" />
+                  <Button size="sm" className="rounded-xl" onClick={handleAddCategory} disabled={saving}><Plus className="w-4 h-4" /></Button>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto space-y-1">
+                <div className="max-h-[400px] overflow-y-auto space-y-1 scrollbar-thin">
                   {categories.map(cat => (
-                    <div key={cat.id} className={cn("flex items-center justify-between p-2 rounded-lg text-xs font-medium border", selectedCatForSub === cat.id ? "bg-primary/5 border-primary/20" : "bg-muted/10")}>
-                      <button onClick={() => setSelectedCatForSub(cat.id)} className="flex-1 text-left">{cat.name}</button>
-                      <button onClick={() => handleDeleteTaxonomy('categories', cat.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <div key={cat.id} className={cn("flex items-center justify-between p-2 rounded-lg text-xs font-medium border transition-colors", selectedCatForSub === cat.id ? "bg-primary/5 border-primary/20" : "bg-muted/10 border-transparent")}>
+                      <button onClick={() => setSelectedCatForSub(cat.id)} className="flex-1 text-left py-1">{cat.name}</button>
+                      <button onClick={() => handleDeleteTaxonomy('categories', cat.id)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   ))}
                 </div>
@@ -309,21 +321,21 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                  <Input placeholder="Subcategory name..." value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)} className="h-10" disabled={!selectedCatForSub} />
-                  <Button size="sm" onClick={handleAddSubcategory} disabled={saving || !selectedCatForSub}><Plus className="w-4 h-4" /></Button>
+                  <Input placeholder="Subcategory name..." value={newSubcategoryName} onChange={e => setNewSubcategoryName(e.target.value)} className="h-10 rounded-xl" disabled={!selectedCatForSub} />
+                  <Button size="sm" className="rounded-xl" onClick={handleAddSubcategory} disabled={saving || !selectedCatForSub}><Plus className="w-4 h-4" /></Button>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto space-y-1">
+                <div className="max-h-[400px] overflow-y-auto space-y-1 scrollbar-thin">
                   {subcategories.filter(s => s.categoryId === selectedCatForSub).map(sub => (
-                    <div key={sub.id} className="flex items-center justify-between p-2 rounded-lg text-xs font-medium bg-muted/10 border">
-                      <span>{sub.name}</span>
-                      <button onClick={() => handleDeleteTaxonomy('subcategories', sub.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <div key={sub.id} className="flex items-center justify-between p-2 rounded-lg text-xs font-medium bg-muted/10 border border-transparent">
+                      <span className="py-1">{sub.name}</span>
+                      <button onClick={() => handleDeleteTaxonomy('subcategories', sub.id)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   ))}
                   {selectedCatForSub && subcategories.filter(s => s.categoryId === selectedCatForSub).length === 0 && (
-                    <p className="text-center py-10 text-muted-foreground text-[10px] italic">No subcategories for this selection.</p>
+                    <p className="text-center py-10 text-muted-foreground text-[10px] italic">No subcategories linked to this category.</p>
                   )}
                   {!selectedCatForSub && (
-                    <p className="text-center py-10 text-muted-foreground text-[10px] italic">Select a category to manage subcategories.</p>
+                    <p className="text-center py-10 text-muted-foreground text-[10px] italic">Select a category to manage its sub-items.</p>
                   )}
                 </div>
               </CardContent>
@@ -336,9 +348,9 @@ export default function AdminSettingsPage() {
             <CardHeader>
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <Database className="w-4 h-4 text-emerald-500" />
-                System Data Override
+                System Maintenance
               </CardTitle>
-              <CardDescription className="text-xs">Manually override global metrics for maintenance or testing purposes.</CardDescription>
+              <CardDescription className="text-xs">Manually override global application metrics.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -352,7 +364,7 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Total Expenses Recorded</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Expenses Recorded</Label>
                   <Input 
                     type="number" 
                     value={stats.totalExpenses} 
@@ -361,7 +373,7 @@ export default function AdminSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Total Reminders Created</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Reminders Set</Label>
                   <Input 
                     type="number" 
                     value={stats.totalReminders} 
@@ -383,13 +395,13 @@ export default function AdminSettingsPage() {
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                  <strong>Warning:</strong> Updating these values directly will override automated calculations. 
+                  <strong>Caution:</strong> Changes here directly affect the admin dashboard visualization. 
                 </p>
               </div>
 
               <Button onClick={handleUpdateStats} disabled={saving} className="w-full h-12 rounded-xl shadow-lg font-bold">
                 {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                Save All Metrics
+                Synchronize Metrics
               </Button>
             </CardContent>
           </Card>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -51,7 +50,7 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Categories & Subcategories
+  // Categories & Subcategories State
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -83,7 +82,18 @@ export function ExpenseCapture() {
     if (!db) return;
     try {
       const snapshot = await getDocs(query(collection(db, "categories"), orderBy("name", "asc")));
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const uniqueCategories: any[] = [];
+      const seenNames = new Set();
+      
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (!seenNames.has(data.name)) {
+          uniqueCategories.push({ id: doc.id, ...data });
+          seenNames.add(data.name);
+        }
+      });
+      
+      setCategories(uniqueCategories);
     } catch (err) {
       console.error("Failed to load categories", err);
     }
@@ -140,7 +150,7 @@ export function ExpenseCapture() {
         createdAt: serverTimestamp()
       });
 
-      toast({ title: "Category Created", description: `"${newCategoryName}" added to your list.` });
+      toast({ title: "Category Created", description: `"${newCategoryName}" added.` });
       setNewCategoryName("");
       setIsCustomCategoryOpen(false);
       
@@ -179,12 +189,12 @@ export function ExpenseCapture() {
     if (!db || !user?.uid) return;
 
     if (!selectedCategory || !selectedSubcategory) {
-      toast({ variant: "destructive", title: "Missing Selection", description: "Please select both a category and subcategory." });
+      toast({ variant: "destructive", title: "Selection Required", description: "Please choose a category and subcategory." });
       return;
     }
 
     if (!amount) {
-      toast({ variant: "destructive", title: "Missing Amount", description: "Please enter an amount." });
+      toast({ variant: "destructive", title: "Amount Required", description: "Please enter the spent amount." });
       return;
     }
 
@@ -240,10 +250,10 @@ export function ExpenseCapture() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Expense Added", description: isWarrantyCategory ? "Warranty recorded and reminder scheduled." : "Expense saved to cloud vault." });
+      toast({ title: "Expense Saved", description: "Synchronized with your cloud vault." });
       resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not sync with cloud." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Check your internet connection." });
     } finally {
       setLoading(false);
     }
@@ -281,7 +291,7 @@ export function ExpenseCapture() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable microphone access." });
+      toast({ variant: "destructive", title: "Microphone Error", description: "Could not access microphone." });
     }
   };
 
@@ -300,7 +310,7 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result) {
-          toast({ title: "Voice Capture", description: "Review and click 'Add Expense'." });
+          toast({ title: "AI Transcribed", description: "Review extracted data and save." });
           setAmount(result.amount.toString());
           setNote(result.description);
           if (result.date) setDate(result.date);
@@ -308,7 +318,7 @@ export function ExpenseCapture() {
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
-      toast({ variant: "destructive", title: "AI Failed", description: "Could not process audio." });
+      toast({ variant: "destructive", title: "AI Error", description: "Failed to process voice input." });
     } finally {
       setLoading(false);
     }
@@ -326,12 +336,12 @@ export function ExpenseCapture() {
         if (result.totalAmount) {
           setAmount(Math.abs(result.totalAmount).toString());
           setNote(result.merchantName || "");
-          toast({ title: "Bill Scanned", description: "Extracted amount and merchant." });
+          toast({ title: "Bill Scanned", description: "Merchant and amount extracted." });
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "destructive", title: "Scan Failed", description: "Could not read receipt." });
+      toast({ variant: "destructive", title: "Scan Error", description: "Failed to process bill image." });
     } finally {
       setLoading(false);
     }
@@ -341,7 +351,7 @@ export function ExpenseCapture() {
     <Card className="shadow-lg border-none bg-card ring-1 ring-primary/5">
       <CardHeader className="bg-primary/5 rounded-t-3xl">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-headline text-primary">Capture Expense</CardTitle>
+          <CardTitle className="text-xl font-headline text-primary font-bold">Record Spend</CardTitle>
           {success && <CheckCircle2 className="text-emerald-500 w-8 h-8 animate-in zoom-in" />}
         </div>
       </CardHeader>
@@ -376,7 +386,7 @@ export function ExpenseCapture() {
                     type="date" 
                     value={date} 
                     onChange={(e) => setDate(e.target.value)} 
-                    className="h-11 shadow-sm"
+                    className="h-11 shadow-sm rounded-xl"
                   />
                 </div>
               </div>
@@ -404,7 +414,7 @@ export function ExpenseCapture() {
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="empty" disabled>No categories found</SelectItem>
+                        <SelectItem value="empty" disabled>No categories available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -447,10 +457,10 @@ export function ExpenseCapture() {
                     <div className="space-y-1.5">
                       <Label className="text-[9px] font-bold uppercase opacity-70">Product Name</Label>
                       <Input 
-                        placeholder="e.g. MacBook Pro" 
+                        placeholder="e.g. iPhone 15 Pro" 
                         value={warrantyData.productName} 
                         onChange={(e) => setWarrantyData({...warrantyData, productName: e.target.value})}
-                        className="h-10 bg-background"
+                        className="h-10 bg-background rounded-xl"
                         required={isWarrantyCategory}
                       />
                     </div>
@@ -461,7 +471,7 @@ export function ExpenseCapture() {
                           type="date" 
                           value={warrantyData.purchaseDate} 
                           onChange={(e) => setWarrantyData({...warrantyData, purchaseDate: e.target.value})}
-                          className="h-10 bg-background text-xs"
+                          className="h-10 bg-background text-xs rounded-xl"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -470,7 +480,7 @@ export function ExpenseCapture() {
                           type="date" 
                           value={warrantyData.expiryDate} 
                           onChange={(e) => setWarrantyData({...warrantyData, expiryDate: e.target.value})}
-                          className="h-10 bg-background text-xs"
+                          className="h-10 bg-background text-xs rounded-xl"
                           required={isWarrantyCategory}
                         />
                       </div>
@@ -481,11 +491,11 @@ export function ExpenseCapture() {
                         placeholder="Email or Phone Number" 
                         value={warrantyData.contact} 
                         onChange={(e) => setWarrantyData({...warrantyData, contact: e.target.value})}
-                        className="h-10 bg-background"
+                        className="h-10 bg-background rounded-xl"
                       />
                     </div>
                     <p className="text-[9px] text-muted-foreground italic">
-                      A reminder will be automatically set for {format(new Date(warrantyData.expiryDate), 'MMM dd, yyyy')}.
+                      Automated reminder set for: {format(new Date(warrantyData.expiryDate), 'MMM dd, yyyy')}.
                     </p>
                   </div>
                 </div>
@@ -496,7 +506,7 @@ export function ExpenseCapture() {
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
-                    placeholder="e.g. Starbucks Latte" 
+                    placeholder="e.g. Weekly Groceries" 
                     value={note} 
                     onChange={(e) => setNote(e.target.value)} 
                     className="pl-10 h-11 rounded-xl shadow-sm" 
@@ -510,7 +520,7 @@ export function ExpenseCapture() {
                     <Repeat className="w-4 h-4 text-primary" />
                     <div>
                       <Label className="text-xs font-bold block">Recurring expense</Label>
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically record this transaction</p>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold">Auto-record this transaction</p>
                     </div>
                   </div>
                   <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
@@ -544,7 +554,7 @@ export function ExpenseCapture() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Paperclip className="w-4 h-4 mr-2" />
-                      Add attachment
+                      Add Bill / PDF
                     </Button>
                   ) : (
                     <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
@@ -582,8 +592,8 @@ export function ExpenseCapture() {
               <h3 className="font-bold text-sm mb-1">{isRecording ? "Listening..." : "Voice Capture"}</h3>
               <p className="text-xs text-muted-foreground px-6 mb-6 leading-relaxed">
                 {isRecording 
-                  ? "Describe your expense now..." 
-                  : "Say: \"Spent 50 dollars on groceries today.\""}
+                  ? "Speak your expense details clearly..." 
+                  : "Say: \"Spent 500 on dinner yesterday.\""}
               </p>
               
               {!isRecording ? (
@@ -593,7 +603,7 @@ export function ExpenseCapture() {
                 </Button>
               ) : (
                 <Button onClick={stopRecording} variant="destructive" className="h-12 px-8 font-bold rounded-xl shadow-md">
-                  Stop & Process
+                  Process Audio
                 </Button>
               )}
             </div>
@@ -602,7 +612,7 @@ export function ExpenseCapture() {
           <TabsContent value="scan">
             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-muted rounded-2xl bg-muted/10">
               <Camera className="w-10 h-10 text-primary mb-4 opacity-40" />
-              <p className="text-xs text-muted-foreground mb-6">Extract amount & merchant automatically.</p>
+              <p className="text-xs text-muted-foreground mb-6">AI will extract Merchant and Amount from the receipt.</p>
               <input type="file" className="hidden" id="scan-upload" accept="image/*" onChange={processImage} />
               <Button asChild className="h-12 px-8 font-bold rounded-xl shadow-md" disabled={loading}>
                 <label htmlFor="scan-upload">
@@ -620,14 +630,14 @@ export function ExpenseCapture() {
           <DialogHeader>
             <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
             <DialogDescription className="text-xs font-medium mt-1">
-              Add a personalized category to your financial command center.
+              Add a personalized category to your records.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Category Name</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Name</label>
               <Input 
-                placeholder="e.g. Personal Projects" 
+                placeholder="e.g. Travel 2026" 
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 className="h-12 rounded-xl text-sm font-bold shadow-sm"
@@ -642,7 +652,7 @@ export function ExpenseCapture() {
               disabled={isCreatingCategory || !newCategoryName.trim()}
             >
               {isCreatingCategory ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              Add Now
+              Create Now
             </Button>
           </DialogFooter>
         </DialogContent>
