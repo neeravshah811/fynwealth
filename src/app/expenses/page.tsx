@@ -3,7 +3,7 @@
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +46,7 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
+  // Firestore Data Subscriptions
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -59,9 +60,25 @@ export default function ExpensesPage() {
     );
   }, [db, user?.uid, viewMonth, viewYear]);
 
-  const { data: expenses, isLoading } = useCollection(expensesQuery);
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, 'categories');
+  }, [db]);
 
-  const categoriesList = Object.keys(SYSTEM_CATEGORIES);
+  const budgetsQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'budgets');
+  }, [db, user?.uid]);
+
+  const { data: expenses, isLoading } = useCollection(expensesQuery);
+  const { data: categoriesData } = useCollection(categoriesQuery);
+  const { data: budgetsData } = useCollection(budgetsQuery);
+
+  const categoriesList = useMemo(() => {
+    const systemCats = Object.keys(SYSTEM_CATEGORIES);
+    const cloudCats = (categoriesData || []).map(c => c.name);
+    return Array.from(new Set([...systemCats, ...cloudCats])).sort();
+  }, [categoriesData]);
 
   const filteredExpenses = useMemo(() => {
     if (!expenses) return [];
@@ -82,14 +99,14 @@ export default function ExpensesPage() {
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!db || !user?.uid) return;
     const docRef = doc(db, 'users', user.uid, 'expenses', id);
-    await updateDoc(docRef, { status: currentStatus === 'paid' ? 'unpaid' : 'paid' });
+    updateDoc(docRef, { status: currentStatus === 'paid' ? 'unpaid' : 'paid' });
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingExpense && db && user?.uid) {
       const docRef = doc(db, 'users', user.uid, 'expenses', editingExpense.id);
-      await updateDoc(docRef, {
+      updateDoc(docRef, {
         ...editingExpense,
         amount: Math.abs(parseFloat(editingExpense.amount))
       });
@@ -100,7 +117,7 @@ export default function ExpensesPage() {
 
   const handleDelete = async (id: string) => {
     if (!db || !user?.uid) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
+    deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
     toast({ title: "Deleted", description: "Record removed." });
   };
 
@@ -110,15 +127,23 @@ export default function ExpensesPage() {
       return;
     }
 
-    const headers = ["Date", "Description", "Category", "Subcategory", "Amount", "Status"];
-    const rows = filteredExpenses.map(e => [
-      e.date,
-      `"${(e.description || e.note || "").replace(/"/g, '""')}"`,
-      e.categoryName || e.category,
-      e.subcategoryName || e.subCategory || "Others",
-      e.amount,
-      e.status || 'paid'
-    ]);
+    const headers = ["Date", "Description", "Category", "Subcategory", "Amount", "Status", "Budget Limit"];
+    const rows = filteredExpenses.map(e => {
+      const budget = (budgetsData || []).find(b => 
+        b.categoryId === e.categoryId || 
+        b.categoryName === (e.categoryName || e.category)
+      );
+
+      return [
+        e.date,
+        `"${(e.description || e.note || "").replace(/"/g, '""')}"`,
+        e.categoryName || e.category,
+        e.subcategoryName || e.subCategory || "Others",
+        e.amount,
+        e.status || 'paid',
+        budget ? budget.limit : ""
+      ];
+    });
 
     const csvContent = [
       headers.join(","),
@@ -129,7 +154,7 @@ export default function ExpensesPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `fynwealth-expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute("download", `fynwealth-vault-${format(new Date(), 'yyyy-MM-dd')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -168,12 +193,13 @@ export default function ExpensesPage() {
           const parts = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
           
           if (parts.length >= 5) {
-            const [date, desc, cat, sub, amt, status] = parts.map(p => p.trim().replace(/^"|"$/g, ''));
+            const [date, desc, cat, sub, amt, status, budgetLimit] = parts.map(p => p.trim().replace(/^"|"$/g, ''));
             
             const parsedAmount = Math.abs(parseFloat(amt));
             if (isNaN(parsedAmount)) throw new Error("Invalid amount");
 
-            await addDoc(collection(db, 'users', user.uid, 'expenses'), {
+            // 1. Record Expense
+            addDoc(collection(db, 'users', user.uid, 'expenses'), {
               userId: user.uid,
               date: date || format(new Date(), 'yyyy-MM-dd'),
               note: desc || "Imported Expense",
@@ -186,6 +212,25 @@ export default function ExpensesPage() {
               status: (status?.toLowerCase() === 'unpaid' ? 'unpaid' : 'paid') as 'paid' | 'unpaid',
               createdAt: serverTimestamp()
             });
+
+            // 2. Record Budget Limit if present and valid
+            if (budgetLimit && !isNaN(parseFloat(budgetLimit))) {
+              const categoryMatch = (categoriesData || []).find(c => 
+                c.name.toLowerCase() === cat.toLowerCase()
+              );
+              
+              if (categoryMatch) {
+                const budgetRef = doc(db, 'users', user.uid, 'budgets', categoryMatch.id);
+                setDoc(budgetRef, {
+                  categoryId: categoryMatch.id,
+                  categoryName: categoryMatch.name,
+                  limit: Math.abs(parseFloat(budgetLimit)),
+                  userId: user.uid,
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+              }
+            }
+
             successCount++;
           }
         } catch (err) {
@@ -195,7 +240,7 @@ export default function ExpensesPage() {
 
       toast({ 
         title: "Import Complete", 
-        description: `Successfully added ${successCount} expenses.${failCount > 0 ? ` Failed to import ${failCount} rows.` : ''}` 
+        description: `Processed ${successCount} entries. Syncing with cloud...` 
       });
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
