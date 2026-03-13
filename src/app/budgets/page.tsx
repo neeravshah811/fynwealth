@@ -1,8 +1,9 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -38,11 +39,22 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 
 export default function BudgetsPage() {
-  const { budgets, expenses, updateBudget, currency, customCategories, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { expenses, currency, customCategories, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { user } = useUser();
+  const firestore = useFirestore();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [editedLimits, setEditedLimits] = useState<Record<string, string>>({});
   const [mounted, setMounted] = useState(false);
+
+  // Firestore Budgets Query
+  const budgetsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, 'users', user.uid, 'budgets');
+  }, [firestore, user?.uid]);
+
+  const { data: budgetsData, isLoading: budgetsLoading } = useCollection(budgetsQuery);
 
   useEffect(() => {
     setMounted(true);
@@ -68,25 +80,47 @@ export default function BudgetsPage() {
   const handleOpenDialog = () => {
     const initialLimits: Record<string, string> = {};
     allCategoriesList.forEach(cat => {
-      const budget = budgets.find(b => b.category === cat);
-      initialLimits[cat] = budget ? budget.limit.toString() : "0";
+      const budgetDoc = budgetsData?.find(b => b.category === cat);
+      initialLimits[cat] = budgetDoc ? budgetDoc.limit.toString() : "0";
     });
     setEditedLimits(initialLimits);
     setIsDialogOpen(true);
   };
 
-  const handleSaveLimits = () => {
-    Object.entries(editedLimits).forEach(([category, limit]) => {
-      const numLimit = parseFloat(limit);
-      if (!isNaN(numLimit)) {
-        updateBudget(category, numLimit);
-      }
-    });
-    setIsDialogOpen(false);
-    toast({
-      title: "Budgets updated",
-      description: "Monthly spending limits updated successfully.",
-    });
+  const handleSaveLimits = async () => {
+    if (!firestore || !user?.uid) return;
+
+    try {
+      const promises = Object.entries(editedLimits).map(([category, limit]) => {
+        const numLimit = parseFloat(limit);
+        if (!isNaN(numLimit)) {
+          // Document ID is the category name for easier direct access
+          const docId = category.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          const docRef = doc(firestore, 'users', user.uid, 'budgets', docId);
+          return setDoc(docRef, {
+            category,
+            limit: numLimit,
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(promises);
+      
+      setIsDialogOpen(false);
+      toast({
+        title: "Budgets updated",
+        description: "Monthly spending limits updated successfully in cloud storage.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: "Could not save budget limits. Check permissions.",
+      });
+    }
   };
 
   const handleCalendarSelect = (date: Date | undefined) => {
@@ -96,10 +130,10 @@ export default function BudgetsPage() {
   };
 
   const totalSpent = allCategoriesList.reduce((sum, cat) => sum + getMonthlySpendByCategory(cat), 0);
-  const totalBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
+  const totalBudget = budgetsData?.reduce((sum, b) => sum + (b.limit || 0), 0) || 0;
   const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
 
-  if (!mounted) {
+  if (!mounted || budgetsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -164,7 +198,7 @@ export default function BudgetsPage() {
             <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-3xl">
               <DialogHeader>
                 <DialogTitle className="font-headline text-2xl font-bold text-primary">Adjust Monthly Limits</DialogTitle>
-                <DialogDescription>Set realistic targets for each category. These limits persist across months.</DialogDescription>
+                <DialogDescription>Set realistic targets for each category. These limits persist in your cloud profile.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-6">
                 {allCategoriesList.map((category) => (
@@ -186,7 +220,7 @@ export default function BudgetsPage() {
                 ))}
               </div>
               <DialogFooter>
-                <Button onClick={handleSaveLimits} className="w-full h-12 rounded-xl font-bold">Save All Changes</Button>
+                <Button onClick={handleSaveLimits} className="w-full h-12 rounded-xl font-bold">Save to Cloud</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -228,10 +262,11 @@ export default function BudgetsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {allCategoriesList.map((categoryName) => {
-          const budget = budgets.find(b => b.category === categoryName) || { category: categoryName, limit: 0 };
+          const budgetDoc = budgetsData?.find(b => b.category === categoryName);
+          const limit = budgetDoc?.limit || 0;
           const spent = getMonthlySpendByCategory(categoryName);
-          const percent = budget.limit > 0 ? Math.min((spent / budget.limit) * 100, 100) : 0;
-          const isOver = budget.limit > 0 && spent > budget.limit;
+          const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+          const isOver = limit > 0 && spent > limit;
           
           return (
             <Card key={categoryName} className="border-none shadow-sm bg-card hover:ring-1 hover:ring-primary/20 transition-all ring-1 ring-black/5">
@@ -244,7 +279,7 @@ export default function BudgetsPage() {
                   <div className="text-[10px] font-bold">
                     <span className="text-foreground">{currency.symbol}{formatAmount(spent)}</span>
                     <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-muted-foreground">{currency.symbol}{formatAmount(budget.limit, 0)}</span>
+                    <span className="text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
                   </div>
                 </div>
                 <Progress value={percent} className={`h-2 ${isOver ? 'bg-destructive/20' : ''}`} />
@@ -253,9 +288,9 @@ export default function BudgetsPage() {
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tight">
                   <span className="text-muted-foreground">{percent.toFixed(0)}% utilized</span>
                   <div className="flex items-center gap-1">
-                    {budget.limit > 0 ? (
+                    {limit > 0 ? (
                        <span className={isOver ? 'text-destructive' : 'text-emerald-600'}>
-                       {isOver ? `${currency.symbol}${formatAmount(spent - budget.limit)} over` : `${currency.symbol}${formatAmount(budget.limit - spent)} available`}
+                       {isOver ? `${currency.symbol}${formatAmount(spent - limit)} over` : `${currency.symbol}${formatAmount(limit - spent)} available`}
                      </span>
                     ) : (
                       <span className="text-muted-foreground italic opacity-50">No limit defined</span>

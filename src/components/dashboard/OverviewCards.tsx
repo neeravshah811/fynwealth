@@ -1,21 +1,32 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { useFynWealthStore } from "@/lib/store";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, PieChart, Wallet as WalletIcon, Clock, Coins } from "lucide-react";
+import { Wallet, PieChart, Clock, Coins, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function OverviewCards() {
-  const { expenses, budgets, currency, viewMonth, viewYear, privacyMode } = useFynWealthStore();
+  const { expenses, currency, viewMonth, viewYear, privacyMode } = useFynWealthStore();
+  const { user } = useUser();
+  const firestore = useFirestore();
   const [mounted, setMounted] = useState(false);
+
+  // Firestore Budgets Query for calculations
+  const budgetsQuery = useMemoFirebase(() => {
+    if (!firestore || !user?.uid) return null;
+    return collection(firestore, 'users', user.uid, 'budgets');
+  }, [firestore, user?.uid]);
+
+  const { data: budgetsData, isLoading: budgetsLoading } = useCollection(budgetsQuery);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
+  if (!mounted || budgetsLoading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[1, 2, 3, 4].map((i) => (
@@ -38,7 +49,7 @@ export function OverviewCards() {
     .filter(e => e.status === 'unpaid')
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const totalBudgetAmount = budgets.reduce((sum, b) => sum + b.limit, 0);
+  const totalBudgetAmount = budgetsData?.reduce((sum, b) => sum + (b.limit || 0), 0) || 0;
   const totalBalance = totalBudgetAmount - (paidSpend + pendingBills);
 
   const formatAmount = (amount: number) => {

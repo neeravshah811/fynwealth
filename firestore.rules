@@ -45,7 +45,7 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     /**
-     * @description User Profiles and private data.
+     * @description User Profiles and all private sub-data (expenses, budgets, bills, etc.)
      */
     match /users/{userId} {
       allow get, list: if isOwner(userId) || isAdmin();
@@ -53,39 +53,12 @@ service cloud.firestore {
       allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId) || isAdmin();
 
-      match /categories/{categoryId} {
+      // Recursive match for all user-owned subcollections (expenses, budgets, categories, billDefinitions)
+      // This ensures that any sub-path correctly inherits ownership logic.
+      match /{allUserData=**} {
         allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
-      }
-
-      match /billDefinitions/{billDefinitionId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
-
-        match /billPayments/{billPaymentId} {
-          allow get, list: if isOwner(userId) || isAdmin();
-          allow create: if isOwner(userId) && request.resource.data.userId == userId;
-          allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-          allow delete: if isExistingOwner(userId);
-        }
-      }
-
-      match /expenses/{expenseId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
-      }
-
-      match /budgets/{budgetId} {
-        allow get, list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if isExistingOwner(userId);
       }
     }
 

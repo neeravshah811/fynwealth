@@ -1,4 +1,3 @@
-
 "use client";
 
 import { create } from "zustand";
@@ -38,11 +37,11 @@ export interface Expense {
   purchaseDate?: string;
   warrantyExpiryDate?: string;
   invoiceUrl?: string;
-  billImageData?: string; // Base64 data URI of the scanned bill
+  billImageData?: string;
   serviceCenterContact?: string;
   notes?: string;
-  billId?: string; // Linked bill ID
-  folderId?: string | null; // Folder association
+  billId?: string;
+  folderId?: string | null;
 }
 
 export interface Bill {
@@ -61,11 +60,6 @@ export interface Bill {
   billImageData?: string;
 }
 
-export interface Budget {
-  category: string;
-  limit: number;
-}
-
 export interface UserProfile {
   firstName: string;
   lastName: string;
@@ -82,7 +76,6 @@ interface FynWealthState {
   expenses: Expense[];
   bills: Bill[];
   folders: Folder[];
-  budgets: Budget[];
   currency: Currency;
   profile: UserProfile | null;
   customCategories: Record<string, string[]>;
@@ -100,7 +93,6 @@ interface FynWealthState {
   deleteBill: (id: string) => void;
   markBillPaid: (id: string) => void;
   markBillNotified: (id: string) => void;
-  updateBudget: (category: string, limit: number) => void;
   setCurrency: (code: string) => void;
   updateProfile: (profile: UserProfile) => void;
   addCustomCategory: (name: string) => void;
@@ -123,7 +115,6 @@ export const useFynWealthStore = create<FynWealthState>()(
       expenses: [],
       bills: [],
       folders: [],
-      budgets: [],
       currency: SUPPORTED_CURRENCIES[0],
       profile: null,
       customCategories: {},
@@ -139,18 +130,12 @@ export const useFynWealthStore = create<FynWealthState>()(
       addExpense: (expense) => {
         const id = Math.random().toString(36).substring(7);
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        
         const status = expense.status || (expense.date <= todayStr ? 'paid' : 'unpaid');
 
         set((state) => ({
           expenses: [
             ...state.expenses, 
-            { 
-              ...expense, 
-              id,
-              status,
-              folderId: expense.folderId ?? null // Explicitly initialize as null if undefined
-            }
+            { ...expense, id, status, folderId: expense.folderId ?? null }
           ]
         }));
 
@@ -162,12 +147,10 @@ export const useFynWealthStore = create<FynWealthState>()(
           else if (expense.frequency === 'Half-yearly') date.setMonth(date.getMonth() + 6);
           else if (expense.frequency === 'Annually') date.setFullYear(date.getFullYear() + 1);
           
-          const nextDateStr = format(date, 'yyyy-MM-dd');
-
           get().addBill({
             name: expense.description || `${expense.category} Recurring`,
             amount: expense.amount,
-            dueDate: nextDateStr,
+            dueDate: format(date, 'yyyy-MM-dd'),
             dueTime: expense.reminderTime || "09:00",
             frequency: expense.frequency,
             category: expense.category,
@@ -194,24 +177,17 @@ export const useFynWealthStore = create<FynWealthState>()(
       updateExpense: (id, updatedFields) => set((state) => {
         const expense = state.expenses.find(e => e.id === id);
         const newExpenses = state.expenses.map((e) => e.id === id ? { ...e, ...updatedFields } : e);
-        
         let newBills = state.bills;
         if (expense?.billId) {
           newBills = state.bills.map(b => b.id === expense.billId ? { 
             ...b, 
-            amount: updatedFields.amount !== undefined ? updatedFields.amount : b.amount,
-            name: updatedFields.description !== undefined ? updatedFields.description : b.name,
-            dueDate: updatedFields.date !== undefined ? updatedFields.date : b.dueDate,
-            category: updatedFields.category !== undefined ? updatedFields.category : b.category,
-            subCategory: updatedFields.subCategory !== undefined ? updatedFields.subCategory : b.subCategory,
-            billImageData: updatedFields.billImageData !== undefined ? updatedFields.billImageData : b.billImageData,
+            amount: updatedFields.amount ?? b.amount,
+            name: updatedFields.description ?? b.name,
+            dueDate: updatedFields.date ?? b.dueDate,
+            category: updatedFields.category ?? b.category,
           } : b);
         }
-
-        return { 
-          expenses: newExpenses,
-          bills: newBills
-        };
+        return { expenses: newExpenses, bills: newBills };
       }),
       deleteExpense: (id) => set((state) => ({
         expenses: state.expenses.filter((e) => e.id !== id)
@@ -223,23 +199,15 @@ export const useFynWealthStore = create<FynWealthState>()(
       })),
       addBill: (bill) => {
         const billId = Math.random().toString(36).substring(7);
-        const expenseId = Math.random().toString(36).substring(7);
-        
         set((state) => ({
           bills: [
             ...state.bills,
-            {
-              ...bill,
-              id: billId,
-              status: 'pending',
-              notified: false,
-              createdAt: new Date().toISOString()
-            }
+            { ...bill, id: billId, status: 'pending', notified: false, createdAt: new Date().toISOString() }
           ],
           expenses: [
             ...state.expenses,
             {
-              id: expenseId,
+              id: Math.random().toString(36).substring(7),
               billId: billId,
               amount: bill.amount,
               description: bill.name,
@@ -250,7 +218,7 @@ export const useFynWealthStore = create<FynWealthState>()(
               notes: bill.notes,
               reminderTime: bill.dueTime,
               billImageData: bill.billImageData,
-              folderId: null // Initialize Root for bill-linked expenses
+              folderId: null
             }
           ]
         }));
@@ -260,26 +228,12 @@ export const useFynWealthStore = create<FynWealthState>()(
         expenses: state.expenses.filter((e) => e.billId !== id)
       })),
       markBillPaid: (id) => set((state) => ({
-        bills: state.bills.map((b) => 
-          b.id === id ? { ...b, status: 'paid' } : b
-        ),
-        expenses: state.expenses.map((e) => 
-          e.billId === id ? { ...e, status: 'paid' } : e
-        )
+        bills: state.bills.map((b) => b.id === id ? { ...b, status: 'paid' } : b),
+        expenses: state.expenses.map((e) => e.billId === id ? { ...e, status: 'paid' } : e)
       })),
       markBillNotified: (id) => set((state) => ({
         bills: state.bills.map((b) => b.id === id ? { ...b, notified: true } : b)
       })),
-      updateBudget: (category, limit) => set((state) => {
-        const budgets = [...state.budgets];
-        const index = budgets.findIndex((b) => b.category === category);
-        if (index !== -1) {
-          budgets[index] = { ...budgets[index], limit };
-        } else {
-          budgets.push({ category, limit });
-        }
-        return { budgets };
-      }),
       setCurrency: (code) => set((state) => ({
         currency: SUPPORTED_CURRENCIES.find(c => c.code === code) || state.currency
       })),
@@ -296,11 +250,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       addFolder: (name) => set((state) => ({
         folders: [
           ...state.folders,
-          {
-            id: Math.random().toString(36).substring(7),
-            name,
-            createdAt: new Date().toISOString()
-          }
+          { id: Math.random().toString(36).substring(7), name, createdAt: new Date().toISOString() }
         ]
       })),
       deleteFolder: (id) => set((state) => ({
@@ -317,19 +267,14 @@ export const useFynWealthStore = create<FynWealthState>()(
       togglePrivacyMode: () => set((state) => ({ privacyMode: !state.privacyMode })),
       setHasSeenTutorial: (seen) => set({ hasSeenTutorial: seen }),
       rolloverRecurring: () => {
-        const state = get();
-        const { expenses, viewMonth, viewYear } = state;
+        const { expenses, viewMonth, viewYear, addExpenses } = get();
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        
         const recurringTemplates = expenses.filter(e => e.isRecurring && e.frequency === 'Monthly');
-        
         if (recurringTemplates.length === 0) return;
 
         const uniqueTemplates = recurringTemplates.reduce((acc, curr) => {
           const key = `${curr.category}-${curr.description}`;
-          if (!acc[key] || new Date(curr.date) > new Date(acc[key].date)) {
-            acc[key] = curr;
-          }
+          if (!acc[key] || new Date(curr.date) > new Date(acc[key].date)) acc[key] = curr;
           return acc;
         }, {} as Record<string, Expense>);
 
@@ -338,29 +283,17 @@ export const useFynWealthStore = create<FynWealthState>()(
           return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
         }).map(e => `${e.category}-${e.description}`);
 
-        const newEntries: Omit<Expense, 'id'>[] = Object.values(uniqueTemplates)
+        const newEntries = Object.values(uniqueTemplates)
           .filter(t => !existingInView.includes(`${t.category}-${t.description}`))
           .map(t => {
             const originalDay = new Date(t.date).getDate();
             const lastDayOfViewMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
             const safeDay = Math.min(originalDay, lastDayOfViewMonth);
-            
-            const newDate = new Date(viewYear, viewMonth, safeDay);
-            const newDateStr = format(newDate, 'yyyy-MM-dd');
-            
-            return {
-              ...t,
-              date: newDateStr,
-              status: newDateStr <= todayStr ? 'paid' : 'unpaid',
-              reminderDate: newDateStr,
-              reminderTime: t.reminderTime || "09:00",
-              folderId: t.folderId ?? null
-            };
+            const newDateStr = format(new Date(viewYear, viewMonth, safeDay), 'yyyy-MM-dd');
+            return { ...t, date: newDateStr, status: newDateStr <= todayStr ? 'paid' : 'unpaid', folderId: t.folderId ?? null };
           });
 
-        if (newEntries.length > 0) {
-          state.addExpenses(newEntries as any);
-        }
+        if (newEntries.length > 0) addExpenses(newEntries as any);
       },
       clearMonthlyExpenses: () => set((state) => ({
         expenses: state.expenses.filter((e) => {
@@ -369,25 +302,11 @@ export const useFynWealthStore = create<FynWealthState>()(
         })
       })),
       clearAllData: () => set({ 
-        expenses: [], 
-        bills: [],
-        folders: [],
-        budgets: [], 
-        customCategories: {}, 
-        profile: null, 
-        privacyMode: false,
-        hasSeenTutorial: false,
-        insights: {
-          predictions: null,
-          unnecessary: null,
-          lastGenerated: null,
-        },
-        viewMonth: new Date().getMonth(), 
-        viewYear: new Date().getFullYear() 
+        expenses: [], bills: [], folders: [], customCategories: {}, profile: null, privacyMode: false,
+        hasSeenTutorial: false, insights: { predictions: null, unnecessary: null, lastGenerated: null },
+        viewMonth: new Date().getMonth(), viewYear: new Date().getFullYear() 
       }),
     }),
-    {
-      name: 'fynwealth_persistent_storage_v3',
-    }
+    { name: 'fynwealth_persistent_storage_v3' }
   )
 );
