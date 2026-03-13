@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Currency } from "./store";
@@ -12,17 +11,89 @@ export const SUPPORTED_CURRENCIES: Currency[] = [
 ];
 
 export const SYSTEM_CATEGORIES: Record<string, string[]> = {
-  "Essentials": ["Rent / Housing", "Electricity", "Water", "Gas / LPG", "Internet / WiFi", "Mobile Recharge / Postpaid", "Maintenance / Society Charges"],
-  "Transportation": ["Fuel", "Public Transport", "Taxi / Ride-sharing", "Vehicle EMI / Maintenance"],
-  "Financial Commitments": ["Loans / EMI", "Credit Card Bills", "Insurance Premiums (Life / Health / Vehicle)", "Bank Charges", "Tax Payments"],
-  "Subscriptions": ["OTT (Netflix, Prime, Hotstar)", "Music (Spotify, Gaana, YouTube Music)", "Apps / Tools", "Newspapers / Magazines"],
-  "Food & Groceries": ["Groceries", "Dining Out", "Snacks & Beverages"],
-  "Shopping": ["Clothing", "Electronics", "Home Items", "Personal Care"],
-  "Warranties": ["Electronics", "Vehicles", "Furniture", "Personal gadgets", "Services and repairs", "Others"],
-  "Health & Personal": ["Medicines", "Doctor / Hospital", "Fitness / Gym", "Self-care"],
-  "Education / Kids": ["School Fees", "Tuition", "Books & Supplies", "Child Expenses"],
-  "Life & Entertainment": ["Movies", "Events", "Travel & Trips", "Hobbies", "Gifts"],
-  "Investments": ["SIP / Mutual Funds", "Recurring Deposit", "Fixed Deposit", "Stocks & Trading", "Crypto"],
-  "Household & Family": ["Repairs", "House Help / Maid", "Laundry", "Pet Care"],
-  "Miscellaneous": ["Charity / Donation", "Unexpected Expenses", "Others"]
+  "Essentials": [
+    "Rent / Housing", 
+    "Electricity", 
+    "Water", 
+    "Gas / LPG", 
+    "Internet / WiFi", 
+    "Mobile Recharge/Bill", 
+    "Maintenance / Society Charges"
+  ],
+  "Transportation": [
+    "Fuel", 
+    "Public Transport", 
+    "Taxi / Ride-sharing", 
+    "Vehicle EMI", 
+    "Vehicle Maintenance"
+  ],
+  "Financial Commitments": [
+    "Loans / EMI", 
+    "Credit Card Bills", 
+    "Insurance Premiums", 
+    "Bank Charges", 
+    "Tax Payments"
+  ],
+  "Subscriptions": [
+    "OTT", 
+    "Music", 
+    "Apps / Tools", 
+    "Newspapers / Magazines"
+  ],
+  "Food & Groceries": [
+    "Groceries", 
+    "Dining Out", 
+    "Snacks & Beverages"
+  ],
+  "Shopping": [
+    "Clothing", 
+    "Electronics", 
+    "Home Items", 
+    "Personal Care"
+  ],
+  "Warranties": [
+    "Electronics", 
+    "Vehicles", 
+    "Furniture", 
+    "Personal gadgets", 
+    "Services and repairs", 
+    "Others"
+  ],
+  "Health & Personal": [
+    "Medicines", 
+    "Doctor / Hospital", 
+    "Fitness / Gym", 
+    "Self-care"
+  ],
+  "Education / Kids": [
+    "School Fees", 
+    "Tuition", 
+    "Books & Supplies", 
+    "Child Expenses"
+  ],
+  "Life & Entertainment": [
+    "Movies", 
+    "Events", 
+    "Travel & Trips", 
+    "Hobbies", 
+    "Gifts"
+  ],
+  "Investments": [
+    "SIP / Mutual Funds", 
+    "Recurring Deposit", 
+    "Fixed Deposit", 
+    "Stocks & Trading", 
+    "Crypto"
+  ],
+  "Household & Family": [
+    "Repairs", 
+    "House Help / Maid", 
+    "Laundry", 
+    "Pet Care"
+  ],
+  "Miscellaneous": [
+    "Charity / Donation", 
+    "Unexpected Expenses", 
+    "Others"
+  ]
 };

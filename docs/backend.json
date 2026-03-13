@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "UserProfile": {
@@ -42,6 +41,10 @@
         "status": { "type": "string", "enum": ["paid", "unpaid"] },
         "billImageData": { "type": "string", "description": "Base64 encoded receipt image or PDF." },
         "folderId": { "type": "string", "description": "ID of the folder this document is in." },
+        "productName": { "type": "string", "description": "Used for Warranty category items." },
+        "purchaseDate": { "type": "string", "format": "date" },
+        "warrantyExpiryDate": { "type": "string", "format": "date" },
+        "serviceCentreContact": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "amount", "description", "category", "date", "status"]

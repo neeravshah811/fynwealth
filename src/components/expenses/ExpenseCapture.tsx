@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -25,7 +24,8 @@ import {
   PlusCircle,
   Paperclip,
   FileText,
-  X
+  X,
+  ShieldCheck
 } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
@@ -62,6 +62,11 @@ export function ExpenseCapture() {
     frequency: 'Monthly' as Frequency,
     attachmentData: '' as string | null,
     attachmentName: '' as string | null,
+    // New fields for Warranties
+    productName: '',
+    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+    warrantyExpiryDate: '',
+    serviceCentreContact: '',
   });
 
   // Fetch custom categories from Firestore
@@ -104,10 +109,32 @@ export function ExpenseCapture() {
         isRecurring: manual.isRecurring,
         frequency: manual.isRecurring ? manual.frequency : 'One-time',
         billImageData: manual.attachmentData,
+        // Warranty data
+        productName: manual.category === 'Warranties' ? manual.productName : null,
+        purchaseDate: manual.category === 'Warranties' ? manual.purchaseDate : null,
+        warrantyExpiryDate: manual.category === 'Warranties' ? manual.warrantyExpiryDate : null,
+        serviceCentreContact: manual.category === 'Warranties' ? manual.serviceCentreContact : null,
         createdAt: serverTimestamp()
       };
 
       await addDoc(collection(db, 'users', user.uid, 'expenses'), payload);
+
+      // Create auto reminder for Warranty Expiry
+      if (manual.category === 'Warranties' && manual.warrantyExpiryDate) {
+        await addDoc(collection(db, 'users', user.uid, 'bills'), {
+          name: `Warranty Expiry: ${manual.productName || manual.description || 'Product'}`,
+          amount: 0,
+          dueDate: manual.warrantyExpiryDate,
+          dueTime: '09:00',
+          frequency: 'One-time',
+          category: 'Warranties',
+          subCategory: manual.subCategory,
+          userId: user.uid,
+          status: 'pending',
+          notified: false,
+          createdAt: serverTimestamp()
+        });
+      }
 
       setManual({ 
         amount: '', 
@@ -119,10 +146,14 @@ export function ExpenseCapture() {
         frequency: 'Monthly',
         attachmentData: null,
         attachmentName: null,
+        productName: '',
+        purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+        warrantyExpiryDate: '',
+        serviceCentreContact: '',
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Success", description: "Expense added successfully." });
+      toast({ title: "Success", description: manual.category === 'Warranties' ? "Warranty saved & reminder set." : "Expense added successfully." });
     } catch (err) {
       toast({ variant: "destructive", title: "Sync Failed", description: "Check your connection." });
     } finally {
@@ -134,14 +165,12 @@ export function ExpenseCapture() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
       toast({ variant: "destructive", title: "Invalid File", description: "Please upload an image or PDF." });
       return;
     }
 
-    // Validate size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
       return;
@@ -378,6 +407,56 @@ export function ExpenseCapture() {
                   </Select>
                 </div>
               </div>
+
+              {manual.category === 'Warranties' && (
+                <div className="space-y-4 border-t pt-4 mt-2 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2 text-primary">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Warranty Details</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Product Name</Label>
+                      <Input 
+                        placeholder="e.g. Laptop" 
+                        value={manual.productName} 
+                        onChange={(e) => setManual({...manual, productName: e.target.value})} 
+                        className="h-11 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Service Contact</Label>
+                      <Input 
+                        placeholder="e.g. 1800-..." 
+                        value={manual.serviceCentreContact} 
+                        onChange={(e) => setManual({...manual, serviceCentreContact: e.target.value})} 
+                        className="h-11 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Purchase Date</Label>
+                      <Input 
+                        type="date" 
+                        value={manual.purchaseDate} 
+                        onChange={(e) => setManual({...manual, purchaseDate: e.target.value})} 
+                        className="h-11 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Expiry Date</Label>
+                      <Input 
+                        type="date" 
+                        value={manual.warrantyExpiryDate} 
+                        onChange={(e) => setManual({...manual, warrantyExpiryDate: e.target.value})} 
+                        className="h-11 rounded-xl"
+                        required={manual.category === 'Warranties'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description</Label>
