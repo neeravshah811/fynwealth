@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -84,6 +83,7 @@ export default function BillsPage() {
         userId: user.uid,
         amount: Math.abs(parseFloat(formData.amount)),
         status: 'pending',
+        notified: false,
         createdAt: serverTimestamp()
       });
 
