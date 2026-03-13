@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -46,7 +45,7 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Required state structure
+  // Dynamic taxonomy state
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -62,7 +61,7 @@ export default function BillsPage() {
     attachmentName: '' as string | null,
   });
 
-  // Load categories
+  // Load categories on mount
   useEffect(() => {
     async function loadCategories() {
       if (!db) return;
@@ -244,11 +243,11 @@ export default function BillsPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Reminder Name</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Reminder Name</Label>
                   <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="h-12 rounded-xl" placeholder="e.g. Rent Payment" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Amount</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
                     <Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required className="pl-8 h-12 rounded-xl font-bold" />
@@ -258,11 +257,11 @@ export default function BillsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Due Date</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Due Date</Label>
                   <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} required className="h-12 rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
                   <Select value={formData.frequency} onValueChange={(v) => setFormData({...formData, frequency: v as Frequency})}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
                     <SelectContent className="z-[100]">
@@ -271,18 +270,22 @@ export default function BillsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px]">
-                      {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                      {categories.length > 0 ? (
+                        categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)
+                      ) : (
+                        <SelectItem value="empty" disabled>No categories found</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                 <Select 
                   value={selectedSubcategory} 
                   onValueChange={setSelectedSubcategory}
@@ -296,7 +299,7 @@ export default function BillsPage() {
               </div>
 
               <div className="space-y-3">
-                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Bill Attachment (Max 5MB)</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Bill Attachment (Max 5MB)</Label>
                 <div className="flex flex-col gap-2">
                   {!formData.attachmentData ? (
                     <Button 

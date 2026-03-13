@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -42,7 +41,7 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Required state structure
+  // Required state structure for dynamic taxonomy
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -137,7 +136,8 @@ export function ExpenseCapture() {
         subcategoryId: selectedSubcategory,
         subcategoryName: subcategoryObj?.name || "Unknown",
         note: note.trim() || "No note provided",
-        date: date, // Using string 'yyyy-MM-dd' for easier range queries
+        date: date,
+        billImageData: attachmentData, // Store as part of the expense for the vault
         createdAt: serverTimestamp()
       };
 
@@ -148,7 +148,7 @@ export function ExpenseCapture() {
       toast({ title: "Expense Added", description: "Your expense has been saved to your cloud vault." });
       resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not sync with cloud. Please check connection." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not sync with cloud." });
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export function ExpenseCapture() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable microphone access in your browser settings." });
+      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable microphone access." });
     }
   };
 
@@ -204,8 +204,8 @@ export function ExpenseCapture() {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
-        if (result && user?.uid) {
-          toast({ title: "Voice Capture", description: "Review the extracted details and click 'Add Expense'." });
+        if (result) {
+          toast({ title: "Voice Capture", description: "Review and click 'Add Expense'." });
           setAmount(result.amount.toString());
           setNote(result.description);
           if (result.date) setDate(result.date);
@@ -213,7 +213,7 @@ export function ExpenseCapture() {
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
-      toast({ variant: "destructive", title: "AI Processing Failed", description: "Could not transcribe audio. Please try again or type manually." });
+      toast({ variant: "destructive", title: "AI Failed", description: "Could not process audio." });
     } finally {
       setLoading(false);
     }
@@ -221,7 +221,7 @@ export function ExpenseCapture() {
 
   const processImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !db || !user?.uid) return;
+    if (!file || !user?.uid) return;
     setLoading(true);
     try {
       const reader = new FileReader();
@@ -231,12 +231,12 @@ export function ExpenseCapture() {
         if (result.totalAmount) {
           setAmount(Math.abs(result.totalAmount).toString());
           setNote(result.merchantName || "");
-          toast({ title: "Bill Scanned", description: "Successfully extracted amount and merchant details." });
+          toast({ title: "Bill Scanned", description: "Extracted amount and merchant." });
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "destructive", title: "Scan Failed", description: "AI could not read the receipt clearly. Please ensure good lighting." });
+      toast({ variant: "destructive", title: "Scan Failed", description: "Could not read receipt." });
     } finally {
       setLoading(false);
     }
@@ -294,9 +294,13 @@ export function ExpenseCapture() {
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px]">
-                      {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
+                      {categories.length > 0 ? (
+                        categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="empty" disabled>No categories found</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
