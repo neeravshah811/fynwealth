@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useFynWealthStore, Frequency, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
@@ -22,7 +22,9 @@ import {
   Loader2,
   HelpCircle,
   Calendar as CalendarIcon,
-  PlusCircle
+  PlusCircle,
+  Paperclip,
+  FileText
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
@@ -52,6 +54,7 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -61,6 +64,8 @@ export default function BillsPage() {
     frequency: 'Monthly' as Frequency,
     category: 'Miscellaneous',
     subCategory: 'Others',
+    attachmentData: '' as string | null,
+    attachmentName: '' as string | null,
   });
 
   // Fetch custom categories from Firestore
@@ -99,6 +104,37 @@ export default function BillsPage() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid File", description: "Please upload an image or PDF." });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({
+        ...prev,
+        attachmentData: reader.result as string,
+        attachmentName: file.name
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAttachment = () => {
+    setFormData(prev => ({ ...prev, attachmentData: null, attachmentName: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleAddCustomCategory = async () => {
     if (!newCategoryName.trim() || !db || !user?.uid) return;
     try {
@@ -123,9 +159,15 @@ export default function BillsPage() {
     setLoading(true);
     try {
       await addDoc(collection(db, 'users', user.uid, 'bills'), {
-        ...formData,
-        userId: user.uid,
+        name: formData.name,
         amount: Math.abs(parseFloat(formData.amount)),
+        dueDate: formData.dueDate,
+        dueTime: formData.dueTime,
+        frequency: formData.frequency,
+        category: formData.category,
+        subCategory: formData.subCategory,
+        attachmentData: formData.attachmentData,
+        userId: user.uid,
         status: 'pending',
         notified: false,
         createdAt: serverTimestamp()
@@ -139,6 +181,8 @@ export default function BillsPage() {
         frequency: 'Monthly',
         category: 'Miscellaneous',
         subCategory: 'Others',
+        attachmentData: null,
+        attachmentName: null,
       });
       setShowForm(false);
       toast({ title: "Reminder Set", description: "Saved successfully." });
@@ -265,6 +309,40 @@ export default function BillsPage() {
                     {subCategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Bill Attachment (Max 5MB)</Label>
+                <div className="flex flex-col gap-2">
+                  {!formData.attachmentData ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full h-12 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-bold"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Add attachment
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText className="w-5 h-5 text-primary shrink-0" />
+                        <span className="text-xs font-bold truncate pr-2">{formData.attachmentName}</span>
+                      </div>
+                      <button type="button" onClick={removeAttachment} className="p-1 hover:bg-primary/10 rounded-full transition-colors">
+                        <X className="w-4 h-4 text-primary" />
+                      </button>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                  />
+                </div>
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg">

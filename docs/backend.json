@@ -40,7 +40,7 @@
         "subCategory": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["paid", "unpaid"] },
-        "billImageData": { "type": "string", "description": "Base64 encoded receipt image." },
+        "billImageData": { "type": "string", "description": "Base64 encoded receipt image or PDF." },
         "folderId": { "type": "string", "description": "ID of the folder this document is in." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -62,6 +62,7 @@
         "subCategory": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "paid"] },
         "notified": { "type": "boolean" },
+        "attachmentData": { "type": "string", "description": "Base64 encoded bill image or PDF." },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },

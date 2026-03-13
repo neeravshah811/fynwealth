@@ -22,7 +22,10 @@ import {
   Upload, 
   StopCircle,
   Tag,
-  PlusCircle
+  PlusCircle,
+  Paperclip,
+  FileText,
+  X
 } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
@@ -47,6 +50,7 @@ export function ExpenseCapture() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [manual, setManual] = useState({
     amount: '',
@@ -56,6 +60,8 @@ export function ExpenseCapture() {
     date: format(new Date(), 'yyyy-MM-dd'),
     isRecurring: false,
     frequency: 'Monthly' as Frequency,
+    attachmentData: '' as string | null,
+    attachmentName: '' as string | null,
   });
 
   // Fetch custom categories from Firestore
@@ -69,9 +75,7 @@ export function ExpenseCapture() {
   const allCategoriesList = useMemo(() => {
     const system = Object.keys(SYSTEM_CATEGORIES);
     const custom = (customCategories || []).map(c => c.name);
-    // Combine and remove duplicates
     const combined = [...new Set([...system, ...custom])];
-    // Keep Miscellaneous at the end if it exists
     return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
   }, [customCategories]);
 
@@ -99,7 +103,7 @@ export function ExpenseCapture() {
         status: manual.date <= todayStr ? 'paid' : 'unpaid',
         isRecurring: manual.isRecurring,
         frequency: manual.isRecurring ? manual.frequency : 'One-time',
-        billImageData: null,
+        billImageData: manual.attachmentData,
         createdAt: serverTimestamp()
       };
 
@@ -113,6 +117,8 @@ export function ExpenseCapture() {
         date: format(new Date(), 'yyyy-MM-dd'),
         isRecurring: false,
         frequency: 'Monthly',
+        attachmentData: null,
+        attachmentName: null,
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
@@ -122,6 +128,39 @@ export function ExpenseCapture() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid File", description: "Please upload an image or PDF." });
+      return;
+    }
+
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setManual(prev => ({
+        ...prev,
+        attachmentData: reader.result as string,
+        attachmentName: file.name
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAttachment = () => {
+    setManual(prev => ({ ...prev, attachmentData: null, attachmentName: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAddCustomCategory = async () => {
@@ -380,6 +419,40 @@ export function ExpenseCapture() {
                     </Select>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Attachment (Max 5MB)</Label>
+                <div className="flex flex-col gap-2">
+                  {!manual.attachmentData ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full h-11 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-bold"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Add attachment
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText className="w-5 h-5 text-primary shrink-0" />
+                        <span className="text-xs font-bold truncate pr-2">{manual.attachmentName}</span>
+                      </div>
+                      <button type="button" onClick={removeAttachment} className="p-1 hover:bg-primary/10 rounded-full transition-colors">
+                        <X className="w-4 h-4 text-primary" />
+                      </button>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                  />
+                </div>
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg">
