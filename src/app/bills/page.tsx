@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef } from "react";
@@ -68,7 +67,6 @@ export default function BillsPage() {
     attachmentName: '' as string | null,
   });
 
-  // Fetch custom categories from Firestore
   const categoriesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return collection(db, 'users', user.uid, 'categories');
@@ -83,7 +81,6 @@ export default function BillsPage() {
     return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
   }, [customCategories]);
 
-  // Firestore Bills Query
   const billsQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(
@@ -283,10 +280,11 @@ export default function BillsPage() {
                     if (v === 'ADD_NEW') {
                       setIsCategoryDialogOpen(true);
                     } else {
-                      setFormData({...formData, category: v, subCategory: SYSTEM_CATEGORIES[v as keyof typeof SYSTEM_CATEGORIES]?.[0] || 'Others'});
+                      const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
+                      setFormData({...formData, category: v, subCategory: newSubCategory});
                     }
                   }}>
-                    <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {allCategoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                       <SelectSeparator />
@@ -304,7 +302,7 @@ export default function BillsPage() {
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                 <Select value={formData.subCategory} onValueChange={(v) => setFormData({...formData, subCategory: v})}>
-                  <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select Subcategory" /></SelectTrigger>
                   <SelectContent className="max-h-[250px]">
                     {subCategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                   </SelectContent>

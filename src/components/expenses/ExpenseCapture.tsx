@@ -62,14 +62,12 @@ export function ExpenseCapture() {
     frequency: 'Monthly' as Frequency,
     attachmentData: '' as string | null,
     attachmentName: '' as string | null,
-    // New fields for Warranties
     productName: '',
     purchaseDate: format(new Date(), 'yyyy-MM-dd'),
     warrantyExpiryDate: '',
     serviceCentreContact: '',
   });
 
-  // Fetch custom categories from Firestore
   const categoriesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return collection(db, 'users', user.uid, 'categories');
@@ -109,7 +107,6 @@ export function ExpenseCapture() {
         isRecurring: manual.isRecurring,
         frequency: manual.isRecurring ? manual.frequency : 'One-time',
         billImageData: manual.attachmentData,
-        // Warranty data
         productName: manual.category === 'Warranties' ? manual.productName : null,
         purchaseDate: manual.category === 'Warranties' ? manual.purchaseDate : null,
         warrantyExpiryDate: manual.category === 'Warranties' ? manual.warrantyExpiryDate : null,
@@ -119,7 +116,6 @@ export function ExpenseCapture() {
 
       await addDoc(collection(db, 'users', user.uid, 'expenses'), payload);
 
-      // Create auto reminder for Warranty Expiry
       if (manual.category === 'Warranties' && manual.warrantyExpiryDate) {
         await addDoc(collection(db, 'users', user.uid, 'bills'), {
           name: `Warranty Expiry: ${manual.productName || manual.description || 'Product'}`,
@@ -335,23 +331,23 @@ export function ExpenseCapture() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
-                    <input 
+                    <Input 
                       type="number" 
                       placeholder="0.00" 
                       value={manual.amount} 
                       onChange={(e) => setManual({...manual, amount: e.target.value})} 
                       required 
-                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-8 font-bold shadow-sm" 
+                      className="pl-8 h-11 font-bold shadow-sm"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Date</Label>
-                  <input 
+                  <Input 
                     type="date" 
                     value={manual.date} 
                     onChange={(e) => setManual({...manual, date: e.target.value})} 
-                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm" 
+                    className="h-11 shadow-sm"
                   />
                 </div>
               </div>
@@ -373,11 +369,12 @@ export function ExpenseCapture() {
                     if (v === 'ADD_NEW') {
                       setIsCategoryDialogOpen(true);
                     } else {
-                      setManual({...manual, category: v, subCategory: SYSTEM_CATEGORIES[v as keyof typeof SYSTEM_CATEGORIES]?.[0] || 'Others'});
+                      const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
+                      setManual({...manual, category: v, subCategory: newSubCategory});
                     }
                   }}>
                     <SelectTrigger className="h-11 rounded-xl font-bold shadow-sm">
-                      <SelectValue />
+                      <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {allCategoriesList.map(cat => (
@@ -397,7 +394,7 @@ export function ExpenseCapture() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                   <Select value={manual.subCategory} onValueChange={(v) => setManual({...manual, subCategory: v})}>
                     <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
-                      <SelectValue />
+                      <SelectValue placeholder="Select Subcategory" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[250px]">
                       {subCategories.map(sub => (
