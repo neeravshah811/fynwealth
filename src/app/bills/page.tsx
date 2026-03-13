@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, 
@@ -77,8 +77,11 @@ export default function BillsPage() {
   const allCategoriesList = useMemo(() => {
     const system = Object.keys(SYSTEM_CATEGORIES);
     const custom = (customCategories || []).map(c => c.name);
-    const combined = [...new Set([...system, ...custom])];
-    return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
+    return Array.from(new Set([...system, ...custom])).sort((a, b) => {
+      if (a === 'Miscellaneous') return 1;
+      if (b === 'Miscellaneous') return -1;
+      return a.localeCompare(b);
+    });
   }, [customCategories]);
 
   const billsQuery = useMemoFirebase(() => {
@@ -218,7 +221,7 @@ export default function BillsPage() {
           <Button variant="outline" size="icon" onClick={() => setShowTutorial(true)} className="rounded-xl"><HelpCircle className="w-5 h-5" /></Button>
           <Popover>
             <PopoverTrigger asChild><Button variant="outline" size="icon" className="rounded-xl"><CalendarIcon className="w-5 h-5" /></Button></PopoverTrigger>
-            <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
+            <PopoverContent className="z-[100] w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
               <Calendar mode="single" selected={new Date(viewYear, viewMonth)} onSelect={handleCalendarSelect} />
             </PopoverContent>
           </Popover>
@@ -260,7 +263,7 @@ export default function BillsPage() {
                   <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
                   <Select value={formData.frequency} onValueChange={(v) => setFormData({...formData, frequency: v as Frequency})}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[100]">
                       {['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Annually'].map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -276,24 +279,16 @@ export default function BillsPage() {
                       <PlusCircle className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <Select value={formData.category} onValueChange={(v) => {
-                    if (v === 'ADD_NEW') {
-                      setIsCategoryDialogOpen(true);
-                    } else {
+                  <Select 
+                    value={formData.category} 
+                    onValueChange={(v) => {
                       const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
                       setFormData({...formData, category: v, subCategory: newSubCategory});
-                    }
-                  }}>
+                    }}
+                  >
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent className="z-[100] max-h-[300px]">
                       {allCategoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                      <SelectSeparator />
-                      <SelectItem value="ADD_NEW" className="text-primary font-bold">
-                        <div className="flex items-center gap-2">
-                          <PlusCircle className="w-4 h-4" />
-                          Add New Category
-                        </div>
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -303,7 +298,7 @@ export default function BillsPage() {
                 <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                 <Select value={formData.subCategory} onValueChange={(v) => setFormData({...formData, subCategory: v})}>
                   <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select Subcategory" /></SelectTrigger>
-                  <SelectContent className="max-h-[250px]">
+                  <SelectContent className="z-[100] max-h-[250px]">
                     {subCategories.map(sub => <SelectItem key={sub} value={sub}>{sub}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -427,7 +422,7 @@ export default function BillsPage() {
       </div>
 
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl z-[150]">
           <DialogHeader>
             <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
           </DialogHeader>

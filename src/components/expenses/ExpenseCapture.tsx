@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { 
   Camera, 
@@ -78,13 +78,15 @@ export function ExpenseCapture() {
   const allCategoriesList = useMemo(() => {
     const system = Object.keys(SYSTEM_CATEGORIES);
     const custom = (customCategories || []).map(c => c.name);
-    const combined = [...new Set([...system, ...custom])];
-    return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
+    return Array.from(new Set([...system, ...custom])).sort((a, b) => {
+      if (a === 'Miscellaneous') return 1;
+      if (b === 'Miscellaneous') return -1;
+      return a.localeCompare(b);
+    });
   }, [customCategories]);
 
   const subCategories = useMemo(() => {
-    const subs = SYSTEM_CATEGORIES[manual.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
-    return subs;
+    return SYSTEM_CATEGORIES[manual.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
   }, [manual.category]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -302,15 +304,15 @@ export function ExpenseCapture() {
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "destructive", title: "Scan Error", description: "AI failed to read bill." });
+      toast({ variant: "scan-error", title: "Scan Error", description: "AI failed to read bill." });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="shadow-lg border-none bg-card overflow-hidden ring-1 ring-primary/5">
-      <CardHeader className="bg-primary/5">
+    <Card className="shadow-lg border-none bg-card ring-1 ring-primary/5">
+      <CardHeader className="bg-primary/5 rounded-t-3xl">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-headline text-primary">Capture Expense</CardTitle>
           {success && <CheckCircle2 className="text-emerald-500 w-8 h-8 animate-in zoom-in" />}
@@ -365,28 +367,20 @@ export function ExpenseCapture() {
                       <PlusCircle className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <Select value={manual.category} onValueChange={(v) => {
-                    if (v === 'ADD_NEW') {
-                      setIsCategoryDialogOpen(true);
-                    } else {
+                  <Select 
+                    value={manual.category} 
+                    onValueChange={(v) => {
                       const newSubCategory = SYSTEM_CATEGORIES[v]?.[0] || 'Others';
                       setManual({...manual, category: v, subCategory: newSubCategory});
-                    }
-                  }}>
+                    }}
+                  >
                     <SelectTrigger className="h-11 rounded-xl font-bold shadow-sm">
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent className="z-[100] max-h-[300px]">
                       {allCategoriesList.map(cat => (
                         <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                       ))}
-                      <SelectSeparator />
-                      <SelectItem value="ADD_NEW" className="text-primary font-bold">
-                        <div className="flex items-center gap-2">
-                          <PlusCircle className="w-4 h-4" />
-                          Add New Category
-                        </div>
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -396,7 +390,7 @@ export function ExpenseCapture() {
                     <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
                       <SelectValue placeholder="Select Subcategory" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[250px]">
+                    <SelectContent className="z-[100] max-h-[250px]">
                       {subCategories.map(sub => (
                         <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                       ))}
@@ -487,7 +481,7 @@ export function ExpenseCapture() {
                       <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="z-[100] rounded-xl">
                         {['Weekly', 'Monthly', 'Quarterly', 'Half-yearly', 'Annually'].map(f => (
                           <SelectItem key={f} value={f}>{f}</SelectItem>
                         ))}
@@ -580,7 +574,7 @@ export function ExpenseCapture() {
       </CardContent>
 
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl z-[150]">
           <DialogHeader>
             <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
           </DialogHeader>
