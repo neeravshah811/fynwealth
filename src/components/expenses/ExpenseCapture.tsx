@@ -81,21 +81,18 @@ export function ExpenseCapture() {
   const loadCategories = async () => {
     if (!db) return;
     try {
-      // Simplified query to avoid potential index errors
       const snapshot = await getDocs(collection(db, "categories"));
-      const uniqueCategories: any[] = [];
-      const seenNames = new Set();
+      const catMap = new Map();
       
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (!seenNames.has(data.name)) {
-          uniqueCategories.push({ id: doc.id, ...data });
-          seenNames.add(data.name);
+        // Deduplicate and prioritize user-owned categories if names collide
+        if (!catMap.has(data.name) || data.userId === user?.uid) {
+          catMap.set(data.name, { id: doc.id, ...data });
         }
       });
       
-      // Sort alphabetically on client side
-      setCategories(uniqueCategories.sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories(Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load categories", err);
     }
@@ -106,13 +103,12 @@ export function ExpenseCapture() {
   }, [db]);
 
   async function loadSubcategories(categoryId: string) {
-    if (!db || !categoryId) {
+    if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
       setSubcategories([]);
       return;
     }
     setIsSubLoading(true);
     try {
-      // Removed orderBy to prevent composite index error
       const q = query(
         collection(db, "subcategories"),
         where("categoryId", "==", categoryId)
@@ -123,8 +119,15 @@ export function ExpenseCapture() {
         ...doc.data()
       }));
       
-      // Sort on client side to avoid index requirement
-      setSubcategories(fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")));
+      const sorted = fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+      setSubcategories(sorted);
+
+      // AUTO SELECT: If only one subcategory exists, select it automatically
+      if (sorted.length === 1) {
+        setSelectedSubcategory(sorted[0].id);
+      } else {
+        setSelectedSubcategory("");
+      }
     } catch (err) {
       console.error("Failed to load subcategories", err);
     } finally {
@@ -133,6 +136,7 @@ export function ExpenseCapture() {
   }
 
   const handleCategoryChange = (categoryId: string) => {
+    if (categoryId === 'empty' || categoryId === 'loading') return;
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
     loadSubcategories(categoryId);
@@ -193,13 +197,18 @@ export function ExpenseCapture() {
     e.preventDefault();
     if (!db || !user?.uid) return;
 
-    if (!selectedCategory || !selectedSubcategory) {
-      toast({ variant: "destructive", title: "Selection Required", description: "Please choose a category and subcategory." });
+    if (!selectedCategory || selectedCategory === 'empty') {
+      toast({ variant: "destructive", title: "Category Required", description: "Please choose a category." });
       return;
     }
 
-    if (!amount) {
-      toast({ variant: "destructive", title: "Amount Required", description: "Please enter the spent amount." });
+    if (!selectedSubcategory || selectedSubcategory === 'empty' || selectedSubcategory === 'loading') {
+      toast({ variant: "destructive", title: "Subcategory Required", description: "Please pick a subcategory." });
+      return;
+    }
+
+    if (!amount || isNaN(parseFloat(amount))) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid numeric amount." });
       return;
     }
 

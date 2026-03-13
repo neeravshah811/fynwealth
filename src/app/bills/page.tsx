@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -83,18 +82,16 @@ export default function BillsPage() {
     if (!db) return;
     try {
       const snapshot = await getDocs(collection(db, "categories"));
-      const uniqueCategories: any[] = [];
-      const seenNames = new Set();
+      const catMap = new Map();
       
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (!seenNames.has(data.name)) {
-          uniqueCategories.push({ id: doc.id, ...data });
-          seenNames.add(data.name);
+        if (!catMap.has(data.name) || data.userId === user?.uid) {
+          catMap.set(data.name, { id: doc.id, ...data });
         }
       });
       
-      setCategories(uniqueCategories.sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories(Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load categories", err);
     }
@@ -105,7 +102,7 @@ export default function BillsPage() {
   }, [db]);
 
   async function loadSubcategories(categoryId: string) {
-    if (!db || !categoryId) {
+    if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
       setSubcategories([]);
       return;
     }
@@ -121,7 +118,15 @@ export default function BillsPage() {
         ...doc.data()
       }));
       
-      setSubcategories(fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")));
+      const sorted = fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+      setSubcategories(sorted);
+
+      // AUTO SELECT: If only one subcategory exists, select it automatically
+      if (sorted.length === 1) {
+        setSelectedSubcategory(sorted[0].id);
+      } else {
+        setSelectedSubcategory("");
+      }
     } catch (err) {
       console.error("Failed to load subcategories", err);
     } finally {
@@ -130,6 +135,7 @@ export default function BillsPage() {
   }
 
   const handleCategoryChange = (categoryId: string) => {
+    if (categoryId === 'empty' || categoryId === 'loading') return;
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
     loadSubcategories(categoryId);
@@ -218,10 +224,20 @@ export default function BillsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.amount || !db || !user?.uid) return;
+    if (!db || !user?.uid) return;
 
-    if (!selectedCategory || !selectedSubcategory) {
-      toast({ variant: "destructive", title: "Selection Required", description: "Please pick both a category and subcategory." });
+    if (!formData.name || !formData.amount) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please enter a name and amount." });
+      return;
+    }
+
+    if (!selectedCategory || selectedCategory === 'empty') {
+      toast({ variant: "destructive", title: "Category Required", description: "Please pick a category." });
+      return;
+    }
+
+    if (!selectedSubcategory || selectedSubcategory === 'empty' || selectedSubcategory === 'loading') {
+      toast({ variant: "destructive", title: "Subcategory Required", description: "Please pick a subcategory." });
       return;
     }
 
