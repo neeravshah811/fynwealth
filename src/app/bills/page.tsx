@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, 
@@ -21,7 +21,8 @@ import {
   History,
   Loader2,
   HelpCircle,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  PlusCircle
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
@@ -33,6 +34,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function BillsPage() {
   const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
@@ -42,6 +50,8 @@ export default function BillsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   
   const [formData, setFormData] = useState({
     name: '',
@@ -52,6 +62,21 @@ export default function BillsPage() {
     category: 'Miscellaneous',
     subCategory: 'Others',
   });
+
+  // Fetch custom categories from Firestore
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'categories');
+  }, [db, user?.uid]);
+
+  const { data: customCategories } = useCollection(categoriesQuery);
+
+  const allCategoriesList = useMemo(() => {
+    const system = Object.keys(SYSTEM_CATEGORIES);
+    const custom = (customCategories || []).map(c => c.name);
+    const combined = [...new Set([...system, ...custom])];
+    return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
+  }, [customCategories]);
 
   // Firestore Bills Query
   const billsQuery = useMemoFirebase(() => {
@@ -64,7 +89,6 @@ export default function BillsPage() {
 
   const { data: bills, isLoading } = useCollection(billsQuery);
 
-  const categoriesList = Object.keys(SYSTEM_CATEGORIES);
   const subCategories = useMemo(() => {
     return SYSTEM_CATEGORIES[formData.category as keyof typeof SYSTEM_CATEGORIES] || ["Others"];
   }, [formData.category]);
@@ -72,6 +96,23 @@ export default function BillsPage() {
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date) {
       setViewDate(date.getMonth(), date.getFullYear());
+    }
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'categories'), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+      setFormData(prev => ({ ...prev, category: newCategoryName.trim(), subCategory: 'Others' }));
+      setNewCategoryName("");
+      setIsCategoryDialogOpen(false);
+      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to save category." });
     }
   };
 
@@ -184,11 +225,33 @@ export default function BillsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Category</Label>
-                  <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v, subCategory: SYSTEM_CATEGORIES[v as keyof typeof SYSTEM_CATEGORIES]?.[0] || 'Others'})}>
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-xs font-bold uppercase text-muted-foreground">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCategoryDialogOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <Select value={formData.category} onValueChange={(v) => {
+                    if (v === 'ADD_NEW') {
+                      setIsCategoryDialogOpen(true);
+                    } else {
+                      setFormData({...formData, category: v, subCategory: SYSTEM_CATEGORIES[v as keyof typeof SYSTEM_CATEGORIES]?.[0] || 'Others'});
+                    }
+                  }}>
                     <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
-                      {categoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      {allCategoriesList.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      <SelectSeparator />
+                      <SelectItem value="ADD_NEW" className="text-primary font-bold">
+                        <div className="flex items-center gap-2">
+                          <PlusCircle className="w-4 h-4" />
+                          Add New Category
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -286,6 +349,29 @@ export default function BillsPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">Add Category</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">New Category Name</label>
+              <Input 
+                placeholder="e.g. Pet Care" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={handleAddCustomCategory}>Create Now</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

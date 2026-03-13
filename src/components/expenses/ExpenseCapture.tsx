@@ -69,7 +69,10 @@ export function ExpenseCapture() {
   const allCategoriesList = useMemo(() => {
     const system = Object.keys(SYSTEM_CATEGORIES);
     const custom = (customCategories || []).map(c => c.name);
-    return [...new Set([...system, ...custom])];
+    // Combine and remove duplicates
+    const combined = [...new Set([...system, ...custom])];
+    // Keep Miscellaneous at the end if it exists
+    return combined.filter(c => c !== 'Miscellaneous').concat(combined.includes('Miscellaneous') ? ['Miscellaneous'] : []);
   }, [customCategories]);
 
   const subCategories = useMemo(() => {
@@ -167,7 +170,7 @@ export function ExpenseCapture() {
     }
   };
 
-  const processVoice = async (blob: Blob) => {
+  const processVoice = async (audioBlob: Blob) => {
     setLoading(true);
     try {
       const reader = new FileReader();
@@ -193,7 +196,7 @@ export function ExpenseCapture() {
           toast({ title: "Voice Processed", description: `Added ${currency.symbol}${result.amount} for ${result.category}.` });
         }
       };
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(audioBlob);
     } catch (err) {
       toast({ variant: "destructive", title: "Processing Error", description: "AI failed to transcribe." });
     } finally {
@@ -259,37 +262,45 @@ export function ExpenseCapture() {
 
           <TabsContent value="manual">
             <form onSubmit={handleManualSubmit} className="space-y-5">
-              {/* Row 1: Amount and Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
-                    <Input 
+                    <input 
                       type="number" 
                       placeholder="0.00" 
                       value={manual.amount} 
                       onChange={(e) => setManual({...manual, amount: e.target.value})} 
                       required 
-                      className="pl-8 h-11 rounded-xl font-bold shadow-sm" 
+                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-8 font-bold shadow-sm" 
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Date</Label>
-                  <Input 
+                  <input 
                     type="date" 
                     value={manual.date} 
                     onChange={(e) => setManual({...manual, date: e.target.value})} 
-                    className="h-11 rounded-xl shadow-sm" 
+                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm" 
                   />
                 </div>
               </div>
 
-              {/* Row 2: Category and Subcategory */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCategoryDialogOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors"
+                      title="Add Custom Category"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <Select value={manual.category} onValueChange={(v) => {
                     if (v === 'ADD_NEW') {
                       setIsCategoryDialogOpen(true);
@@ -401,7 +412,6 @@ export function ExpenseCapture() {
         </Tabs>
       </CardContent>
 
-      {/* New Category Dialog */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
           <DialogHeader>
