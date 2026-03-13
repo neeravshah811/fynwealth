@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus, 
   Trash2, 
@@ -22,7 +24,8 @@ import {
   HelpCircle,
   Calendar as CalendarIcon,
   Paperclip,
-  FileText
+  FileText,
+  MessageSquare
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
@@ -73,12 +76,12 @@ export default function BillsPage() {
     frequency: 'Monthly' as Frequency,
     attachmentData: '' as string | null,
     attachmentName: '' as string | null,
+    note: ''
   });
 
   const loadCategories = async () => {
     if (!db) return;
     try {
-      // Simplified query to avoid index errors
       const snapshot = await getDocs(collection(db, "categories"));
       const uniqueCategories: any[] = [];
       const seenNames = new Set();
@@ -91,7 +94,6 @@ export default function BillsPage() {
         }
       });
       
-      // Sort alphabetically on client side
       setCategories(uniqueCategories.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load categories", err);
@@ -109,7 +111,6 @@ export default function BillsPage() {
     }
     setIsSubLoading(true);
     try {
-      // Removed orderBy to prevent composite index error
       const q = query(
         collection(db, "subcategories"),
         where("categoryId", "==", categoryId)
@@ -120,7 +121,6 @@ export default function BillsPage() {
         ...doc.data()
       }));
       
-      // Sort on client side to avoid index requirement
       setSubcategories(fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")));
     } catch (err) {
       console.error("Failed to load subcategories", err);
@@ -209,6 +209,7 @@ export default function BillsPage() {
       frequency: 'Monthly',
       attachmentData: null,
       attachmentName: null,
+      note: ''
     });
     setSelectedCategory("");
     setSelectedSubcategory("");
@@ -240,6 +241,7 @@ export default function BillsPage() {
         subcategoryId: selectedSubcategory,
         subcategoryName: subcategoryObj?.name || "Unknown",
         attachmentData: formData.attachmentData,
+        note: formData.note,
         userId: user.uid,
         status: 'pending',
         notified: false,
@@ -379,6 +381,16 @@ export default function BillsPage() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Note (Optional)</Label>
+                <Textarea 
+                  value={formData.note} 
+                  onChange={(e) => setFormData({...formData, note: e.target.value})} 
+                  placeholder="Additional details, account numbers, etc." 
+                  className="rounded-xl min-h-[80px]"
+                />
+              </div>
+
               <div className="space-y-3">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Attachment (Optional)</Label>
                 <div className="flex flex-col gap-2">
@@ -468,7 +480,7 @@ export default function BillsPage() {
             return (
               <Card key={bill.id} className={cn("border-none shadow-sm ring-1 ring-primary/5 rounded-2xl", isOverdue && "ring-destructive/30 bg-destructive/5")}>
                 <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-6">
+                  <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
                       <h4 className="font-bold text-lg truncate pr-2">{bill.name}</h4>
                       <div className="flex items-center gap-1.5 mt-1">
@@ -485,6 +497,14 @@ export default function BillsPage() {
                       </div>
                     </div>
                   </div>
+                  
+                  {bill.note && (
+                    <div className="mb-6 p-3 bg-muted/20 rounded-xl flex items-start gap-2.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-muted-foreground leading-relaxed italic">{bill.note}</p>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button onClick={() => handleMarkPaid(bill.id)} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/10">Mark Paid</Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(bill.id)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl"><Trash2 className="w-4 h-4" /></Button>

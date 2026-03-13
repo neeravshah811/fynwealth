@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -68,6 +69,7 @@
         "status": { "type": "string", "enum": ["pending", "paid"] },
         "notified": { "type": "boolean" },
         "attachmentData": { "type": "string" },
+        "note": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
