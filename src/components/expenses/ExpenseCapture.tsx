@@ -81,7 +81,8 @@ export function ExpenseCapture() {
   const loadCategories = async () => {
     if (!db) return;
     try {
-      const snapshot = await getDocs(query(collection(db, "categories"), orderBy("name", "asc")));
+      // Simplified query to avoid potential index errors
+      const snapshot = await getDocs(collection(db, "categories"));
       const uniqueCategories: any[] = [];
       const seenNames = new Set();
       
@@ -93,7 +94,8 @@ export function ExpenseCapture() {
         }
       });
       
-      setCategories(uniqueCategories);
+      // Sort alphabetically on client side
+      setCategories(uniqueCategories.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to load categories", err);
     }
@@ -110,16 +112,19 @@ export function ExpenseCapture() {
     }
     setIsSubLoading(true);
     try {
+      // Removed orderBy to prevent composite index error
       const q = query(
         collection(db, "subcategories"),
-        where("categoryId", "==", categoryId),
-        orderBy("name", "asc")
+        where("categoryId", "==", categoryId)
       );
       const snapshot = await getDocs(q);
-      setSubcategories(snapshot.docs.map(doc => ({
+      const fetchedSubs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })));
+      }));
+      
+      // Sort on client side to avoid index requirement
+      setSubcategories(fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")));
     } catch (err) {
       console.error("Failed to load subcategories", err);
     } finally {
