@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -122,14 +123,12 @@ export function ExpenseCapture() {
     if (!newCategoryName.trim() || !db || !user?.uid) return;
     setIsCreatingCategory(true);
     try {
-      // 1. Create the category
       const categoryRef = await addDoc(collection(db, "categories"), {
         name: newCategoryName.trim(),
         userId: user.uid,
         createdAt: serverTimestamp()
       });
 
-      // 2. Create a default "Others" subcategory for it
       await addDoc(collection(db, "subcategories"), {
         name: "Others",
         categoryId: categoryRef.id,
@@ -141,7 +140,6 @@ export function ExpenseCapture() {
       setNewCategoryName("");
       setIsCustomCategoryOpen(false);
       
-      // 3. Refresh and select
       await loadCategories();
       handleCategoryChange(categoryRef.id);
     } catch (err) {
@@ -191,14 +189,19 @@ export function ExpenseCapture() {
       const categoryObj = categories.find(c => c.id === selectedCategory);
       const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
 
+      const finalNote = note.trim() || "No note provided";
+
       const payload: any = {
         userId: user.uid,
         amount: Math.abs(parseFloat(amount)),
         categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown",
+        category: categoryObj?.name || "Unknown", // for consistency
         subcategoryId: selectedSubcategory,
         subcategoryName: subcategoryObj?.name || "Unknown",
-        note: note.trim() || "No note provided",
+        subCategory: subcategoryObj?.name || "Unknown", // for consistency
+        note: finalNote,
+        description: finalNote, // save both for consistency across UI components
         date: date,
         billImageData: attachmentData,
         createdAt: serverTimestamp()
@@ -218,8 +221,10 @@ export function ExpenseCapture() {
           frequency: 'One-time',
           categoryId: selectedCategory,
           categoryName: 'Warranties',
+          category: 'Warranties',
           subcategoryId: selectedSubcategory,
           subcategoryName: subcategoryObj?.name || "Unknown",
+          subCategory: subcategoryObj?.name || "Unknown",
           userId: user.uid,
           status: 'pending',
           notified: false,

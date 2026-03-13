@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
@@ -95,10 +96,11 @@ export default function DocumentsPage() {
 
   const filteredExpenses = useMemo(() => {
     return expenses
-      .filter(e => 
-        e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        e.category.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      .filter(e => {
+        const desc = (e.description || e.note || "").toLowerCase();
+        const cat = (e.categoryName || e.category || "").toLowerCase();
+        return desc.includes(searchTerm.toLowerCase()) || cat.includes(searchTerm.toLowerCase());
+      })
       .filter(e => (e.folderId ?? null) === currentFolderId);
   }, [expenses, searchTerm, currentFolderId]);
 
@@ -338,7 +340,7 @@ export default function DocumentsPage() {
                       ) : docUri ? (
                         <img 
                           src={docUri} 
-                          alt={expense.description} 
+                          alt={expense.description || expense.note} 
                           className="w-full h-full object-cover transition-transform group-hover:scale-105"
                         />
                       ) : (
@@ -357,10 +359,10 @@ export default function DocumentsPage() {
                     <CardContent className="p-4 space-y-3 flex-1">
                       <div className="flex justify-between items-start gap-2">
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-sm truncate leading-tight" title={expense.description}>{expense.description}</h4>
+                          <h4 className="font-bold text-sm truncate leading-tight" title={expense.description || expense.note}>{expense.description || expense.note || "No description"}</h4>
                           <div className="flex items-center gap-1.5 mt-1.5">
                             <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0 h-5 border-none font-bold uppercase">
-                              {expense.category}
+                              {expense.categoryName || expense.category || "General"}
                             </Badge>
                             {isPdf && (
                               <Badge variant="outline" className="text-[9px] py-0 h-5 border-primary/20 text-primary uppercase font-bold">
@@ -412,7 +414,7 @@ export default function DocumentsPage() {
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = docUri;
-                            link.download = `doc-${expense.description.replace(/\s+/g, '-').toLowerCase()}-${expense.date}.${isPdf ? 'pdf' : 'png'}`;
+                            link.download = `doc-${(expense.description || expense.note || "doc").replace(/\s+/g, '-').toLowerCase()}-${expense.date}.${isPdf ? 'pdf' : 'png'}`;
                             link.click();
                           }}
                         >

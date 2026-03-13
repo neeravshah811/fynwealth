@@ -68,11 +68,14 @@ export default function ExpensesPage() {
     if (!expenses) return [];
     return expenses
       .filter(e => {
-        const matchesSearch = e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             e.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             (e.subCategory || "").toLowerCase().includes(searchTerm.toLowerCase());
+        const desc = (e.description || e.note || "").toLowerCase();
+        const cat = (e.categoryName || e.category || "").toLowerCase();
+        const sub = (e.subcategoryName || e.subCategory || "").toLowerCase();
+        const term = searchTerm.toLowerCase();
+
+        const matchesSearch = desc.includes(term) || cat.includes(term) || sub.includes(term);
         const matchesStatus = statusFilter === "all" || e.status === statusFilter;
-        const matchesCategory = categoryFilter === "all" || e.category === categoryFilter;
+        const matchesCategory = categoryFilter === "all" || (e.categoryName === categoryFilter || e.category === categoryFilter);
         return matchesSearch && matchesStatus && matchesCategory;
       });
   }, [expenses, searchTerm, statusFilter, categoryFilter]);
@@ -111,9 +114,9 @@ export default function ExpensesPage() {
     const headers = ["Date", "Description", "Category", "Subcategory", "Amount", "Status"];
     const rows = filteredExpenses.map(e => [
       e.date,
-      `"${e.description.replace(/"/g, '""')}"`,
-      e.category,
-      e.subCategory || "Others",
+      `"${(e.description || e.note || "").replace(/"/g, '""')}"`,
+      e.categoryName || e.category,
+      e.subcategoryName || e.subCategory || "Others",
       e.amount,
       e.status
     ]);
@@ -157,14 +160,12 @@ export default function ExpensesPage() {
         return;
       }
 
-      // Simple CSV parsing (skipping header)
       const dataRows = lines.slice(1);
       let successCount = 0;
       let failCount = 0;
 
       for (const row of dataRows) {
         try {
-          // Naive split, but handles basics. For complex CSVs with quotes, regex is better.
           const parts = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
           
           if (parts.length >= 5) {
@@ -176,8 +177,11 @@ export default function ExpensesPage() {
             await addDoc(collection(db, 'users', user.uid, 'expenses'), {
               userId: user.uid,
               date: date || format(new Date(), 'yyyy-MM-dd'),
+              note: desc || "Imported Expense",
               description: desc || "Imported Expense",
+              categoryName: cat || "Miscellaneous",
               category: cat || "Miscellaneous",
+              subcategoryName: sub || "Others",
               subCategory: sub || "Others",
               amount: parsedAmount,
               status: (status?.toLowerCase() === 'paid' ? 'paid' : 'unpaid') as 'paid' | 'unpaid',
@@ -321,19 +325,19 @@ export default function ExpensesPage() {
                               expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100'
                             }`}
                           >
-                            {expense.status.toUpperCase()}
+                            {(expense.status || 'unpaid').toUpperCase()}
                           </button>
                         </TableCell>
                         <TableCell className="text-xs font-medium">{format(new Date(expense.date), 'MMM dd')}</TableCell>
                         <TableCell>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-sm truncate max-w-[180px]">{expense.description}</span>
+                            <span className="font-bold text-sm truncate max-w-[180px]">{expense.description || expense.note || "No description"}</span>
                             <div className="flex items-center gap-1 mt-0.5">
                               <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] py-0 h-4 border-none font-bold uppercase">
-                                {expense.category}
+                                {expense.categoryName || expense.category || "General"}
                               </Badge>
-                              {expense.subCategory && expense.subCategory !== 'Others' && (
-                                <span className="text-[8px] text-muted-foreground uppercase font-medium">/ {expense.subCategory}</span>
+                              {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
+                                <span className="text-[8px] text-muted-foreground uppercase font-medium">/ {expense.subcategoryName || expense.subCategory}</span>
                               )}
                             </div>
                           </div>
@@ -387,11 +391,11 @@ export default function ExpensesPage() {
             <form onSubmit={handleSaveEdit} className="space-y-6 pt-4">
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
-                <Input type="number" className="h-12 text-lg font-bold rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
+                <input type="number" className="flex h-12 w-full rounded-xl bg-muted/30 border-none shadow-inner px-3 py-2 text-lg font-bold" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Description</Label>
-                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.description} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value})} required />
+                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.description || editingExpense.note || ""} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} required />
               </div>
               <Button type="submit" className="w-full h-14 font-bold rounded-xl shadow-lg">Save Changes</Button>
             </form>
