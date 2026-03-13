@@ -56,6 +56,7 @@ export function ExpenseCapture() {
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [isSubLoading, setIsSubLoading] = useState(false);
 
   // Custom Category Dialog State
   const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
@@ -97,6 +98,7 @@ export function ExpenseCapture() {
       setSubcategories([]);
       return;
     }
+    setIsSubLoading(true);
     try {
       const q = query(
         collection(db, "subcategories"),
@@ -110,6 +112,8 @@ export function ExpenseCapture() {
       })));
     } catch (err) {
       console.error("Failed to load subcategories", err);
+    } finally {
+      setIsSubLoading(false);
     }
   }
 
@@ -196,12 +200,12 @@ export function ExpenseCapture() {
         amount: Math.abs(parseFloat(amount)),
         categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown",
-        category: categoryObj?.name || "Unknown", // for consistency
+        category: categoryObj?.name || "Unknown",
         subcategoryId: selectedSubcategory,
         subcategoryName: subcategoryObj?.name || "Unknown",
-        subCategory: subcategoryObj?.name || "Unknown", // for consistency
+        subCategory: subcategoryObj?.name || "Unknown",
         note: finalNote,
-        description: finalNote, // save both for consistency across UI components
+        description: finalNote,
         date: date,
         billImageData: attachmentData,
         createdAt: serverTimestamp()
@@ -409,17 +413,26 @@ export function ExpenseCapture() {
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
                   <Select 
+                    key={`sub-${selectedCategory}`}
                     value={selectedSubcategory} 
                     onValueChange={setSelectedSubcategory}
-                    disabled={!selectedCategory}
+                    disabled={!selectedCategory || isSubLoading}
                   >
                     <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
-                      <SelectValue placeholder="Select Subcategory" />
+                      <SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[250px]">
-                      {subcategories.map(sub => (
-                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
-                      ))}
+                      {isSubLoading ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center"><Loader2 className="w-3 h-3 animate-spin mr-2" /> Loading...</div>
+                        </SelectItem>
+                      ) : subcategories.length > 0 ? (
+                        subcategories.map(sub => (
+                          <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="empty" disabled>No subcategories found</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
