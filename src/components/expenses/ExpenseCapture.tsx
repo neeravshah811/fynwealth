@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, ShieldCheck, Upload, X } from "lucide-react";
+import { Camera, Mic, Plus, Loader2, CheckCircle2, Repeat, Upload, X, StopCircle } from "lucide-react";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
 import { toast } from "@/hooks/use-toast";
@@ -28,7 +27,9 @@ export function ExpenseCapture() {
   
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [manualDoc, setManualDoc] = useState<{ data: string; type: string; name: string } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
 
   const [manual, setManual] = useState({
     amount: '',
@@ -59,7 +60,7 @@ export function ExpenseCapture() {
         status: manual.date <= todayStr ? 'paid' : 'unpaid',
         isRecurring: manual.isRecurring,
         frequency: manual.isRecurring ? manual.frequency : 'One-time',
-        billImageData: manualDoc?.data || null,
+        billImageData: null,
         createdAt: serverTimestamp()
       };
 
@@ -73,12 +74,74 @@ export function ExpenseCapture() {
         isRecurring: false,
         frequency: 'Monthly',
       });
-      setManualDoc(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Success", description: "Expense synced to cloud." });
+      toast({ title: "Success", description: "Expense added to your vault." });
     } catch (err) {
       toast({ variant: "destructive", title: "Sync Failed", description: "Check your connection." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        await processVoice(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setAudioChunks([]);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Microphone Denied", description: "Please enable mic access to record." });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const processVoice = async (blob: Blob) => {
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        const result = await voiceExpenseCapture({ audioDataUri: base64String });
+        
+        if (result && user?.uid) {
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          await addDoc(collection(db, 'users', user.uid, 'expenses'), {
+            userId: user.uid,
+            amount: result.amount,
+            description: result.description || 'Voice Captured Expense',
+            category: result.category,
+            date: result.date || todayStr,
+            status: (result.date || todayStr) <= todayStr ? 'paid' : 'unpaid',
+            createdAt: serverTimestamp()
+          });
+          
+          setSuccess(true);
+          setTimeout(() => setSuccess(false), 2000);
+          toast({ title: "Voice Processed", description: `Added ${currency.symbol}${result.amount} for ${result.category}.` });
+        }
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Processing Error", description: "AI failed to transcribe your voice." });
     } finally {
       setLoading(false);
     }
@@ -133,9 +196,10 @@ export function ExpenseCapture() {
       </CardHeader>
       <CardContent className="pt-6">
         <Tabs defaultValue="manual" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="manual" className="text-xs font-bold uppercase">Manual</TabsTrigger>
-            <TabsTrigger value="scan" className="text-xs font-bold uppercase">Scan</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="manual" className="text-[10px] md:text-xs font-bold uppercase">Manual</TabsTrigger>
+            <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase">Voice</TabsTrigger>
+            <TabsTrigger value="scan" className="text-[10px] md:text-xs font-bold uppercase">Scan</TabsTrigger>
           </TabsList>
 
           <TabsContent value="manual">
@@ -178,9 +242,34 @@ export function ExpenseCapture() {
 
               <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Sync to Cloud
+                Add Expense
               </Button>
             </form>
+          </TabsContent>
+
+          <TabsContent value="voice">
+            <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed border-muted rounded-2xl bg-muted/10">
+              <div className={`p-6 rounded-full mb-4 transition-all duration-500 ${isRecording ? 'bg-destructive/20 animate-pulse scale-110' : 'bg-primary/10'}`}>
+                {isRecording ? <StopCircle className="w-12 h-12 text-destructive" /> : <Mic className="w-12 h-12 text-primary" />}
+              </div>
+              <h3 className="font-bold text-sm mb-1">{isRecording ? "Listening..." : "Voice Capture"}</h3>
+              <p className="text-xs text-muted-foreground px-6 mb-6">
+                {isRecording 
+                  ? "Describe your expense now..." 
+                  : "Tap to record. Say: \"Spent 50 dollars on groceries today.\""}
+              </p>
+              
+              {!isRecording ? (
+                <Button onClick={startRecording} disabled={loading} className="h-12 px-8 font-bold rounded-xl shadow-md bg-primary">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                  Start Recording
+                </Button>
+              ) : (
+                <Button onClick={stopRecording} variant="destructive" className="h-12 px-8 font-bold rounded-xl shadow-md">
+                  Stop & Process
+                </Button>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="scan">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -146,7 +147,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <button className={cn(
-          "rounded-lg flex items-center justify-center transition-colors shadow-sm",
+          "rounded-lg flex items-center justify-center transition-colors shadow-sm focus:outline-none",
           standalone 
             ? "w-12 h-10 text-muted-foreground hover:text-primary hover:bg-primary/5" 
             : "w-12 h-10 bg-primary/10 text-primary hover:bg-primary/20"
