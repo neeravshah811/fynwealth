@@ -37,10 +37,10 @@ export default function LoginPage() {
 
     if (mode === 'signup') {
       createUserWithEmailAndPassword(auth, email, password)
-        .then(async (userCredential) => {
+        .then((userCredential) => {
           const user = userCredential.user;
           // Non-blocking update of profile
-          updateFirebaseProfile(user, { displayName: name });
+          updateFirebaseProfile(user, { displayName: name }).catch(() => {});
           
           const [firstName = '', ...rest] = name.split(' ');
           updateStoreProfile({
@@ -56,11 +56,15 @@ export default function LoginPage() {
           setLoading(false);
         })
         .catch((error: any) => {
-          console.error('Sign Up Error:', error);
+          let message = 'Could not create account.';
+          if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
+          if (error.code === 'auth/invalid-email') message = 'Invalid email address.';
+          if (error.code === 'auth/weak-password') message = 'Password is too weak.';
+          
           toast({
             variant: 'destructive',
             title: 'Sign Up Failed',
-            description: error.message || 'Could not create account.',
+            description: message,
           });
           setLoading(false);
         });
@@ -85,11 +89,22 @@ export default function LoginPage() {
           setLoading(false);
         })
         .catch((error: any) => {
-          console.error('Sign In Error:', error);
+          let message = 'Check your email and password.';
+          // Handle 'auth/invalid-credential' which is the modern consolidated error for wrong email/password
+          if (
+            error.code === 'auth/user-not-found' || 
+            error.code === 'auth/wrong-password' || 
+            error.code === 'auth/invalid-credential'
+          ) {
+            message = 'Invalid email or password.';
+          } else if (error.code === 'auth/too-many-requests') {
+            message = 'Too many failed attempts. Please try again later.';
+          }
+          
           toast({
             variant: 'destructive',
             title: 'Sign In Failed',
-            description: error.message || 'Check your email and password.',
+            description: message,
           });
           setLoading(false);
         });
@@ -116,7 +131,7 @@ export default function LoginPage() {
         toast({
           variant: 'destructive',
           title: 'Reset Failed',
-          description: error.message || 'Could not send reset email.',
+          description: 'Could not send reset email. Check if the address is correct.',
         });
         setLoading(false);
       });
@@ -125,10 +140,7 @@ export default function LoginPage() {
   const handleGoogleLogin = () => {
     setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
-    
-    // Add scopes if necessary, but default is usually fine
-    provider.addScope('profile');
-    provider.addScope('email');
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     signInWithPopup(auth, provider)
       .then((result) => {
@@ -151,10 +163,14 @@ export default function LoginPage() {
       })
       .catch((error: any) => {
         console.error('Google Sign In Error:', error);
+        let message = 'Could not complete Google sign in.';
+        if (error.code === 'auth/popup-closed-by-user') message = 'Sign-in window was closed.';
+        if (error.code === 'auth/cancelled-by-user') message = 'Sign-in was cancelled.';
+        
         toast({
           variant: 'destructive',
           title: 'Google Login Failed',
-          description: error.message || 'Could not complete Google sign in. Ensure popups are allowed.',
+          description: message,
         });
         setGoogleLoading(false);
       });
