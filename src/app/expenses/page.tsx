@@ -215,6 +215,31 @@ export default function ExpensesPage() {
           <h1 className="text-2xl md:text-3xl font-bold font-headline mb-2 text-primary">Expenses</h1>
           <p className="text-sm md:text-base text-muted-foreground">Track and manage every cent you spend across devices.</p>
         </div>
+        <div className="flex items-center gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept=".csv" 
+            onChange={handleFileImport} 
+          />
+          <Button 
+            variant="outline" 
+            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-5"
+            onClick={handleImportClick}
+            disabled={isImporting}
+          >
+            {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            Import CSV
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-5"
+            onClick={handleExport}
+          >
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -228,36 +253,9 @@ export default function ExpensesPage() {
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept=".csv" 
-                      onChange={handleFileImport} 
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9 text-[10px] uppercase font-bold rounded-lg border-primary/20 text-primary"
-                      onClick={handleImportClick}
-                      disabled={isImporting}
-                    >
-                      {isImporting ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Upload className="w-3 h-3 mr-1.5" />}
-                      Import
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9 text-[10px] uppercase font-bold rounded-lg border-primary/20 text-primary"
-                      onClick={handleExport}
-                    >
-                      <Download className="w-3 h-3 mr-1.5" /> Export
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-9 text-[10px] uppercase font-bold rounded-lg">
-                      <Filter className="w-3 h-3 mr-1.5" /> Filter
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" className="h-9 text-[10px] uppercase font-bold rounded-lg">
+                    <Filter className="w-3 h-3 mr-1.5" /> Filter
+                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
