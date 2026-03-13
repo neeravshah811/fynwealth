@@ -353,15 +353,33 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted/50">
-                <div className="flex items-center gap-3">
-                  <Repeat className="w-4 h-4 text-primary" />
-                  <div>
-                    <Label className="text-xs font-bold block">Monthly Recurring</Label>
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Auto-adds next month</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted/50">
+                  <div className="flex items-center gap-3">
+                    <Repeat className="w-4 h-4 text-primary" />
+                    <div>
+                      <Label className="text-xs font-bold block">Recurring expense</Label>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically record this transaction</p>
+                    </div>
                   </div>
+                  <Switch checked={manual.isRecurring} onCheckedChange={(checked) => setManual({...manual, isRecurring: checked})} />
                 </div>
-                <Switch checked={manual.isRecurring} onCheckedChange={(checked) => setManual({...manual, isRecurring: checked})} />
+
+                {manual.isRecurring && (
+                  <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                    <Select value={manual.frequency} onValueChange={(v) => setManual({...manual, frequency: v as Frequency})}>
+                      <SelectTrigger className="h-11 rounded-xl font-medium shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {['Weekly', 'Monthly', 'Quarterly', 'Half-yearly', 'Annually'].map(f => (
+                          <SelectItem key={f} value={f}>{f}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg">
