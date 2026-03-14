@@ -401,7 +401,7 @@ export function ExpenseCapture() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center justify-between px-1 h-5">
                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
                     <button 
                       type="button" 
@@ -428,7 +428,9 @@ export function ExpenseCapture() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
+                  <div className="flex items-center px-1 h-5">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategory</Label>
+                  </div>
                   <Select 
                     key={`sub-exp-${selectedCategory}`}
                     value={selectedSubcategory} 

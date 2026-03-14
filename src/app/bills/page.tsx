@@ -336,7 +336,7 @@ export default function BillsPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Due Date</Label>
                   <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} required className="h-12 rounded-xl" />
@@ -350,13 +350,16 @@ export default function BillsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center justify-between px-1 h-5">
                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
                     <button 
                       type="button" 
                       onClick={() => setIsCustomCategoryOpen(true)}
-                      className="text-primary hover:text-primary/80 transition-colors"
+                      className="text-primary hover:text-primary/80 transition-colors p-0.5 rounded-full hover:bg-primary/5"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -372,29 +375,30 @@ export default function BillsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Subcategory</Label>
-                <Select 
-                  key={`sub-rem-${selectedCategory}`}
-                  value={selectedSubcategory} 
-                  onValueChange={setSelectedSubcategory}
-                  disabled={!selectedCategory || isSubLoading}
-                >
-                  <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} /></SelectTrigger>
-                  <SelectContent className="z-[100] max-h-[250px]">
-                    {isSubLoading ? (
-                      <SelectItem value="loading" disabled>
-                        <div className="flex items-center"><Loader2 className="w-3 h-3 animate-spin mr-2" /> Loading...</div>
-                      </SelectItem>
-                    ) : subcategories.length > 0 ? (
-                      subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)
-                    ) : (
-                      <SelectItem value="empty" disabled>No subcategories found</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <div className="flex items-center px-1 h-5">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategory</Label>
+                  </div>
+                  <Select 
+                    key={`sub-rem-${selectedCategory}`}
+                    value={selectedSubcategory} 
+                    onValueChange={setSelectedSubcategory}
+                    disabled={!selectedCategory || isSubLoading}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} /></SelectTrigger>
+                    <SelectContent className="z-[100] max-h-[250px]">
+                      {isSubLoading ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center"><Loader2 className="w-3 h-3 animate-spin mr-2" /> Loading...</div>
+                        </SelectItem>
+                      ) : subcategories.length > 0 ? (
+                        subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)
+                      ) : (
+                        <SelectItem value="empty" disabled>No subcategories found</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
