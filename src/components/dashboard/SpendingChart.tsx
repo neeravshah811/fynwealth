@@ -59,14 +59,14 @@ export function SpendingChart() {
 
   return (
     <Card className="shadow-sm border-none bg-card/80 backdrop-blur lg:col-span-2 h-full flex flex-col">
-      <CardHeader className="p-4 pb-2">
+      <CardHeader className="p-6 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[400px] p-2">
+      <CardContent className="flex-1 min-h-[450px] p-6 pt-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={data} 
-            margin={{ top: 10, right: 10, left: 40, bottom: 140 }}
+            margin={{ top: 40, right: 80, left: 20, bottom: 140 }}
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
@@ -84,6 +84,7 @@ export function SpendingChart() {
             <YAxis 
               axisLine={false} 
               tickLine={false} 
+              width={60}
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} 
               tickFormatter={(value) => `${currency.symbol}${value >= 1000 ? (value/1000).toFixed(0)+'k' : value}`}
             />
