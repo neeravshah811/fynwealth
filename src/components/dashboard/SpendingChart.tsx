@@ -61,19 +61,20 @@ export function SpendingChart() {
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[300px] p-2">
+      <CardContent className="flex-1 min-h-[350px] p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} 
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }} 
               interval={0}
-              height={60}
-              angle={-30}
+              height={100}
+              angle={-45}
               textAnchor="end"
+              dx={-5}
               dy={10}
             />
             <YAxis 
@@ -85,19 +86,19 @@ export function SpendingChart() {
             <Tooltip 
               cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
               contentStyle={{ 
-                borderRadius: '8px', 
+                borderRadius: '12px', 
                 border: 'none', 
                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                 backgroundColor: 'hsl(var(--card))',
-                fontSize: '10px',
-                padding: '8px 10px'
+                fontSize: '11px',
+                padding: '10px 12px'
               }}
               formatter={(value: number) => [
                 <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
                 null
               ]}
             />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32}>
+            <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={32}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
