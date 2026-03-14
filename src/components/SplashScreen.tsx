@@ -7,14 +7,14 @@ export function SplashScreen() {
   const [shouldRender, setShouldRender] = useState(true);
 
   useEffect(() => {
-    // significantly reduced delays for snappier entry
+    // Timing adjusted to 4 seconds as requested
     const fadeTimer = setTimeout(() => {
       setIsVisible(false);
-    }, 300); 
+    }, 4000); 
 
     const unmountTimer = setTimeout(() => {
       setShouldRender(false);
-    }, 500);
+    }, 4300);
 
     return () => {
       clearTimeout(fadeTimer);
