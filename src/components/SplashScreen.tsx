@@ -7,14 +7,14 @@ export function SplashScreen() {
   const [shouldRender, setShouldRender] = useState(true);
 
   useEffect(() => {
-    // Timing adjusted to 4 seconds as requested
+    // Timing adjusted to 3 seconds as requested
     const fadeTimer = setTimeout(() => {
       setIsVisible(false);
-    }, 4000); 
+    }, 3000); 
 
     const unmountTimer = setTimeout(() => {
       setShouldRender(false);
-    }, 4300);
+    }, 3300);
 
     return () => {
       clearTimeout(fadeTimer);
