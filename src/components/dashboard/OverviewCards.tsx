@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
@@ -40,6 +40,23 @@ export function OverviewCards() {
   const { data: budgets, isLoading: budgetsLoading } = useCollection(budgetsQuery);
   const { data: expenses, isLoading: expensesLoading } = useCollection(expensesQuery);
 
+  const stats = useMemo(() => {
+    if (!expenses && !budgets) return { paidSpend: 0, pendingBills: 0, totalBudgetAmount: 0, totalBalance: 0 };
+    
+    const paid = (expenses || [])
+      .filter(e => e.status === 'paid' || !e.status)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const pending = (expenses || [])
+      .filter(e => e.status === 'unpaid')
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const budget = (budgets || []).reduce((sum, b) => sum + (Number(b.limit) || 0), 0);
+    const balance = budget - (paid + pending);
+
+    return { paidSpend: paid, pendingBills: pending, totalBudgetAmount: budget, totalBalance: balance };
+  }, [expenses, budgets]);
+
   if (!mounted || budgetsLoading || expensesLoading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -49,17 +66,6 @@ export function OverviewCards() {
       </div>
     );
   }
-
-  const paidSpend = (expenses || [])
-    .filter(e => e.status === 'paid' || !e.status)
-    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-
-  const pendingBills = (expenses || [])
-    .filter(e => e.status === 'unpaid')
-    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-
-  const totalBudgetAmount = (budgets || []).reduce((sum, b) => sum + (Number(b.limit) || 0), 0);
-  const totalBalance = totalBudgetAmount - (paidSpend + pendingBills);
 
   const formatAmount = (amount: number) => {
     return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -84,10 +90,10 @@ export function OverviewCards() {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-      <MetricCard title="Spent" amount={paidSpend} icon={Wallet} colorClass="text-primary" subtext="Month Total" />
-      <MetricCard title="Pending" amount={pendingBills} icon={Clock} colorClass="text-accent" subtext="Upcoming" />
-      <MetricCard title="Budget" amount={totalBudgetAmount} icon={PieChart} colorClass="text-emerald-500" subtext="Target" />
-      <MetricCard title="Balance" amount={totalBalance} icon={Coins} colorClass={totalBalance < 0 ? "text-destructive" : "text-primary"} subtext="Remaining" />
+      <MetricCard title="Spent" amount={stats.paidSpend} icon={Wallet} colorClass="text-primary" subtext="Month Total" />
+      <MetricCard title="Pending" amount={stats.pendingBills} icon={Clock} colorClass="text-accent" subtext="Upcoming" />
+      <MetricCard title="Budget" amount={stats.totalBudgetAmount} icon={PieChart} colorClass="text-emerald-500" subtext="Target" />
+      <MetricCard title="Balance" amount={stats.totalBalance} icon={Coins} colorClass={stats.totalBalance < 0 ? "text-destructive" : "text-primary"} subtext="Remaining" />
     </div>
   );
 }

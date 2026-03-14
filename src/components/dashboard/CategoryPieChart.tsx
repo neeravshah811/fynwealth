@@ -1,5 +1,7 @@
+
 "use client";
 
+import { useMemo } from "react";
 import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
@@ -33,20 +35,22 @@ export function CategoryPieChart() {
   }, [db, user?.uid, viewMonth, viewYear]);
 
   const { data: expensesData } = useCollection(expensesQuery);
-  const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
 
-  const data = expenses
-    .reduce((acc: any[], curr) => {
-      const catName = curr.categoryName || curr.category || "General";
-      const existing = acc.find(item => item.name === catName);
-      if (existing) {
-        existing.value += (Number(curr.amount) || 0);
-      } else {
-        acc.push({ name: catName, value: (Number(curr.amount) || 0) });
-      }
-      return acc;
-    }, [])
-    .sort((a, b) => b.value - a.value);
+  const data = useMemo(() => {
+    const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
+    return expenses
+      .reduce((acc: any[], curr) => {
+        const catName = curr.categoryName || curr.category || "General";
+        const existing = acc.find(item => item.name === catName);
+        if (existing) {
+          existing.value += (Number(curr.amount) || 0);
+        } else {
+          acc.push({ name: catName, value: (Number(curr.amount) || 0) });
+        }
+        return acc;
+      }, [])
+      .sort((a, b) => b.value - a.value);
+  }, [expensesData]);
 
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', '#10b981', '#3b82f6', '#f43f5e', '#8b5cf6', '#0ea5e9', '#f97316'];
 

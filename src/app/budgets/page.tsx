@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -102,6 +103,17 @@ export default function BudgetsPage() {
     setMounted(true);
   }, []);
 
+  const budgetStats = useMemo(() => {
+    const totalSpent = expenses
+      .filter(e => e.status === 'paid' || !e.status)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const totalBudget = budgetsData?.reduce((sum, b) => sum + (Number(b.limit) || 0), 0) || 0;
+    const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
+
+    return { totalSpent, totalBudget, overallRemainingPercent };
+  }, [expenses, budgetsData]);
+
   // Standardized logic: Spent = Paid or no status
   const getMonthlySpendByCategory = (categoryId: string, categoryName: string) => {
     return expenses
@@ -169,14 +181,6 @@ export default function BudgetsPage() {
       setViewDate(date.getMonth(), date.getFullYear());
     }
   };
-
-  // Synchronized Total Spent Logic (matches Dashboard OverviewCards)
-  const totalSpent = expenses
-    .filter(e => e.status === 'paid' || !e.status)
-    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-
-  const totalBudget = budgetsData?.reduce((sum, b) => sum + (Number(b.limit) || 0), 0) || 0;
-  const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
 
   if (!mounted || budgetsLoading || expensesLoading) {
     return (
@@ -278,7 +282,7 @@ export default function BudgetsPage() {
               <Target className="w-5 h-5 text-primary" />
               <span className="text-xs font-bold font-headline uppercase tracking-wider text-primary">Progress</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{overallRemainingPercent.toFixed(0)}%</div>
+            <div className="text-2xl font-bold font-headline mb-1">{budgetStats.overallRemainingPercent.toFixed(0)}%</div>
             <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Remaining of Total</p>
           </CardContent>
         </Card>
@@ -288,7 +292,7 @@ export default function BudgetsPage() {
               <TrendingUp className="w-5 h-5 text-destructive" />
               <span className="text-xs font-bold font-headline uppercase tracking-wider text-muted-foreground">Total Spent</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(totalSpent)}</div>
+            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(budgetStats.totalSpent)}</div>
             <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Usage for {format(new Date(viewYear, viewMonth), 'MMM')}</p>
           </CardContent>
         </Card>
@@ -298,7 +302,7 @@ export default function BudgetsPage() {
               <PieChart className="w-5 h-5 text-emerald-500" />
               <span className="text-xs font-bold font-headline uppercase tracking-wider text-muted-foreground">Budget Limit</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(totalBudget)}</div>
+            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(budgetStats.totalBudget)}</div>
             <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Global Monthly Target</p>
           </CardContent>
         </Card>
