@@ -63,7 +63,7 @@ export function SpendingChart() {
       </CardHeader>
       <CardContent className="flex-1 min-h-[350px] p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 90 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
               dataKey="name" 
@@ -71,11 +71,11 @@ export function SpendingChart() {
               tickLine={false} 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }} 
               interval={0}
-              height={100}
+              height={120}
               angle={-45}
               textAnchor="end"
               dx={-5}
-              dy={10}
+              dy={15}
             />
             <YAxis 
               axisLine={false} 

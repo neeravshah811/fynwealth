@@ -375,7 +375,7 @@ export default function ExpensesPage() {
                           <div className="flex flex-col min-w-0">
                             <span className="font-bold text-sm truncate max-w-[180px]">{expense.description || expense.note || "No description"}</span>
                             <div className="flex items-center gap-1 mt-0.5">
-                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] py-0 h-4 border-none font-bold uppercase">
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-1.5 h-5 border-none font-bold uppercase inline-flex items-center">
                                 {expense.categoryName || expense.category || "General"}
                               </Badge>
                               {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
