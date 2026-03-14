@@ -33,15 +33,16 @@ export function CategoryPieChart() {
   }, [db, user?.uid, viewMonth, viewYear]);
 
   const { data: expensesData } = useCollection(expensesQuery);
-  const expenses = expensesData || [];
+  const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
 
   const data = expenses
     .reduce((acc: any[], curr) => {
-      const existing = acc.find(item => item.name === curr.category);
+      const catName = curr.categoryName || curr.category || "General";
+      const existing = acc.find(item => item.name === catName);
       if (existing) {
-        existing.value += curr.amount;
+        existing.value += (Number(curr.amount) || 0);
       } else {
-        acc.push({ name: curr.category, value: curr.amount });
+        acc.push({ name: catName, value: (Number(curr.amount) || 0) });
       }
       return acc;
     }, [])

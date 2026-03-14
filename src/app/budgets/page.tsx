@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -90,9 +89,13 @@ export default function BudgetsPage() {
     setMounted(true);
   }, []);
 
+  // Standardized logic: Spent = Paid or no status
   const getMonthlySpendByCategory = (categoryId: string, categoryName: string) => {
     return expenses
-      .filter(e => e.categoryId === categoryId || e.categoryName === categoryName || e.category === categoryName)
+      .filter(e => 
+        (e.categoryId === categoryId || e.categoryName === categoryName || e.category === categoryName) &&
+        (e.status === 'paid' || !e.status)
+      )
       .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   };
 
@@ -152,7 +155,11 @@ export default function BudgetsPage() {
     }
   };
 
-  const totalSpent = categories.reduce((sum, cat) => sum + getMonthlySpendByCategory(cat.id, cat.name), 0);
+  // Synchronized Total Spent Logic (matches Dashboard OverviewCards)
+  const totalSpent = expenses
+    .filter(e => e.status === 'paid' || !e.status)
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
   const totalBudget = budgetsData?.reduce((sum, b) => sum + (Number(b.limit) || 0), 0) || 0;
   const overallRemainingPercent = totalBudget > 0 ? Math.max(0, ((totalBudget - totalSpent) / totalBudget) * 100) : 0;
 
