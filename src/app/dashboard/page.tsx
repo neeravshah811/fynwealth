@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -103,9 +102,15 @@ export default function DashboardPage() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold truncate text-foreground leading-none mb-1.5" title={expense.description || expense.note}>{expense.description || expense.note || "No description"}</p>
-          <p className="text-xs text-muted-foreground truncate uppercase tracking-tight">
-            {expense.categoryName || expense.category || "General"} • {format(new Date(expense.date), 'MMM dd')}
-          </p>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-muted-foreground truncate uppercase tracking-tight font-bold">
+              {format(new Date(expense.date), 'MMM dd')}
+            </span>
+            <span className="text-[8px] text-muted-foreground/30">•</span>
+            <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+              {expense.categoryName || expense.category || "General"}
+            </Badge>
+          </div>
         </div>
       </div>
       <div className="text-sm font-bold text-destructive shrink-0 whitespace-nowrap ml-2">

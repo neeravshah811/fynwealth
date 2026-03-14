@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
@@ -374,12 +373,12 @@ export default function ExpensesPage() {
                         <TableCell>
                           <div className="flex flex-col min-w-0">
                             <span className="font-bold text-sm truncate max-w-[180px]">{expense.description || expense.note || "No description"}</span>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-1.5 h-5 border-none font-bold uppercase inline-flex items-center">
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-1 h-auto border-none font-bold uppercase inline-flex items-center text-center">
                                 {expense.categoryName || expense.category || "General"}
                               </Badge>
                               {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
-                                <span className="text-[8px] text-muted-foreground uppercase font-medium">/ {expense.subcategoryName || expense.subCategory}</span>
+                                <span className="text-[8px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-1 rounded-full">/ {expense.subcategoryName || expense.subCategory}</span>
                               )}
                             </div>
                           </div>

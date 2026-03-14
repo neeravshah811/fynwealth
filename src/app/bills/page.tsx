@@ -506,10 +506,12 @@ export default function BillsPage() {
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
                       <h4 className="font-bold text-lg truncate pr-2">{bill.name}</h4>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <Badge variant="secondary" className="text-[9px] font-bold uppercase">{bill.categoryName}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-1 px-2 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+                          {bill.categoryName}
+                        </Badge>
                         {bill.subcategoryName && bill.subcategoryName !== 'Others' && (
-                          <span className="text-[9px] text-muted-foreground uppercase font-medium">/ {bill.subcategoryName}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-1 rounded-full">/ {bill.subcategoryName}</span>
                         )}
                       </div>
                     </div>
