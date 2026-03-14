@@ -86,8 +86,11 @@ export default function BillsPage() {
       
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (!catMap.has(data.name) || data.userId === user?.uid) {
-          catMap.set(data.name, { id: doc.id, ...data });
+        const normalized = data.name?.trim().toLowerCase();
+        if (!normalized) return;
+        
+        if (!catMap.has(normalized) || data.userId === user?.uid) {
+          catMap.set(normalized, { id: doc.id, ...data });
         }
       });
       
@@ -294,7 +297,7 @@ export default function BillsPage() {
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Cloud Reminders</h1>
+          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
           <p className="text-xs text-muted-foreground font-bold uppercase">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
@@ -446,7 +449,7 @@ export default function BillsPage() {
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Cloud Reminder"}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Reminder"}
               </Button>
             </form>
           </CardContent>
