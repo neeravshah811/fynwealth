@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
@@ -22,6 +23,7 @@ import { predictHeavySpendingMonths } from "@/ai/flows/heavy-spending-month-pred
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 
 export default function InsightsPage() {
   const { currency, insights, setInsights } = useFynWealthStore();
@@ -30,6 +32,7 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const fetchingRef = useRef(false);
 
   // Firestore Expenses Query - Use all expenses for better insights
   const expensesQuery = useMemoFirebase(() => {
@@ -48,25 +51,18 @@ export default function InsightsPage() {
   }, []);
 
   const loadInsights = useCallback(async (isManual = false) => {
-    if (expenses.length === 0) return;
-
-    // Throttle: Don't auto-run if we have data generated in the last 6 hours
-    if (!isManual && insights.lastGenerated) {
-      const lastGen = new Date(insights.lastGenerated).getTime();
-      const sixHours = 6 * 60 * 60 * 1000;
-      if (Date.now() - lastGen < sixHours && insights.predictions && insights.unnecessary) {
-        return;
-      }
-    }
+    if (expenses.length === 0 || fetchingRef.current) return;
 
     setLoading(true);
     setError(null);
+    fetchingRef.current = true;
+
     try {
       const expenseData = expenses.map(e => ({ 
         date: e.date, 
         amount: Math.abs(e.amount), 
-        description: e.description, 
-        category: e.category 
+        description: e.description || e.note || "Expense", 
+        category: e.categoryName || e.category || "General" 
       }));
       
       const pResult = await predictHeavySpendingMonths({ 
@@ -97,14 +93,22 @@ export default function InsightsPage() {
       }
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
-  }, [expenses, insights, setInsights]);
+  }, [expenses, setInsights]);
 
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading) {
-      loadInsights();
+      // Throttle: Don't auto-run if we have data generated in the last 6 hours
+      const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
+      const sixHours = 6 * 60 * 60 * 1000;
+      const needsUpdate = !insights.predictions || !insights.unnecessary || (Date.now() - lastGen > sixHours);
+
+      if (needsUpdate) {
+        loadInsights();
+      }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated]);
 
   if (!mounted) {
     return (
@@ -274,7 +278,7 @@ export default function InsightsPage() {
           <CardContent className="p-8 relative z-10 text-center md:text-left">
             <h3 className="text-xl font-headline font-bold mb-3">Optimization Ready</h3>
             <p className="text-primary-foreground/80 max-w-xl text-sm mb-6 leading-relaxed">
-              We've identified several ways to improve your savings rate. Click below to view your personalized financial optimization plan.
+              We've identified several ways to improve your savings rate. AI-generated insights are suggestions and should be verified independently.
             </p>
             <Button className="bg-white text-primary hover:bg-white/90 h-11 px-8 font-bold rounded-xl shadow-lg">
               Explore Optimization

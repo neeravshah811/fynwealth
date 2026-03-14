@@ -1,9 +1,10 @@
+
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
-import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from "firebase/firestore";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -50,11 +51,28 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Categories & Subcategories State
-  const [categories, setCategories] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
+  // Taxonomy listeners
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "categories");
+  }, [db]);
+
+  const { data: categoriesRaw } = useCollection(categoriesQuery);
+
+  const categories = useMemo(() => {
+    if (!categoriesRaw) return [];
+    const catMap = new Map();
+    categoriesRaw.forEach(cat => {
+      if (!catMap.has(cat.name) || cat.userId === user?.uid) {
+        catMap.set(cat.name, cat);
+      }
+    });
+    return Array.from(catMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [categoriesRaw, user?.uid]);
+
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [subcategories, setSubcategories] = useState<any[]>([]);
   const [isSubLoading, setIsSubLoading] = useState(false);
 
   // Custom Category Dialog State
@@ -78,30 +96,6 @@ export function ExpenseCapture() {
     contact: ""
   });
 
-  const loadCategories = async () => {
-    if (!db) return;
-    try {
-      const snapshot = await getDocs(collection(db, "categories"));
-      const catMap = new Map();
-      
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        // Deduplicate and prioritize user-owned categories if names collide
-        if (!catMap.has(data.name) || data.userId === user?.uid) {
-          catMap.set(data.name, { id: doc.id, ...data });
-        }
-      });
-      
-      setCategories(Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (err) {
-      console.error("Failed to load categories", err);
-    }
-  };
-
-  useEffect(() => {
-    loadCategories();
-  }, [db]);
-
   async function loadSubcategories(categoryId: string) {
     if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
       setSubcategories([]);
@@ -122,7 +116,6 @@ export function ExpenseCapture() {
       const sorted = fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
       setSubcategories(sorted);
 
-      // AUTO SELECT: If only one subcategory exists, select it automatically
       if (sorted.length === 1) {
         setSelectedSubcategory(sorted[0].id);
       } else {
@@ -162,8 +155,6 @@ export function ExpenseCapture() {
       toast({ title: "Category Created", description: `"${newCategoryName}" added.` });
       setNewCategoryName("");
       setIsCustomCategoryOpen(false);
-      
-      await loadCategories();
       handleCategoryChange(categoryRef.id);
     } catch (err) {
       toast({ variant: "destructive", title: "Error", description: "Failed to create category." });

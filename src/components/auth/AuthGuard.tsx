@@ -3,7 +3,7 @@
 
 import { useUser, useFirestore } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
@@ -16,8 +16,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const db = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isVerifyingRole, setIsVerifyingRole] = useState(true);
+  const verifyAttempted = useRef(false);
 
   useEffect(() => {
     async function verifyRole() {
@@ -31,14 +31,26 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      // Check if user is an admin
+      // Skip verification if already done for this session/user
+      if (verifyAttempted.current && pathname !== '/login') {
+        setIsVerifyingRole(false);
+        return;
+      }
+
       try {
+        // If email is missing (some anonymous logins), assume regular user
+        if (!user.email) {
+          setIsVerifyingRole(false);
+          if (pathname === '/login') router.push('/dashboard');
+          return;
+        }
+
         const adminRef = collection(db, 'admins');
         const q = query(adminRef, where('email', '==', user.email), limit(1));
         const snapshot = await getDocs(q);
         const adminExists = !snapshot.empty || user.email === 'admin@fynwealth.com';
         
-        setIsAdmin(adminExists);
+        verifyAttempted.current = true;
 
         if (pathname === '/login') {
           if (adminExists) {
@@ -48,17 +60,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
           }
         }
       } catch (error) {
-        // Silent catch for role check: If query fails, assume they are a regular user
-        // unless they are the hardcoded super admin email.
-        const isSuperAdmin = user.email === 'admin@fynwealth.com';
-        setIsAdmin(isSuperAdmin);
-        
+        // Default to safe behavior on error
         if (pathname === '/login') {
-          if (isSuperAdmin) {
-            router.push('/admin-dashboard');
-          } else {
-            router.push('/dashboard');
-          }
+          router.push('/dashboard');
         }
       } finally {
         setIsVerifyingRole(false);
