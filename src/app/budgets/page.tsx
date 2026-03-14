@@ -55,13 +55,26 @@ export default function BudgetsPage() {
       if (!firestore) return;
       try {
         const snapshot = await getDocs(collection(firestore, "categories"));
-        setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const catMap = new Map();
+        
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          const normalized = data.name?.trim().toLowerCase();
+          if (!normalized) return;
+          
+          // Deduplicate by name, preferring the user's own category
+          if (!catMap.has(normalized) || data.userId === user?.uid) {
+            catMap.set(normalized, { id: doc.id, ...data });
+          }
+        });
+        
+        setCategories(Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
       } catch (err) {
         console.error("Failed to load categories", err);
       }
     }
     loadCategories();
-  }, [firestore]);
+  }, [firestore, user?.uid]);
 
   const budgetsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
