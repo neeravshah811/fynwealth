@@ -107,7 +107,8 @@ export default function BudgetsPage() {
     const initialLimits: Record<string, string> = {};
     categories.forEach(cat => {
       const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
-      initialLimits[cat.id] = budgetDoc ? budgetDoc.limit.toString() : "0";
+      // If doc exists and limit > 0, show it. Otherwise show empty string instead of "0"
+      initialLimits[cat.id] = (budgetDoc && budgetDoc.limit !== 0) ? budgetDoc.limit.toString() : "";
     });
     setEditedLimits(initialLimits);
     setIsDialogOpen(true);
@@ -118,7 +119,8 @@ export default function BudgetsPage() {
 
     try {
       const promises = Object.entries(editedLimits).map(([catId, limit]) => {
-        const numLimit = parseFloat(limit);
+        // Interpret empty string as 0
+        const numLimit = limit === "" ? 0 : parseFloat(limit);
         if (!isNaN(numLimit)) {
           const categoryObj = categories.find(c => c.id === catId);
           const docRef = doc(firestore, 'users', user.uid, 'budgets', catId);
@@ -237,7 +239,8 @@ export default function BudgetsPage() {
                         id={cat.id} 
                         type="number" 
                         className="pl-8 h-10 text-sm font-bold rounded-xl" 
-                        value={editedLimits[cat.id] || "0"} 
+                        placeholder="0.00"
+                        value={editedLimits[cat.id] ?? ""} 
                         onChange={(e) => setEditedLimits({ ...editedLimits, [cat.id]: e.target.value })} 
                       />
                     </div>
