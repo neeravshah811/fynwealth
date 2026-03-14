@@ -9,6 +9,7 @@ import { collection, query, where, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { 
   FileText, 
@@ -107,7 +108,7 @@ export default function DashboardPage() {
               {format(new Date(expense.date), 'MMM dd')}
             </span>
             <span className="text-[8px] text-muted-foreground/30">•</span>
-            <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+            <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-1 h-auto border-none font-bold uppercase inline-flex items-center text-center">
               {expense.categoryName || expense.category || "General"}
             </Badge>
           </div>
