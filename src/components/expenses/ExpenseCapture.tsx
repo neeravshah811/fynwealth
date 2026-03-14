@@ -512,7 +512,7 @@ export function ExpenseCapture() {
               )}
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description (Optional)</Label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
