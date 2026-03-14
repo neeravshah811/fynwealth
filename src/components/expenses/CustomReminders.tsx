@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Bell, Plus, Trash2, CheckCircle2, Calendar, Clock, AlertCircle } from "lucide-react";
+import { Bell, Plus, Trash2, CheckCircle2, Calendar, Clock, AlertCircle, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -146,7 +145,7 @@ export function CustomReminders() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Notes (Optional)</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Description (Optional)</Label>
               <Textarea 
                 placeholder="Account numbers, specific instructions..." 
                 value={formData.notes}
@@ -247,25 +246,5 @@ export function CustomReminders() {
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function X(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
   );
 }

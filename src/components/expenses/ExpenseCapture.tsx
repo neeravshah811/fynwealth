@@ -211,7 +211,7 @@ export function ExpenseCapture() {
       const categoryObj = categories.find(c => c.id === selectedCategory);
       const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
 
-      const finalNote = note.trim() || "No note provided";
+      const finalNote = note.trim() || "No description provided";
 
       const payload: any = {
         userId: user.uid,
@@ -384,7 +384,7 @@ export function ExpenseCapture() {
                       value={amount} 
                       onChange={(e) => setAmount(e.target.value)} 
                       required 
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm font-bold shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm font-bold shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -512,7 +512,7 @@ export function ExpenseCapture() {
               )}
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Note</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description</Label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 

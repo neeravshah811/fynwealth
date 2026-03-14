@@ -402,7 +402,7 @@ export default function BillsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Note (Optional)</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description (Optional)</Label>
                 <Textarea 
                   value={formData.note} 
                   onChange={(e) => setFormData({...formData, note: e.target.value})} 
