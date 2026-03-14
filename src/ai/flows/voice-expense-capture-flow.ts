@@ -9,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 
 const VoiceExpenseCaptureInputSchema = z.object({
   audioDataUri: z
@@ -56,7 +55,7 @@ const transcribeAudioPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: VoiceExpenseCaptureInputSchema},
   output: {schema: z.string().describe('The transcribed text from the audio.')},
-  model: googleAI.model('gemini-1.5-pro-latest'), // Using a multimodal model for audio input
+  model: 'googleai/gemini-1.5-flash', // Using a multimodal model for audio input
   prompt: `Transcribe the following audio into text: {{media url=audioDataUri}}`,
 });
 

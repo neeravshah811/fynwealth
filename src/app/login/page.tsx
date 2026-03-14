@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,10 +31,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [checkingRedirect, setCheckingRedirect] = useState(true);
 
   // Handle returning from a Google redirect (standard for mobile)
   useEffect(() => {
     if (!auth) return;
+
+    // Check if we already have a user from a previous session or immediate login
+    if (auth.currentUser) {
+      setCheckingRedirect(false);
+      return;
+    }
 
     getRedirectResult(auth)
       .then((result) => {
@@ -56,15 +62,16 @@ export default function LoginPage() {
             description: 'Signed in with Google successfully.',
           });
         }
+        setCheckingRedirect(false);
       })
       .catch((error: any) => {
-        // Only show error if it's an actual failure (not just "no redirect found")
+        setCheckingRedirect(false);
         if (error.code !== 'auth/no-current-user') {
           console.error('Redirect Sign-in Error:', error);
           toast({
             variant: 'destructive',
             title: 'Google Login Failed',
-            description: 'Could not complete the mobile sign-in process.',
+            description: 'Could not complete the mobile sign-in process. Please try again.',
           });
         }
       });
@@ -78,7 +85,6 @@ export default function LoginPage() {
       createUserWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
           const user = userCredential.user;
-          // Non-blocking update of profile
           updateFirebaseProfile(user, { displayName: name }).catch(() => {});
           
           const [firstName = '', ...rest] = name.split(' ');
@@ -185,6 +191,7 @@ export default function LoginPage() {
 
     if (isMobile) {
       // Use redirect for mobile to bypass popup blockers
+      // Loading state will persist until redirect occurs
       signInWithRedirect(auth, provider);
     } else {
       // Use popup for desktop for better UX
@@ -222,6 +229,15 @@ export default function LoginPage() {
         });
     }
   };
+
+  if (checkingRedirect) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+        <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">Verifying Authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
