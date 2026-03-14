@@ -23,7 +23,7 @@ export function SpendingChart() {
   const { user } = useUser();
   const db = useFirestore();
 
-  // Fetch Expenses
+  // Fetch Expenses - Only show actualized spend
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -39,6 +39,7 @@ export function SpendingChart() {
   const { data: expensesData } = useCollection(expensesQuery);
 
   const data = useMemo(() => {
+    // Filter by status 'paid' or no status to match Dashboard Metrics
     const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
     return expenses
       .reduce((acc: any[], curr) => {
@@ -61,9 +62,12 @@ export function SpendingChart() {
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[350px] p-2">
+      <CardContent className="flex-1 min-h-[400px] p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 90 }}>
+          <BarChart 
+            data={data} 
+            margin={{ top: 10, right: 10, left: 40, bottom: 140 }}
+          >
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
               dataKey="name" 
@@ -71,7 +75,7 @@ export function SpendingChart() {
               tickLine={false} 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }} 
               interval={0}
-              height={120}
+              height={140}
               angle={-45}
               textAnchor="end"
               dx={-5}
