@@ -1,13 +1,15 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   updateProfile as updateFirebaseProfile,
   sendPasswordResetEmail
 } from 'firebase/auth';
@@ -30,6 +32,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Handle returning from a Google redirect (standard for mobile)
+  useEffect(() => {
+    if (!auth) return;
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          const user = result.user;
+          
+          if (user.displayName) {
+            const [firstName = '', ...rest] = user.displayName.split(' ');
+            updateStoreProfile({
+              firstName,
+              lastName: rest.join(' '),
+              email: user.email || ''
+            });
+          }
+
+          toast({
+            title: 'Welcome!',
+            description: 'Signed in with Google successfully.',
+          });
+        }
+      })
+      .catch((error: any) => {
+        // Only show error if it's an actual failure (not just "no redirect found")
+        if (error.code !== 'auth/no-current-user') {
+          console.error('Redirect Sign-in Error:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Google Login Failed',
+            description: 'Could not complete the mobile sign-in process.',
+          });
+        }
+      });
+  }, [auth, updateStoreProfile]);
 
   const handleEmailAuth = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +129,6 @@ export default function LoginPage() {
         })
         .catch((error: any) => {
           let message = 'Check your email and password.';
-          // Handle 'auth/invalid-credential' which is the modern consolidated error for wrong email/password
           if (
             error.code === 'auth/user-not-found' || 
             error.code === 'auth/wrong-password' || 
@@ -142,38 +180,47 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        const user = result.user;
+    // Detection for mobile environments where popups are often blocked
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-        if (user.displayName) {
-          const [firstName = '', ...rest] = user.displayName.split(' ');
-          updateStoreProfile({
-            firstName,
-            lastName: rest.join(' '),
-            email: user.email || ''
+    if (isMobile) {
+      // Use redirect for mobile to bypass popup blockers
+      signInWithRedirect(auth, provider);
+    } else {
+      // Use popup for desktop for better UX
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          const user = result.user;
+
+          if (user.displayName) {
+            const [firstName = '', ...rest] = user.displayName.split(' ');
+            updateStoreProfile({
+              firstName,
+              lastName: rest.join(' '),
+              email: user.email || ''
+            });
+          }
+
+          toast({
+            title: 'Welcome!',
+            description: 'Signed in with Google.',
           });
-        }
-
-        toast({
-          title: 'Welcome!',
-          description: 'Signed in with Google.',
+          setGoogleLoading(false);
+        })
+        .catch((error: any) => {
+          console.error('Google Sign In Error:', error);
+          let message = 'Could not complete Google sign in.';
+          if (error.code === 'auth/popup-closed-by-user') message = 'Sign-in window was closed.';
+          if (error.code === 'auth/cancelled-by-user') message = 'Sign-in was cancelled.';
+          
+          toast({
+            variant: 'destructive',
+            title: 'Google Login Failed',
+            description: message,
+          });
+          setGoogleLoading(false);
         });
-        setGoogleLoading(false);
-      })
-      .catch((error: any) => {
-        console.error('Google Sign In Error:', error);
-        let message = 'Could not complete Google sign in.';
-        if (error.code === 'auth/popup-closed-by-user') message = 'Sign-in window was closed.';
-        if (error.code === 'auth/cancelled-by-user') message = 'Sign-in was cancelled.';
-        
-        toast({
-          variant: 'destructive',
-          title: 'Google Login Failed',
-          description: message,
-        });
-        setGoogleLoading(false);
-      });
+    }
   };
 
   return (
