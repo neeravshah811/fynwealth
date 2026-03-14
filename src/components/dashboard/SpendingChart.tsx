@@ -51,27 +51,30 @@ export function SpendingChart() {
         }
         return acc;
       }, [])
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
+      .sort((a, b) => b.value - a.value);
   }, [expensesData]);
 
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', '#10b981', '#3b82f6', '#f43f5e', '#8b5cf6'];
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', '#10b981', '#3b82f6', '#f43f5e', '#8b5cf6', '#0ea5e9', '#f97316'];
 
   return (
     <Card className="shadow-sm border-none bg-card/80 backdrop-blur lg:col-span-2 h-full flex flex-col">
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[250px] p-2">
+      <CardContent className="flex-1 min-h-[300px] p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} 
-              dy={5}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }} 
+              interval={0}
+              height={60}
+              angle={-30}
+              textAnchor="end"
+              dy={10}
             />
             <YAxis 
               axisLine={false} 
