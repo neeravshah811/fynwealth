@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -90,7 +91,7 @@ export function OverviewCards() {
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div id="tour-overview" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <MetricCard 
         title="Spent" 
         amount={stats.paidSpend} 

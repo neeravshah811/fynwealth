@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -371,6 +372,7 @@ export function ExpenseCapture() {
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
                     <input 
+                      id="tour-expense-amount"
                       type="number" 
                       placeholder="0.00" 
                       value={amount} 
@@ -405,7 +407,7 @@ export function ExpenseCapture() {
                     </button>
                   </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4">
+                    <SelectTrigger id="tour-expense-category" className="h-12 rounded-xl font-bold shadow-sm px-4">
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px] rounded-xl">
@@ -449,6 +451,7 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
+              {/* Warranty and recurring sections remained unchanged */}
               {isWarrantyCategory && (
                 <div className="p-5 bg-primary/5 rounded-[20px] border border-primary/10 space-y-4 animate-in fade-in slide-in-from-top-4">
                   <div className="flex items-center gap-3 mb-2">
@@ -581,13 +584,14 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg transition-all active:scale-95 mt-4">
+              <Button id="tour-expense-save" type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg transition-all active:scale-95 mt-4">
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
                 Add Expense
               </Button>
             </form>
           </TabsContent>
 
+          {/* Voice and Scan tabs remained unchanged */}
           <TabsContent value="voice">
             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-muted rounded-[20px] bg-muted/10">
               <div className={`p-8 rounded-full mb-6 transition-all duration-500 ${isRecording ? 'bg-destructive/20 animate-pulse scale-110 shadow-xl' : 'bg-primary/10'}`}>
@@ -622,7 +626,7 @@ export function ExpenseCapture() {
               <input type="file" className="hidden" id="scan-upload" accept="image/*" onChange={processImage} />
               <Button asChild className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all active:scale-95" disabled={loading}>
                 <label htmlFor="scan-upload" className="cursor-pointer">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Upload className="w-5 h-5 mr-2" />}
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
                   Upload Receipt
                 </label>
               </Button>

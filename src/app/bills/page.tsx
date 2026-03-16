@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -309,7 +310,7 @@ export default function BillsPage() {
               </PopoverContent>
             </Popover>
           </div>
-          <Button onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-8 shadow-lg transition-all active:scale-95">
+          <Button id="tour-reminders-add" onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-8 shadow-lg transition-all active:scale-95">
             {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
             {showForm ? "Cancel" : "Add Reminder"}
           </Button>
@@ -325,6 +326,7 @@ export default function BillsPage() {
           </CardHeader>
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Form fields remained unchanged */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Reminder Name</Label>
@@ -463,7 +465,7 @@ export default function BillsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div className="space-y-8">
+        <div id="tour-reminders-list" className="space-y-8">
           <div className="flex items-center gap-3 px-1">
             <Clock className="w-6 h-6 text-primary" />
             <h2 className="text-xl font-headline font-bold tracking-tight">Upcoming</h2>

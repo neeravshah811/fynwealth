@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
@@ -228,6 +229,7 @@ export default function DocumentsPage() {
           </div>
 
           <Button 
+            id="tour-doc-upload"
             onClick={() => setIsFolderDialogOpen(true)}
             className="h-11 px-8 rounded-xl font-bold shadow-lg transition-all active:scale-95"
           >
@@ -292,7 +294,7 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        <div className="space-y-6">
+        <div id="tour-doc-list" className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-primary" />

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -271,7 +272,7 @@ export default function BudgetsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div id="tour-budget-progress" className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-primary/5 border-none shadow-sm ring-1 ring-primary/10 transition-all hover:shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-4">

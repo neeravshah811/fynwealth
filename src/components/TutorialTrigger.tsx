@@ -3,39 +3,21 @@
 
 import { useState, useEffect } from 'react';
 import { useFynWealthStore } from '@/lib/store';
-import { TutorialDialog } from './TutorialDialog';
+import { WalkthroughTour } from './WalkthroughTour';
 
 /**
- * TutorialTrigger automatically shows the onboarding tutorial
- * for new users after the splash screen finishes.
+ * TutorialTrigger automatically shows the contextual walkthrough
+ * for new users after they have authenticated and the app is ready.
  */
 export function TutorialTrigger() {
-  const { hasSeenTutorial, setHasSeenTutorial } = useFynWealthStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { tutorialCompleted } = useFynWealthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted && !hasSeenTutorial) {
-      // Delay reduced to 1s to match faster splash screen
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [hasSeenTutorial, mounted]);
+  if (!mounted || tutorialCompleted) return null;
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    if (!open) {
-      setHasSeenTutorial(true);
-    }
-  };
-
-  if (!mounted) return null;
-
-  return <TutorialDialog open={isOpen} onOpenChange={handleOpenChange} />;
+  return <WalkthroughTour />;
 }

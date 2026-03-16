@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from "zustand";
@@ -34,12 +35,14 @@ interface FynWealthState {
   viewYear: number;
   privacyMode: boolean;
   hasSeenTutorial: boolean;
+  tutorialCompleted: boolean;
   setCurrency: (code: string) => void;
   updateProfile: (profile: UserProfile) => void;
   setViewDate: (month: number, year: number) => void;
   setInsights: (insights: Partial<AIInsights>) => void;
   togglePrivacyMode: () => void;
   setHasSeenTutorial: (seen: boolean) => void;
+  setTutorialCompleted: (completed: boolean) => void;
   clearAllData: () => void;
 }
 
@@ -62,6 +65,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       viewYear: new Date().getFullYear(),
       privacyMode: false,
       hasSeenTutorial: false,
+      tutorialCompleted: false,
       setCurrency: (code) => set((state) => ({
         currency: SUPPORTED_CURRENCIES.find(c => c.code === code) || state.currency
       })),
@@ -72,9 +76,11 @@ export const useFynWealthStore = create<FynWealthState>()(
       })),
       togglePrivacyMode: () => set((state) => ({ privacyMode: !state.privacyMode })),
       setHasSeenTutorial: (seen) => set({ hasSeenTutorial: seen }),
+      setTutorialCompleted: (completed) => set({ tutorialCompleted: completed }),
       clearAllData: () => set({ 
         profile: null, privacyMode: false,
-        hasSeenTutorial: false, insights: { predictions: null, unnecessary: null, lastGenerated: null },
+        hasSeenTutorial: false, tutorialCompleted: false,
+        insights: { predictions: null, unnecessary: null, lastGenerated: null },
         viewMonth: new Date().getMonth(), viewYear: new Date().getFullYear() 
       }),
     }),
