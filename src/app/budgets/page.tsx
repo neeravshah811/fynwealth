@@ -19,7 +19,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
   Edit2, 
@@ -49,6 +48,7 @@ export default function BudgetsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [editedLimits, setEditedLimits] = useState<Record<string, string>>({});
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
 
@@ -127,12 +127,19 @@ export default function BudgetsPage() {
     return amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = (categoryId?: string) => {
     const initialLimits: Record<string, string> = {};
-    categories.forEach(cat => {
-      const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
-      initialLimits[cat.id] = (budgetDoc && budgetDoc.limit !== 0) ? budgetDoc.limit.toString() : "";
-    });
+    if (categoryId) {
+      setActiveCategoryId(categoryId);
+      const budgetDoc = budgetsData?.find(b => b.categoryId === categoryId);
+      initialLimits[categoryId] = (budgetDoc && budgetDoc.limit !== 0) ? budgetDoc.limit.toString() : "";
+    } else {
+      setActiveCategoryId(null);
+      categories.forEach(cat => {
+        const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
+        initialLimits[cat.id] = (budgetDoc && budgetDoc.limit !== 0) ? budgetDoc.limit.toString() : "";
+      });
+    }
     setEditedLimits(initialLimits);
     setIsDialogOpen(true);
   };
@@ -141,8 +148,12 @@ export default function BudgetsPage() {
     if (!firestore || !user?.uid) return;
 
     try {
-      const promises = Object.entries(editedLimits).map(([catId, limit]) => {
-        const numLimit = limit === "" ? 0 : parseFloat(limit);
+      const entriesToSave = activeCategoryId 
+        ? [[activeCategoryId, editedLimits[activeCategoryId]]] 
+        : Object.entries(editedLimits);
+
+      const promises = entriesToSave.map(([catId, limit]) => {
+        const numLimit = limit === "" ? 0 : parseFloat(limit || "0");
         if (!isNaN(numLimit)) {
           const categoryObj = categories.find(c => c.id === catId);
           const docRef = doc(firestore, 'users', user.uid, 'budgets', catId);
@@ -162,7 +173,7 @@ export default function BudgetsPage() {
       setIsDialogOpen(false);
       toast({
         title: "Budgets updated",
-        description: "Monthly spending limits updated successfully.",
+        description: "Spending limits updated successfully.",
       });
     } catch (error) {
       toast({
@@ -186,6 +197,8 @@ export default function BudgetsPage() {
       </div>
     );
   }
+
+  const activeCategoryName = activeCategoryId ? categories.find(c => c.id === activeCategoryId)?.name : null;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-24 max-w-7xl mx-auto">
@@ -229,48 +242,55 @@ export default function BudgetsPage() {
             </Popover>
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenDialog} className="h-11 px-8 rounded-xl font-bold shadow-lg transition-all active:scale-95">
-                <Edit2 className="w-4 h-4 mr-2" />
-                Adjust Limits
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md rounded-[20px] p-8 border-none shadow-2xl gap-0">
-              <DialogHeader className="pb-6 border-b border-muted/50 mb-8">
-                <DialogTitle className="font-headline text-2xl font-bold text-primary">Adjust Limits</DialogTitle>
-                <DialogDescription className="text-sm mt-2">Set realistic targets for each category from your cloud registry.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 scrollbar-thin mb-8">
-                {categories.map((cat) => (
-                  <div key={cat.id} className="grid grid-cols-4 items-center gap-4 group">
-                    <Label htmlFor={cat.id} className="text-right text-[10px] font-bold uppercase truncate text-muted-foreground group-hover:text-primary transition-colors tracking-widest">
-                      {cat.name}
-                    </Label>
-                    <div className="col-span-3 relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">{currency.symbol}</span>
-                      <Input 
-                        id={cat.id} 
-                        type="number" 
-                        className="pl-9 h-11 text-sm font-bold rounded-xl bg-muted/30 border-transparent focus:bg-background focus:ring-2 focus:ring-primary shadow-inner" 
-                        placeholder="0.00"
-                        value={editedLimits[cat.id] ?? ""} 
-                        onChange={(e) => setEditedLimits({ ...editedLimits, [cat.id]: e.target.value })} 
-                      />
-                    </div>
-                  </div>
-                ))}
-                {categories.length === 0 && (
-                  <p className="text-center py-12 text-muted-foreground text-sm italic font-medium">No categories defined in registry.</p>
-                )}
-              </div>
-              <DialogFooter>
-                <Button onClick={handleSaveLimits} className="w-full h-14 rounded-xl font-bold text-base shadow-lg transition-all active:scale-95">Save Changes</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => handleOpenDialog()} className="h-11 px-8 rounded-xl font-bold shadow-lg transition-all active:scale-95">
+            <Edit2 className="w-4 h-4 mr-2" />
+            Adjust Limits
+          </Button>
         </div>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md rounded-[20px] p-8 border-none shadow-2xl gap-0">
+          <DialogHeader className="pb-6 border-b border-muted/50 mb-8">
+            <DialogTitle className="font-headline text-2xl font-bold text-primary">
+              {activeCategoryName ? `Adjust ${activeCategoryName} Limit` : 'Adjust All Limits'}
+            </DialogTitle>
+            <DialogDescription className="text-sm mt-2">
+              {activeCategoryName 
+                ? `Set a realistic target for the ${activeCategoryName} category.` 
+                : 'Set realistic targets for each category from your cloud registry.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 scrollbar-thin mb-8">
+            {categories
+              .filter(cat => !activeCategoryId || cat.id === activeCategoryId)
+              .map((cat) => (
+              <div key={cat.id} className="grid grid-cols-4 items-center gap-4 group">
+                <Label htmlFor={cat.id} className="text-right text-[10px] font-bold uppercase truncate text-muted-foreground group-hover:text-primary transition-colors tracking-widest">
+                  {cat.name}
+                </Label>
+                <div className="col-span-3 relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">{currency.symbol}</span>
+                  <Input 
+                    id={cat.id} 
+                    type="number" 
+                    className="pl-9 h-11 text-sm font-bold rounded-xl bg-muted/30 border-transparent focus:bg-background focus:ring-2 focus:ring-primary shadow-inner" 
+                    placeholder="0.00"
+                    value={editedLimits[cat.id] ?? ""} 
+                    onChange={(e) => setEditedLimits({ ...editedLimits, [cat.id]: e.target.value })} 
+                  />
+                </div>
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <p className="text-center py-12 text-muted-foreground text-sm italic font-medium">No categories defined in registry.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveLimits} className="w-full h-14 rounded-xl font-bold text-base shadow-lg transition-all active:scale-95">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div id="tour-budget-progress" className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-primary/5 border-none shadow-sm ring-1 ring-primary/10 transition-all hover:shadow-md">
@@ -331,8 +351,8 @@ export default function BudgetsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={handleOpenDialog}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                      onClick={() => handleOpenDialog(cat.id)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all lg:opacity-0 group-hover:opacity-100"
                       title="Edit Limit"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -344,7 +364,7 @@ export default function BudgetsPage() {
                     </div>
                   </div>
                 </div>
-                <Progress value={percent} className={`h-2.5 rounded-full ${isOver ? 'bg-destructive/20' : 'bg-muted/50'}`} />
+                <Progress value={percent} className={cn("h-2.5 rounded-full", isOver ? 'bg-destructive/20' : 'bg-muted/50')} />
               </CardHeader>
               <CardContent className="pt-0 p-6">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
