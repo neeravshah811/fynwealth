@@ -71,24 +71,27 @@ export function OverviewCards() {
     return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => (
-    <Card className="border-none bg-card shadow-sm transition-all hover:shadow-md ring-1 ring-black/5">
-      <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
-        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
-        <div className="p-2 rounded-xl bg-muted/30">
-          <Icon className={cn("w-4 h-4", colorClass)} />
-        </div>
-      </CardHeader>
-      <CardContent className="px-5 pb-5">
-        <div className={cn("text-2xl font-bold font-headline truncate tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
-          {currency.symbol}{formatAmount(amount)}
-        </div>
-        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-70">
-          {subtext}
-        </p>
-      </CardContent>
-    </Card>
-  );
+  const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => {
+    const isNegative = amount < 0;
+    return (
+      <Card className="border-none bg-card shadow-sm transition-all hover:shadow-md ring-1 ring-black/5">
+        <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
+          <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
+          <div className="p-2 rounded-xl bg-muted/30">
+            <Icon className={cn("w-4 h-4", colorClass)} />
+          </div>
+        </CardHeader>
+        <CardContent className="px-5 pb-5">
+          <div className={cn("text-2xl font-bold font-headline truncate tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
+            {isNegative && "-"}{currency.symbol}{formatAmount(amount)}
+          </div>
+          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-70">
+            {subtext}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div id="tour-overview" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
