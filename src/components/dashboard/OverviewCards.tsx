@@ -5,7 +5,7 @@ import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Receipt, Target, Clock, Wallet } from "lucide-react";
+import { ReceiptText, Target, Timer, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -71,10 +71,10 @@ export function OverviewCards() {
   };
 
   const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => (
-    <Card className="border-none bg-card/80 backdrop-blur transition-all hover:shadow-md">
+    <Card className="border-none bg-card shadow-sm transition-all hover:shadow-md ring-1 ring-black/5">
       <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
-        <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
-        <div className={cn("p-2.5 rounded-xl bg-muted/50", colorClass.replace('text-', 'bg-').replace('text-', 'text-opacity-20'))}>
+        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
+        <div className="p-2 rounded-xl bg-muted/30">
           <Icon className={cn("w-4 h-4", colorClass)} />
         </div>
       </CardHeader>
@@ -82,7 +82,7 @@ export function OverviewCards() {
         <div className={cn("text-2xl font-bold font-headline truncate tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
           {currency.symbol}{formatAmount(amount)}
         </div>
-        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-70">
           {subtext}
         </p>
       </CardContent>
@@ -91,10 +91,34 @@ export function OverviewCards() {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <MetricCard title="Spent" amount={stats.paidSpend} icon={Receipt} colorClass="text-primary" subtext="Month Total" />
-      <MetricCard title="Pending" amount={stats.pendingBills} icon={Clock} colorClass="text-accent" subtext="Upcoming" />
-      <MetricCard title="Budget" amount={stats.totalBudgetAmount} icon={Target} colorClass="text-emerald-500" subtext="Target" />
-      <MetricCard title="Balance" amount={stats.totalBalance} icon={Wallet} colorClass={stats.totalBalance < 0 ? "text-destructive" : "text-primary"} subtext="Remaining" />
+      <MetricCard 
+        title="Spent" 
+        amount={stats.paidSpend} 
+        icon={ReceiptText} 
+        colorClass="text-primary" 
+        subtext="Actual Paid" 
+      />
+      <MetricCard 
+        title="Pending" 
+        amount={stats.pendingBills} 
+        icon={Timer} 
+        colorClass="text-accent" 
+        subtext="Unpaid Dues" 
+      />
+      <MetricCard 
+        title="Budget" 
+        amount={stats.totalBudgetAmount} 
+        icon={Target} 
+        colorClass="text-emerald-600" 
+        subtext="Monthly Goal" 
+      />
+      <MetricCard 
+        title="Balance" 
+        amount={stats.totalBalance} 
+        icon={Wallet} 
+        colorClass={stats.totalBalance < 0 ? "text-destructive" : "text-primary"} 
+        subtext="Remaining" 
+      />
     </div>
   );
 }

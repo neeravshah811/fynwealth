@@ -19,7 +19,8 @@ import {
   Sparkles,
   TrendingUp,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  Tag
 } from "lucide-react";
 import Link from "next/link";
 import { TutorialDialog } from "@/components/TutorialDialog";
@@ -97,8 +98,8 @@ export default function DashboardPage() {
   const ExpenseRow = ({ expense }: { expense: any }) => (
     <div key={expense.id} className="flex items-center justify-between p-4 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
       <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0 uppercase">
-          {(expense.categoryName || expense.category || "G")[0]}
+        <div className="w-10 h-10 rounded-xl bg-muted/30 flex items-center justify-center text-muted-foreground shrink-0 transition-colors group-hover:text-primary">
+          <Tag className="w-5 h-5" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold truncate text-foreground leading-none mb-1.5" title={expense.description || expense.note}>{expense.description || expense.note || "No description"}</p>
@@ -208,7 +209,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <Card className="border-none bg-card/80 backdrop-blur">
+        <Card className="border-none bg-card shadow-sm ring-1 ring-black/5">
           <CardHeader className="flex flex-row items-center justify-between p-5 pb-3 border-b border-muted/50">
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-primary" />
@@ -234,7 +235,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none bg-card/80 backdrop-blur ring-1 ring-accent/10">
+        <Card className="border-none bg-card shadow-sm ring-1 ring-black/5">
           <CardHeader className="flex flex-row items-center justify-between p-5 pb-3 border-b border-muted/50">
             <div className="flex items-center gap-3">
               <CalendarRange className="w-5 h-5 text-accent" />
@@ -257,7 +258,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none bg-primary/5 ring-1 ring-primary/10">
+        <Card className="border-none bg-primary/5 ring-1 ring-primary/10 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between p-5 pb-3 border-b border-primary/10">
             <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-primary" />
