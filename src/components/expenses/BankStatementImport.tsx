@@ -24,7 +24,7 @@ import {
   X,
   Plus
 } from "lucide-react";
-import { processBankStatement } from "@/ai/flows/bank-statement-import-flow";
+import { processBankStatement, type BankStatementOutput } from "@/ai/flows/bank-statement-import-flow";
 import { SYSTEM_CATEGORIES } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -39,6 +39,17 @@ export function BankStatementImport() {
   const db = useFirestore();
   const { user } = useUser();
 
+  const handleResult = (result: BankStatementOutput) => {
+    // Filter for debits only as per requirements
+    const expensesOnly = result.transactions.filter(t => t.type === 'debit');
+    setTransactions(expensesOnly);
+    setReviewMode(true);
+    toast({ 
+      title: "Statement Parsed", 
+      description: `Found ${expensesOnly.length} expenses to review.` 
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
@@ -46,27 +57,41 @@ export function BankStatementImport() {
     setLoading(true);
     const reader = new FileReader();
     
+    // Check if it's a text-based file (CSV) or a binary file (PDF/Image)
+    const isTextFile = file.type === 'text/csv' || file.name.endsWith('.csv') || file.type === 'text/plain';
+
     reader.onloadend = async () => {
       try {
-        const base64String = reader.result as string;
+        const content = reader.result as string;
         const result = await processBankStatement({
-          fileDataUri: base64String,
+          fileDataUri: isTextFile ? undefined : content,
+          rawText: isTextFile ? content : undefined,
           categories: Object.keys(SYSTEM_CATEGORIES)
         });
 
-        // Filter for debits only as per requirements
-        const expensesOnly = result.transactions.filter(t => t.type === 'debit');
-        setTransactions(expensesOnly);
-        setReviewMode(true);
-        toast({ title: "Statement Parsed", description: `Found ${expensesOnly.length} expenses to review.` });
-      } catch (err) {
-        toast({ variant: "destructive", title: "Import Error", description: "Could not read the statement format." });
+        if (result && result.transactions) {
+          handleResult(result);
+        } else {
+          throw new Error("No transactions detected in this file.");
+        }
+      } catch (err: any) {
+        console.error("Statement Parse Error:", err);
+        toast({ 
+          variant: "destructive", 
+          title: "Import Failed", 
+          description: err.message || "The AI could not read this statement format. Try a different export type." 
+        });
       } finally {
         setLoading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsDataURL(file);
+
+    if (isTextFile) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleConfirmImport = async () => {
@@ -74,11 +99,10 @@ export function BankStatementImport() {
 
     setLoading(true);
     try {
-      // Process confirmed transactions
       const promises = transactions.map(t => {
         return addDoc(collection(db, 'users', user.uid, 'expenses'), {
           userId: user.uid,
-          amount: t.amount,
+          amount: Math.abs(t.amount),
           date: t.date,
           categoryName: t.category,
           category: t.category,
@@ -132,10 +156,10 @@ export function BankStatementImport() {
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Bank Statement Import
+              Statement Import
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Upload a PDF or CSV to bulk-record transactions instantly.
+              Upload PDF or CSV statements to bulk-record transactions.
             </DialogDescription>
           </DialogHeader>
 
@@ -145,9 +169,9 @@ export function BankStatementImport() {
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "Analyzing Statement..." : "Select File"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "AI is Analyzing..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Support for major bank statements in PDF or CSV format. Data is processed locally and not stored.
+                  Upload your bank statement (PDF or CSV). We'll extract only the debits/expenses for you.
                 </p>
               </div>
               
@@ -155,7 +179,7 @@ export function BankStatementImport() {
                 type="file" 
                 ref={fileInputRef}
                 className="hidden" 
-                accept=".pdf,.csv" 
+                accept=".pdf,.csv,.txt" 
                 onChange={handleFileChange} 
               />
               
@@ -165,7 +189,7 @@ export function BankStatementImport() {
                 className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20 transition-all active:scale-95"
               >
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Parsing Data" : "Choose Statement"}
+                {loading ? "Parsing Statement" : "Choose Statement"}
               </Button>
             </div>
           ) : (
@@ -173,7 +197,7 @@ export function BankStatementImport() {
               <div className="flex-1 overflow-hidden p-6">
                 <div className="flex items-center justify-between mb-4 px-2">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Detected Expenses ({transactions.length})</span>
-                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-none font-bold text-[9px] uppercase">Review Required</Badge>
+                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-none font-bold text-[9px] uppercase">Review & Import</Badge>
                 </div>
                 <ScrollArea className="h-full pr-4 border rounded-2xl bg-muted/5">
                   <div className="p-4 space-y-3">
@@ -181,7 +205,7 @@ export function BankStatementImport() {
                       <div key={i} className="flex items-center justify-between p-4 bg-card border rounded-xl shadow-sm group hover:ring-1 hover:ring-primary/20 transition-all">
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">{format(new Date(t.date), 'MMM dd')}</span>
+                            <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">{t.date}</span>
                             <h4 className="font-bold text-sm truncate pr-4">{t.description}</h4>
                           </div>
                           <div className="flex items-center gap-2">
@@ -192,7 +216,7 @@ export function BankStatementImport() {
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="font-bold text-sm text-foreground whitespace-nowrap">
-                            ${t.amount.toLocaleString()}
+                            ${Math.abs(t.amount).toLocaleString()}
                           </span>
                           <button 
                             onClick={() => removeTransaction(i)}

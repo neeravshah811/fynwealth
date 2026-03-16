@@ -13,9 +13,14 @@ import { z } from 'genkit';
 const BankStatementInputSchema = z.object({
   fileDataUri: z
     .string()
+    .optional()
     .describe(
-      "A bank statement file (PDF or image), as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A bank statement file (PDF or image), as a data URI."
     ),
+  rawText: z
+    .string()
+    .optional()
+    .describe("The raw text content of a statement (e.g. from a CSV file)."),
   categories: z.array(z.string()).describe("A list of valid expense categories to use for classification."),
 });
 export type BankStatementInput = z.infer<typeof BankStatementInputSchema>;
@@ -44,17 +49,24 @@ const prompt = ai.definePrompt({
   output: { schema: BankStatementOutputSchema },
   prompt: `You are an expert financial auditor. Your task is to extract transactions from the provided bank statement.
 
-Analyze the statement and extract:
-1. Date (format as YYYY-MM-DD)
-2. Description/Merchant
-3. Amount (as a positive number)
-4. Type (debit for expenses/outflow, credit for income/refunds)
-5. Category: Choose the best fit from this list: {{{categories}}}
+Analyze the provided data and extract every transaction.
+1. Date: Ensure it is in YYYY-MM-DD format. If the year is missing, assume it is 2024.
+2. Description: The merchant name or transaction details.
+3. Amount: The absolute numerical value.
+4. Type: Mark as 'debit' for payments/expenses and 'credit' for income/refunds.
+5. Category: Choose the best fit from this list: {{{categories}}}.
 
-Focus primarily on debits. If a transaction looks like a refund, mark it as a credit but categorize it. 
-If the year is not present on the statement, assume it is 2024.
+CRITICAL INSTRUCTIONS:
+- Focus primarily on capturing DEBITS (expenses).
+- Only include CREDITS if they appear to be REFUNDS for a previous expense. Ignore salary, transfers-in, or general income.
+- If the format is a CSV or table, parse the columns carefully to identify Date, Description, and Amount.
 
-Statement: {{media url=fileDataUri}}`,
+Statement Data:
+{{#if fileDataUri}}{{media url=fileDataUri}}{{/if}}
+{{#if rawText}}
+Raw Text Content:
+{{{rawText}}}
+{{/if}}`,
 });
 
 const processBankStatementFlow = ai.defineFlow(
