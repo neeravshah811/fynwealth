@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -29,44 +28,44 @@ interface Step {
 
 const TOUR_STEPS: Step[] = [
   {
-    title: "Overview",
-    description: "Your financial pulse. Track total spending, savings goals, and real-time balance across all accounts.",
+    title: "Smart Overview",
+    description: "The Dashboard gives you a bird’s-eye view of your monthly spend, active budgets, and remaining balance at a glance.",
     targetId: "tour-overview",
     path: "/dashboard",
     icon: LayoutDashboard,
-    color: "text-primary"
+    color: "text-blue-500"
   },
   {
-    title: "Bill Reminders",
-    description: "Never miss a due date. Set up automated reminders for rent, utilities, and subscriptions.",
+    title: "Payment Reminders",
+    description: "Never miss a due date again. Set up recurring reminders for EMIs, rent, and subscriptions with automated notifications.",
     targetId: "tour-reminders-add",
     path: "/bills",
     icon: Bell,
-    color: "text-accent"
+    color: "text-amber-500"
   },
   {
-    title: "Recording Expenses",
-    description: "Capture transactions instantly. Just input the amount and select a category to keep your records synced.",
+    title: "Capture Everything",
+    description: "Add expenses manually, scan physical bills with your camera, or just use your voice to record transactions instantly.",
     targetId: "tour-expense-amount",
     path: "/expenses",
     icon: Receipt,
-    color: "text-emerald-500"
+    color: "text-accent"
   },
   {
-    title: "Budget Limits",
-    description: "Set realistic targets for each category and visualize your progress to avoid overspending.",
+    title: "Manage Budgets",
+    description: "Set realistic monthly limits for categories and track your progress in real-time to avoid overspending.",
     targetId: "tour-budget-progress",
     path: "/budgets",
     icon: PieChart,
-    color: "text-purple-500"
+    color: "text-emerald-500"
   },
   {
-    title: "Document Safe",
-    description: "Securely store digital copies of your receipts and invoices for taxes or warranty tracking.",
+    title: "Digital Document Hub",
+    description: "Every bill you scan or upload is automatically stored in your Document Safe. Search and preview invoices whenever you need them.",
     targetId: "tour-doc-list",
     path: "/documents",
     icon: Files,
-    color: "text-blue-500"
+    color: "text-purple-500"
   }
 ];
 
@@ -165,8 +164,8 @@ export function WalkthroughTour() {
           className="absolute pointer-events-auto transition-all duration-500 ease-out flex flex-col items-center"
           style={{
             left: `${Math.min(Math.max(16, spotlightRect.left + (spotlightRect.width / 2) - 160), window.innerWidth - 336)}px`,
-            top: spotlightRect.bottom + 20 > window.innerHeight - 250 
-              ? `${spotlightRect.top - 260}px` 
+            top: spotlightRect.bottom + 20 > window.innerHeight - 300 
+              ? `${Math.max(16, spotlightRect.top - 280)}px` 
               : `${spotlightRect.bottom + 20}px`,
             width: "320px"
           }}
@@ -213,7 +212,7 @@ export function WalkthroughTour() {
                   onClick={handleNext} 
                   className="rounded-full h-9 px-5 font-bold shadow-lg shadow-primary/20"
                 >
-                  {currentStepIndex === TOUR_STEPS.length - 1 ? "Finish" : "Next"}
+                  {currentStepIndex === TOUR_STEPS.length - 1 ? "Start Saving" : "Next"}
                   {currentStepIndex < TOUR_STEPS.length - 1 && <ChevronRight className="w-4 h-4 ml-1" />}
                 </Button>
               </div>
@@ -224,7 +223,7 @@ export function WalkthroughTour() {
           <div 
             className={cn(
               "w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent transition-all",
-              spotlightRect.bottom + 20 > window.innerHeight - 250
+              spotlightRect.bottom + 20 > window.innerHeight - 300
                 ? "border-t-[10px] border-t-card -mt-0.5"
                 : "border-b-[10px] border-b-card order-first -mb-0.5"
             )}
@@ -241,7 +240,7 @@ export function WalkthroughTour() {
             </div>
             <h2 className="text-2xl font-bold font-headline mb-4">Welcome to FynWealth</h2>
             <p className="text-muted-foreground leading-relaxed mb-8">
-              Let's take a quick 30-second tour to master your financial vault and start saving smarter.
+              Take control of your finances with smart tracking and AI-powered insights. Let's show you around your new financial command center!
             </p>
             <Button onClick={handleNext} className="w-full h-12 rounded-xl font-bold text-base">
               Start Walkthrough
