@@ -55,14 +55,12 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Taxonomy state
   const [categories, setCategories] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [isSubLoading, setIsSubLoading] = useState(false);
 
-  // Custom Category Dialog State
   const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -124,7 +122,6 @@ export default function BillsPage() {
       const sorted = fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
       setSubcategories(sorted);
 
-      // AUTO SELECT: If only one subcategory exists, select it automatically
       if (sorted.length === 1) {
         setSelectedSubcategory(sorted[0].id);
       } else {
@@ -295,21 +292,29 @@ export default function BillsPage() {
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24">
       <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div className="space-y-1">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
+        <div className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
-          <p className="text-xs text-muted-foreground font-bold uppercase">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
+          <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => setShowTutorial(true)} className="rounded-xl"><HelpCircle className="w-5 h-5" /></Button>
-          <Popover>
-            <PopoverTrigger asChild><Button variant="outline" size="icon" className="rounded-xl"><CalendarIcon className="w-5 h-5" /></Button></PopoverTrigger>
-            <PopoverContent className="z-[100] w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
-              <Calendar mode="single" selected={new Date(viewYear, viewMonth)} onSelect={handleCalendarSelect} />
-            </PopoverContent>
-          </Popover>
-          <Button onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-6 shadow-lg">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setShowTutorial(true)} className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5">
+              <HelpCircle className="w-5 h-5" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5">
+                  <CalendarIcon className="w-5 h-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="z-[100] w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
+                <Calendar mode="single" selected={new Date(viewYear, viewMonth)} onSelect={handleCalendarSelect} />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <Button onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-8 shadow-lg transition-all active:scale-95">
             {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
             {showForm ? "Cancel" : "Add Reminder"}
           </Button>
@@ -317,59 +322,65 @@ export default function BillsPage() {
       </div>
 
       {showForm && (
-        <Card className="border-none shadow-2xl overflow-hidden animate-in slide-in-from-top-4 rounded-3xl">
-          <CardHeader className="bg-primary/5">
-            <CardTitle className="text-xl font-headline flex items-center gap-3 font-bold text-primary">
+        <Card className="border-none shadow-2xl overflow-hidden animate-in slide-in-from-top-8 rounded-[20px]">
+          <CardHeader className="bg-primary/5 border-b border-muted/50 p-8">
+            <CardTitle className="text-xl font-headline flex items-center gap-4 font-bold text-primary">
               <CreditCard className="w-6 h-6" /> Configure Reminder
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Reminder Name</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="h-12 rounded-xl" placeholder="e.g. Rent Payment" />
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Reminder Name</Label>
+                  <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="h-12 rounded-xl px-4 font-medium" placeholder="e.g. Rent Payment" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Amount</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
-                    <Input type="number" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required className="pl-8 h-12 rounded-xl font-bold" />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
+                    <input 
+                      type="number" 
+                      value={formData.amount} 
+                      onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                      required 
+                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 pl-9 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all"
+                    />
                   </div>
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Due Date</Label>
-                  <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} required className="h-12 rounded-xl" />
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Due Date</Label>
+                  <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} required className="h-12 rounded-xl px-4" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Frequency</Label>
                   <Select value={formData.frequency} onValueChange={(v) => setFormData({...formData, frequency: v as Frequency})}>
-                    <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent className="z-[100]">
+                    <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4"><SelectValue /></SelectTrigger>
+                    <SelectContent className="z-[100] rounded-xl">
                       {['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Annually'].map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1 h-5">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Category</Label>
+                  <div className="flex items-center justify-between px-1 h-5 mb-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Category</Label>
                     <button 
                       type="button" 
                       onClick={() => setIsCustomCategoryOpen(true)}
-                      className="text-primary hover:text-primary/80 transition-colors p-0.5 rounded-full hover:bg-primary/5"
+                      className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="h-12 rounded-xl font-bold"><SelectValue placeholder="Select Category" /></SelectTrigger>
-                    <SelectContent className="z-[100] max-h-[300px]">
+                    <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4"><SelectValue placeholder="Select Category" /></SelectTrigger>
+                    <SelectContent className="z-[100] max-h-[300px] rounded-xl">
                       {categories.length > 0 ? (
                         categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)
                       ) : (
@@ -379,8 +390,8 @@ export default function BillsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center px-1 h-5">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Subcategory</Label>
+                  <div className="flex items-center px-1 h-5 mb-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Subcategory</Label>
                   </div>
                   <Select 
                     key={`sub-rem-${selectedCategory}`}
@@ -388,8 +399,8 @@ export default function BillsPage() {
                     onValueChange={setSelectedSubcategory}
                     disabled={!selectedCategory || isSubLoading}
                   >
-                    <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} /></SelectTrigger>
-                    <SelectContent className="z-[100] max-h-[250px]">
+                    <SelectTrigger className="h-12 rounded-xl shadow-sm px-4"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} /></SelectTrigger>
+                    <SelectContent className="z-[100] max-h-[250px] rounded-xl">
                       {isSubLoading ? (
                         <SelectItem value="loading" disabled>
                           <div className="flex items-center"><Loader2 className="w-3 h-3 animate-spin mr-2" /> Loading...</div>
@@ -405,36 +416,36 @@ export default function BillsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Description (Optional)</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Description (Optional)</Label>
                 <Textarea 
                   value={formData.note} 
                   onChange={(e) => setFormData({...formData, note: e.target.value})} 
                   placeholder="Additional details, account numbers, etc." 
-                  className="rounded-xl min-h-[80px]"
+                  className="rounded-xl min-h-[100px] p-4 font-medium shadow-inner"
                 />
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Attachment (Optional)</Label>
-                <div className="flex flex-col gap-2">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Attachment</Label>
+                <div className="flex flex-col gap-3">
                   {!formData.attachmentData ? (
                     <Button 
                       type="button" 
                       variant="outline" 
-                      className="w-full h-12 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-bold"
+                      className="w-full h-12 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-bold transition-all"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Paperclip className="w-4 h-4 mr-2" />
                       Add Bill / Invoice
                     </Button>
                   ) : (
-                    <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl border border-primary/10">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FileText className="w-5 h-5 text-primary shrink-0" />
-                        <span className="text-xs font-bold truncate pr-2">{formData.attachmentName}</span>
+                    <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10 shadow-sm">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <FileText className="w-6 h-6 text-primary shrink-0" />
+                        <span className="text-xs font-bold truncate pr-4">{formData.attachmentName}</span>
                       </div>
-                      <button type="button" onClick={removeAttachment} className="p-1 hover:bg-primary/10 rounded-full transition-colors">
-                        <X className="w-4 h-4 text-primary" />
+                      <button type="button" onClick={removeAttachment} className="p-2 hover:bg-primary/10 rounded-full transition-colors">
+                        <X className="w-5 h-5 text-primary" />
                       </button>
                     </div>
                   )}
@@ -448,8 +459,8 @@ export default function BillsPage() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Reminder"}
+              <Button type="submit" disabled={loading} className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95 text-base">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Save Reminder"}
               </Button>
             </form>
           </CardContent>
@@ -457,11 +468,11 @@ export default function BillsPage() {
       )}
 
       <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-3xl border-none shadow-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-[20px] border-none shadow-2xl">
+          <DialogHeader className="pb-4">
             <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
-            <DialogDescription className="text-xs font-medium mt-1">
-              Add a personalized label to your dashboard.
+            <DialogDescription className="text-sm font-medium mt-2">
+              Add a personalized label to your records.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
@@ -471,106 +482,108 @@ export default function BillsPage() {
                 placeholder="e.g. Side Hustle" 
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-12 rounded-xl text-sm font-bold shadow-sm"
+                className="h-12 rounded-xl text-sm font-bold shadow-sm px-4"
                 autoFocus
               />
             </div>
           </div>
           <DialogFooter>
             <Button 
-              className="w-full h-14 font-bold rounded-xl shadow-lg" 
+              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95" 
               onClick={handleAddCustomCategory}
               disabled={isCreatingCategory || !newCategoryName.trim()}
             >
-              {isCreatingCategory ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              {isCreatingCategory ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
               Create Category
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 px-1">
-            <Clock className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-headline font-bold">Upcoming</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className="space-y-8">
+          <div className="flex items-center gap-3 px-1">
+            <Clock className="w-6 h-6 text-primary" />
+            <h2 className="text-xl font-headline font-bold tracking-tight">Upcoming</h2>
           </div>
           {isLoading ? (
-            <div className="py-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-primary" /></div>
+            <div className="py-24 text-center"><Loader2 className="w-12 h-12 animate-spin mx-auto text-primary/30" /></div>
           ) : pendingReminders.map((bill) => {
             const date = new Date(bill.dueDate);
             const isOverdue = isPast(date) && !isToday(date);
             return (
-              <Card key={bill.id} className={cn("border-none shadow-sm ring-1 ring-primary/5 rounded-2xl", isOverdue && "ring-destructive/30 bg-destructive/5")}>
+              <Card key={bill.id} className={cn("border-none shadow-sm ring-1 ring-primary/5 rounded-[20px] transition-all hover:shadow-md", isOverdue && "ring-destructive/30 bg-destructive/5")}>
                 <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-lg truncate pr-2">{bill.name}</h4>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                        <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-1 px-2 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="min-w-0 pr-4">
+                      <h4 className="font-bold text-lg truncate mb-2 leading-tight">{bill.name}</h4>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-1 px-2.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
                           {bill.categoryName}
                         </Badge>
                         {bill.subcategoryName && bill.subcategoryName !== 'Others' && (
-                          <span className="text-[9px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-1 rounded-full">/ {bill.subcategoryName}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-1 rounded-full tracking-tighter">/ {bill.subcategoryName}</span>
                         )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-bold text-xl text-primary">{currency.symbol}{bill.amount.toLocaleString()}</div>
-                      <div className={cn("text-[10px] font-bold uppercase mt-1", isOverdue ? "text-destructive" : "text-muted-foreground")}>
+                      <div className="font-bold text-2xl text-primary tracking-tighter mb-1">{currency.symbol}{bill.amount.toLocaleString()}</div>
+                      <div className={cn("text-[10px] font-bold uppercase tracking-widest", isOverdue ? "text-destructive" : "text-muted-foreground")}>
                         {isOverdue ? "Overdue" : "Due"} {format(date, 'MMM dd')}
                       </div>
                     </div>
                   </div>
                   
                   {bill.note && (
-                    <div className="mb-6 p-3 bg-muted/20 rounded-xl flex items-start gap-2.5">
-                      <MessageSquare className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                      <p className="text-[11px] text-muted-foreground leading-relaxed italic">{bill.note}</p>
+                    <div className="mb-8 p-4 bg-muted/20 rounded-[16px] flex items-start gap-3 border border-muted/50">
+                      <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground leading-relaxed italic font-medium">{bill.note}</p>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    <Button onClick={() => handleMarkPaid(bill.id)} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/10">Mark Paid</Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(bill.id)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl"><Trash2 className="w-4 h-4" /></Button>
+                  <div className="flex gap-3">
+                    <Button onClick={() => handleMarkPaid(bill.id)} className="flex-1 rounded-xl h-11 font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/10 transition-all active:scale-95">Mark Paid</Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(bill.id)} className="h-11 w-11 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></Button>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
           {!isLoading && pendingReminders.length === 0 && (
-            <div className="text-center py-12 bg-muted/10 rounded-2xl border-2 border-dashed border-muted text-muted-foreground italic text-sm">
+            <div className="text-center py-20 bg-muted/10 rounded-[20px] border-2 border-dashed border-muted text-muted-foreground font-medium italic text-sm">
               No pending reminders.
             </div>
           )}
         </div>
 
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 px-1">
-            <History className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-xl font-headline font-bold">History</h2>
+        <div className="space-y-8">
+          <div className="flex items-center gap-3 px-1">
+            <History className="w-6 h-6 text-emerald-600" />
+            <h2 className="text-xl font-headline font-bold tracking-tight">History</h2>
           </div>
-          {paidReminders.slice(0, 8).map((bill) => (
-            <Card key={bill.id} className="border-none shadow-sm opacity-70 rounded-xl hover:opacity-100 transition-opacity">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                    <CheckCircle2 className="w-4 h-4" />
+          <div className="space-y-4">
+            {paidReminders.slice(0, 8).map((bill) => (
+              <Card key={bill.id} className="border-none shadow-sm opacity-70 rounded-xl hover:opacity-100 transition-all hover:shadow-md hover:ring-primary/10">
+                <CardContent className="p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-sm truncate block text-foreground mb-0.5">{bill.name}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Paid {format(new Date(bill.dueDate), 'MMM dd')}</span>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <span className="font-bold text-sm truncate block">{bill.name}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase font-bold">Paid on {format(new Date(bill.dueDate), 'MMM dd')}</span>
-                  </div>
-                </div>
-                <span className="font-bold text-sm text-foreground shrink-0">{currency.symbol}{bill.amount.toLocaleString()}</span>
-              </CardContent>
-            </Card>
-          ))}
-          {paidReminders.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground italic text-xs">
-              No recent settlements.
-            </div>
-          )}
+                  <span className="font-bold text-base text-foreground shrink-0 tracking-tight">{currency.symbol}{bill.amount.toLocaleString()}</span>
+                </CardContent>
+              </Card>
+            ))}
+            {paidReminders.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground font-medium italic text-xs">
+                No recent settlements.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

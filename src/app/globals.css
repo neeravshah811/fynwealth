@@ -23,7 +23,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 259 69% 42%;
-    --radius: 0.75rem;
+    --radius: 1.25rem; /* Standardized to 20px */
     --chart-1: 259 69% 42%;
     --chart-2: 38 92% 50%;
     --chart-3: 199 89% 48%;

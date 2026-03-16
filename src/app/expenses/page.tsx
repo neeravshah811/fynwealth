@@ -45,7 +45,6 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Firestore Data Subscriptions
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -185,7 +184,6 @@ export default function ExpensesPage() {
 
       const dataRows = lines.slice(1);
       let successCount = 0;
-      let failCount = 0;
 
       for (const row of dataRows) {
         try {
@@ -197,7 +195,6 @@ export default function ExpensesPage() {
             const parsedAmount = Math.abs(parseFloat(amt));
             if (isNaN(parsedAmount)) throw new Error("Invalid amount");
 
-            // 1. Record Expense
             addDoc(collection(db, 'users', user.uid, 'expenses'), {
               userId: user.uid,
               date: date || format(new Date(), 'yyyy-MM-dd'),
@@ -212,7 +209,6 @@ export default function ExpensesPage() {
               createdAt: serverTimestamp()
             });
 
-            // 2. Record Budget Limit if present and valid
             if (budgetLimit && !isNaN(parseFloat(budgetLimit))) {
               const categoryMatch = (categoriesData || []).find(c => 
                 c.name.toLowerCase() === cat.toLowerCase()
@@ -233,7 +229,7 @@ export default function ExpensesPage() {
             successCount++;
           }
         } catch (err) {
-          failCount++;
+          // skip
         }
       }
 
@@ -254,12 +250,12 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-7xl mx-auto pb-24">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-headline mb-2 text-primary">Expenses</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Track and manage every cent you spend across devices.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
+        <div className="space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Expenses</h1>
+          <p className="text-sm md:text-base text-muted-foreground font-medium">Track and manage every cent across devices.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4 flex-wrap">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -269,7 +265,7 @@ export default function ExpensesPage() {
           />
           <Button 
             variant="outline" 
-            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-5"
+            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-6 transition-all hover:bg-primary/5"
             onClick={handleImportClick}
             disabled={isImporting}
           >
@@ -278,7 +274,7 @@ export default function ExpensesPage() {
           </Button>
           <Button 
             variant="outline" 
-            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-5"
+            className="h-11 rounded-xl bg-card shadow-sm border-primary/20 text-primary font-bold px-6 transition-all hover:bg-primary/5"
             onClick={handleExport}
           >
             <Download className="w-4 h-4 mr-2" /> Export CSV
@@ -286,38 +282,38 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <ExpenseCapture />
         </div>
         
-        <div className="lg:col-span-2 space-y-10">
-          <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5 bg-card">
-            <CardHeader className="pb-6 bg-muted/20">
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="border-none shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-6 bg-muted/20 border-b border-muted/50 p-6">
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base md:text-lg font-headline font-bold">Transaction History</CardTitle>
-                  <Button variant="ghost" size="sm" className="h-9 text-[10px] uppercase font-bold rounded-lg">
-                    <Filter className="w-3 h-3 mr-1.5" /> Filter
+                  <CardTitle className="text-base md:text-lg font-headline font-bold uppercase tracking-widest text-muted-foreground">Transaction History</CardTitle>
+                  <Button variant="ghost" size="sm" className="h-9 text-[10px] uppercase font-bold rounded-lg border border-transparent hover:border-muted-foreground/20">
+                    <Filter className="w-3.5 h-3.5 mr-2" /> Filter
                   </Button>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   <div className="md:col-span-5 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input 
                       placeholder="Search description..." 
-                      className="pl-10 h-12 rounded-xl"
+                      className="pl-11 h-12 rounded-xl border-muted bg-background focus:ring-primary shadow-sm"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                   <div className="md:col-span-3">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-12 rounded-xl">
+                      <SelectTrigger className="h-12 rounded-xl border-muted bg-background shadow-sm px-4">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-xl">
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
                         <SelectItem value="unpaid">Unpaid</SelectItem>
@@ -326,10 +322,10 @@ export default function ExpensesPage() {
                   </div>
                   <div className="md:col-span-4">
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="h-12 rounded-xl">
+                      <SelectTrigger className="h-12 rounded-xl border-muted bg-background shadow-sm px-4">
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
+                      <SelectContent className="max-h-[300px] rounded-xl">
                         <SelectItem value="all">All Categories</SelectItem>
                         {categoriesList.map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -344,41 +340,41 @@ export default function ExpensesPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/10 border-none">
-                      <TableHead className="text-[10px] uppercase font-bold tracking-widest pl-6">Status</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold tracking-widest">Date</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold tracking-widest">Description</TableHead>
-                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest">Amount</TableHead>
-                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest pr-6">Actions</TableHead>
+                    <TableRow className="bg-muted/10 border-none hover:bg-muted/10">
+                      <TableHead className="text-[10px] uppercase font-bold tracking-widest pl-6 h-12">Status</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold tracking-widest h-12">Date</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold tracking-widest h-12">Description</TableHead>
+                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest h-12">Amount</TableHead>
+                      <TableHead className="text-right text-[10px] uppercase font-bold tracking-widest pr-6 h-12">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></TableCell>
+                        <TableCell colSpan={5} className="text-center py-24"><Loader2 className="w-10 h-10 animate-spin mx-auto text-primary/30" /></TableCell>
                       </TableRow>
                     ) : filteredExpenses.map((expense) => (
-                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-b border-muted/30">
-                        <TableCell className="pl-6">
+                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-b border-muted/30 group">
+                        <TableCell className="pl-6 py-5">
                           <button 
                             onClick={() => handleToggleStatus(expense.id, expense.status)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-colors ${
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-all active:scale-95 ${
                               expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
                             }`}
                           >
                             {(expense.status || 'paid').toUpperCase()}
                           </button>
                         </TableCell>
-                        <TableCell className="text-xs font-medium">{format(new Date(expense.date), 'MMM dd')}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs font-bold text-muted-foreground">{format(new Date(expense.date), 'MMM dd')}</TableCell>
+                        <TableCell className="py-5">
                           <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-sm truncate max-w-[180px]">{expense.description || expense.note || "No description"}</span>
-                            <div className="flex flex-wrap items-center gap-1 mt-1">
-                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-1 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+                            <span className="font-bold text-sm truncate max-w-[200px] text-foreground mb-1">{expense.description || expense.note || "No description"}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
                                 {expense.categoryName || expense.category || "General"}
                               </Badge>
                               {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
-                                <span className="text-[8px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-1 rounded-full">/ {expense.subcategoryName || expense.subCategory}</span>
+                                <span className="text-[8px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-0.5 rounded-full tracking-tighter">/ {expense.subcategoryName || expense.subCategory}</span>
                               )}
                             </div>
                           </div>
@@ -387,22 +383,22 @@ export default function ExpensesPage() {
                           {currency.symbol}{formatAmount(expense.amount)}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-primary/10" onClick={() => setEditingExpense(expense)}>
-                              <Edit2 className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense(expense)}>
+                              <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-destructive/10 group"><Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" /></Button>
+                                <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-destructive/10 group transition-all"><Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" /></Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent className="rounded-2xl">
+                              <AlertDialogContent className="rounded-[20px] p-8 border-none shadow-2xl">
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Record?</AlertDialogTitle>
-                                  <AlertDialogDescription>This will permanently remove this expense from your vault.</AlertDialogDescription>
+                                  <AlertDialogTitle className="text-xl font-bold font-headline">Delete Record?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm mt-2">This will permanently remove this expense from your vault. This action cannot be reversed.</AlertDialogDescription>
                                 </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive rounded-xl shadow-lg shadow-destructive/20">Delete</AlertDialogAction>
+                                <AlertDialogFooter className="mt-8 gap-3">
+                                  <AlertDialogCancel className="rounded-xl h-12 font-bold px-6">Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive rounded-xl h-12 font-bold px-6 shadow-lg shadow-destructive/20 transition-all active:scale-95">Confirm Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -412,7 +408,7 @@ export default function ExpensesPage() {
                     ))}
                     {filteredExpenses.length === 0 && !isLoading && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic text-sm">
+                        <TableCell colSpan={5} className="text-center py-32 text-muted-foreground font-medium italic text-sm">
                           No transactions found for this period.
                         </TableCell>
                       </TableRow>
@@ -427,18 +423,18 @@ export default function ExpensesPage() {
 
       {editingExpense && (
         <Dialog open={!!editingExpense} onOpenChange={(open) => !open && setEditingExpense(null)}>
-          <DialogContent className="sm:max-w-[450px] rounded-3xl p-8 border-none shadow-2xl">
-            <DialogHeader><DialogTitle className="font-headline text-2xl font-bold text-primary">Edit Transaction</DialogTitle></DialogHeader>
-            <form onSubmit={handleSaveEdit} className="space-y-6 pt-4">
+          <DialogContent className="sm:max-w-[480px] rounded-[20px] p-8 border-none shadow-2xl gap-0">
+            <DialogHeader className="pb-6 border-b border-muted/50 mb-8"><DialogTitle className="font-headline text-2xl font-bold text-primary">Edit Transaction</DialogTitle></DialogHeader>
+            <form onSubmit={handleSaveEdit} className="space-y-8">
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Amount ({currency.symbol})</Label>
-                <input type="number" className="flex h-12 w-full rounded-xl bg-muted/30 border-none shadow-inner px-3 py-2 text-lg font-bold" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Amount ({currency.symbol})</Label>
+                <input type="number" className="flex h-14 w-full rounded-xl bg-muted/30 border-none shadow-inner px-4 py-2 text-2xl font-bold transition-all focus:ring-2 focus:ring-primary" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase text-muted-foreground ml-1">Description</Label>
-                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner" value={editingExpense.description || editingExpense.note || ""} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} required />
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Description</Label>
+                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-medium" value={editingExpense.description || editingExpense.note || ""} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} required />
               </div>
-              <Button type="submit" className="w-full h-14 font-bold rounded-xl shadow-lg">Save Changes</Button>
+              <Button type="submit" className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95 text-base mt-4">Save Changes</Button>
             </form>
           </DialogContent>
         </Dialog>

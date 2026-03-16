@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -63,7 +62,6 @@ export default function BudgetsPage() {
           const normalized = data.name?.trim().toLowerCase();
           if (!normalized) return;
           
-          // Deduplicate by name, preferring the user's own category
           if (!catMap.has(normalized) || data.userId === user?.uid) {
             catMap.set(normalized, { id: doc.id, ...data });
           }
@@ -114,7 +112,6 @@ export default function BudgetsPage() {
     return { totalSpent, totalBudget, overallRemainingPercent };
   }, [expenses, budgetsData]);
 
-  // Standardized logic: Spent = Paid or no status
   const getMonthlySpendByCategory = (categoryId: string, categoryName: string) => {
     return expenses
       .filter(e => 
@@ -132,7 +129,6 @@ export default function BudgetsPage() {
     const initialLimits: Record<string, string> = {};
     categories.forEach(cat => {
       const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
-      // If doc exists and limit > 0, show it. Otherwise show empty string instead of "0"
       initialLimits[cat.id] = (budgetDoc && budgetDoc.limit !== 0) ? budgetDoc.limit.toString() : "";
     });
     setEditedLimits(initialLimits);
@@ -144,7 +140,6 @@ export default function BudgetsPage() {
 
     try {
       const promises = Object.entries(editedLimits).map(([catId, limit]) => {
-        // Interpret empty string as 0
         const numLimit = limit === "" ? 0 : parseFloat(limit);
         if (!isNaN(numLimit)) {
           const categoryObj = categories.find(c => c.id === catId);
@@ -185,27 +180,27 @@ export default function BudgetsPage() {
   if (!mounted || budgetsLoading || expensesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <Loader2 className="w-10 h-10 text-primary/30 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-24">
+    <div className="space-y-10 animate-in fade-in duration-500 pb-24 max-w-7xl mx-auto">
       <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div>
-          <h1 className="text-3xl font-bold font-headline mb-1 text-primary">Budgets</h1>
-          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold font-headline text-primary tracking-tight">Budgets</h1>
+          <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
         </div>
         
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+              className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
               onClick={() => setShowTutorial(true)}
             >
               <HelpCircle className="w-5 h-5" />
@@ -216,12 +211,12 @@ export default function BudgetsPage() {
                 <Button 
                   variant="outline" 
                   size="icon" 
-                  className="h-10 w-10 rounded-lg shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+                  className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
                 >
                   <CalendarIcon className="w-5 h-5" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
+              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
                 <Calendar
                   mode="single"
                   selected={new Date(viewYear, viewMonth)}
@@ -234,28 +229,28 @@ export default function BudgetsPage() {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={handleOpenDialog} className="h-11 px-6 rounded-xl font-bold shadow-lg shadow-primary/20">
+              <Button onClick={handleOpenDialog} className="h-11 px-8 rounded-xl font-bold shadow-lg transition-all active:scale-95">
                 <Edit2 className="w-4 h-4 mr-2" />
                 Adjust Limits
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-3xl">
-              <DialogHeader>
-                <DialogTitle className="font-headline text-2xl font-bold text-primary">Adjust Monthly Limits</DialogTitle>
-                <DialogDescription>Set realistic targets for each category from the cloud registry.</DialogDescription>
+            <DialogContent className="max-w-md rounded-[20px] p-8 border-none shadow-2xl gap-0">
+              <DialogHeader className="pb-6 border-b border-muted/50 mb-8">
+                <DialogTitle className="font-headline text-2xl font-bold text-primary">Adjust Limits</DialogTitle>
+                <DialogDescription className="text-sm mt-2">Set realistic targets for each category from your cloud registry.</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-6">
+              <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 scrollbar-thin mb-8">
                 {categories.map((cat) => (
-                  <div key={cat.id} className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor={cat.id} className="text-right text-[10px] font-bold uppercase truncate text-muted-foreground">
+                  <div key={cat.id} className="grid grid-cols-4 items-center gap-4 group">
+                    <Label htmlFor={cat.id} className="text-right text-[10px] font-bold uppercase truncate text-muted-foreground group-hover:text-primary transition-colors tracking-widest">
                       {cat.name}
                     </Label>
                     <div className="col-span-3 relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">{currency.symbol}</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">{currency.symbol}</span>
                       <Input 
                         id={cat.id} 
                         type="number" 
-                        className="pl-8 h-10 text-sm font-bold rounded-xl" 
+                        className="pl-9 h-11 text-sm font-bold rounded-xl bg-muted/30 border-transparent focus:bg-background focus:ring-2 focus:ring-primary shadow-inner" 
                         placeholder="0.00"
                         value={editedLimits[cat.id] ?? ""} 
                         onChange={(e) => setEditedLimits({ ...editedLimits, [cat.id]: e.target.value })} 
@@ -264,51 +259,57 @@ export default function BudgetsPage() {
                   </div>
                 ))}
                 {categories.length === 0 && (
-                  <p className="text-center py-10 text-muted-foreground text-sm italic">No categories defined in registry.</p>
+                  <p className="text-center py-12 text-muted-foreground text-sm italic font-medium">No categories defined in registry.</p>
                 )}
               </div>
               <DialogFooter>
-                <Button onClick={handleSaveLimits} className="w-full h-12 rounded-xl font-bold">Save Changes</Button>
+                <Button onClick={handleSaveLimits} className="w-full h-14 rounded-xl font-bold text-base shadow-lg transition-all active:scale-95">Save Changes</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <Card className="bg-primary/5 border-none shadow-sm ring-1 ring-primary/10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-primary/5 border-none shadow-sm ring-1 ring-primary/10 transition-all hover:shadow-md">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-5 h-5 text-primary" />
-              <span className="text-xs font-bold font-headline uppercase tracking-wider text-primary">Progress</span>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Target className="w-5 h-5" />
+              </div>
+              <span className="text-[11px] font-bold font-headline uppercase tracking-widest text-primary">Progress</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{budgetStats.overallRemainingPercent.toFixed(0)}%</div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Remaining of Total</p>
+            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{budgetStats.overallRemainingPercent.toFixed(0)}%</div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Remaining of Total</p>
           </CardContent>
         </Card>
-        <Card className="bg-muted/30 border-none shadow-sm ring-1 ring-black/5">
+        <Card className="bg-card border-none shadow-sm transition-all hover:shadow-md">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-destructive" />
-              <span className="text-xs font-bold font-headline uppercase tracking-wider text-muted-foreground">Total Spent</span>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="text-[11px] font-bold font-headline uppercase tracking-widest text-muted-foreground">Total Spent</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(budgetStats.totalSpent)}</div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Usage for {format(new Date(viewYear, viewMonth), 'MMM')}</p>
+            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{currency.symbol}{formatAmount(budgetStats.totalSpent)}</div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Usage for {format(new Date(viewYear, viewMonth), 'MMM')}</p>
           </CardContent>
         </Card>
-        <Card className="bg-muted/30 border-none shadow-sm ring-1 ring-black/5">
+        <Card className="bg-card border-none shadow-sm transition-all hover:shadow-md">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <PieChart className="w-5 h-5 text-emerald-500" />
-              <span className="text-xs font-bold font-headline uppercase tracking-wider text-muted-foreground">Budget Limit</span>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <PieChart className="w-5 h-5" />
+              </div>
+              <span className="text-[11px] font-bold font-headline uppercase tracking-widest text-muted-foreground">Budget Limit</span>
             </div>
-            <div className="text-2xl font-bold font-headline mb-1">{currency.symbol}{formatAmount(budgetStats.totalBudget)}</div>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Global Monthly Target</p>
+            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{currency.symbol}{formatAmount(budgetStats.totalBudget)}</div>
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Global Monthly Target</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
         {categories.map((cat) => {
           const budgetDoc = budgetsData?.find(b => b.categoryId === cat.id);
           const limit = Number(budgetDoc?.limit) || 0;
@@ -317,31 +318,33 @@ export default function BudgetsPage() {
           const isOver = limit > 0 && spent > limit;
           
           return (
-            <Card key={cat.id} className="border-none shadow-sm bg-card hover:ring-1 hover:ring-primary/20 transition-all ring-1 ring-black/5">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <CardTitle className="text-sm font-headline flex items-center gap-2 font-bold">
-                    {cat.name}
-                    {isOver && <Badge variant="destructive" className="py-0 h-4 text-[8px] uppercase font-bold">Over</Badge>}
-                  </CardTitle>
-                  <div className="text-[10px] font-bold">
-                    <span className="text-foreground">{currency.symbol}{formatAmount(spent)}</span>
-                    <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
+            <Card key={cat.id} className="border-none bg-card hover:shadow-md transition-all group">
+              <CardHeader className="pb-5 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CardTitle className="text-base font-headline font-bold truncate">
+                      {cat.name}
+                    </CardTitle>
+                    {isOver && <Badge variant="destructive" className="py-0 h-5 text-[9px] uppercase font-bold shadow-sm shadow-destructive/20">Over</Badge>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-sm font-bold text-foreground">{currency.symbol}{formatAmount(spent)}</span>
+                    <span className="text-muted-foreground mx-2 text-[10px] opacity-50">/</span>
+                    <span className="text-xs font-bold text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
                   </div>
                 </div>
-                <Progress value={percent} className={`h-2 ${isOver ? 'bg-destructive/20' : ''}`} />
+                <Progress value={percent} className={`h-2.5 rounded-full ${isOver ? 'bg-destructive/20' : 'bg-muted/50'}`} />
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tight">
+              <CardContent className="pt-0 p-6">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest">
                   <span className="text-muted-foreground">{percent.toFixed(0)}% utilized</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     {limit > 0 ? (
-                       <span className={isOver ? 'text-destructive' : 'text-emerald-600'}>
-                       {isOver ? `${currency.symbol}${formatAmount(spent - limit)} over` : `${currency.symbol}${formatAmount(limit - spent)} available`}
+                       <span className={cn("px-2.5 py-1 rounded-lg border font-bold", isOver ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100')}>
+                       {isOver ? `${currency.symbol}${formatAmount(spent - limit)} over` : `${currency.symbol}${formatAmount(limit - spent)} left`}
                      </span>
                     ) : (
-                      <span className="text-muted-foreground italic opacity-50">No limit defined</span>
+                      <span className="text-muted-foreground/40 italic font-medium">No limit set</span>
                     )}
                   </div>
                 </div>
@@ -350,8 +353,8 @@ export default function BudgetsPage() {
           );
         })}
         {categories.length === 0 && (
-          <div className="lg:col-span-2 text-center py-20 bg-muted/10 rounded-3xl border-2 border-dashed">
-            <Tag className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+          <div className="lg:col-span-2 text-center py-32 bg-muted/10 rounded-[20px] border-2 border-dashed border-muted/50 flex flex-col items-center justify-center gap-4">
+            <Tag className="w-12 h-12 text-muted-foreground/30" />
             <p className="text-sm font-bold text-muted-foreground italic">No categories found. Please seed them in Admin Settings.</p>
           </div>
         )}

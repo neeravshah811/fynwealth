@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -6,7 +5,7 @@ import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, PieChart, Clock, Coins, Loader2 } from "lucide-react";
+import { Wallet, PieChart, Clock, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -59,9 +58,9 @@ export function OverviewCards() {
 
   if (!mounted || budgetsLoading || expensesLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 bg-muted/50 animate-pulse rounded-xl" />
+          <div key={i} className="h-32 bg-muted/50 animate-pulse rounded-[20px]" />
         ))}
       </div>
     );
@@ -72,16 +71,18 @@ export function OverviewCards() {
   };
 
   const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => (
-    <Card className="shadow-sm border-none bg-card/80 backdrop-blur ring-1 ring-muted/20">
-      <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase">{title}</CardTitle>
-        <Icon className={cn("w-3.5 h-3.5", colorClass)} />
+    <Card className="border-none bg-card/80 backdrop-blur transition-all hover:shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
+        <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
+        <div className={cn("p-2 rounded-xl bg-muted/50", colorClass.replace('text-', 'bg-').replace('text-', 'text-opacity-20'))}>
+          <Icon className={cn("w-4 h-4", colorClass)} />
+        </div>
       </CardHeader>
-      <CardContent className="px-3 pb-3">
-        <div className={cn("text-lg font-bold font-headline truncate", privacyMode && "blur-md select-none", colorClass)}>
+      <CardContent className="px-5 pb-5">
+        <div className={cn("text-2xl font-bold font-headline truncate tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
           {currency.symbol}{formatAmount(amount)}
         </div>
-        <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold tracking-tight">
+        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
           {subtext}
         </p>
       </CardContent>
@@ -89,7 +90,7 @@ export function OverviewCards() {
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <MetricCard title="Spent" amount={stats.paidSpend} icon={Wallet} colorClass="text-primary" subtext="Month Total" />
       <MetricCard title="Pending" amount={stats.pendingBills} icon={Clock} colorClass="text-accent" subtext="Upcoming" />
       <MetricCard title="Budget" amount={stats.totalBudgetAmount} icon={PieChart} colorClass="text-emerald-500" subtext="Target" />
