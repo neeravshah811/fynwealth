@@ -45,6 +45,7 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
 
 const prompt = ai.definePrompt({
   name: 'processBankStatementPrompt',
+  model: 'googleai/gemini-1.5-flash',
   input: { schema: BankStatementInputSchema },
   output: { schema: BankStatementOutputSchema },
   prompt: `You are an expert financial auditor. Your task is to extract transactions from the provided bank statement.
@@ -77,7 +78,6 @@ const processBankStatementFlow = ai.defineFlow(
     outputSchema: BankStatementOutputSchema,
   },
   async (input) => {
-    // Explicitly using the default model via the ai instance
     const { output } = await prompt(input);
     return output!;
   }
