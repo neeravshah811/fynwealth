@@ -62,11 +62,11 @@ export function SpendingChart() {
       <CardHeader className="p-6 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[500px] p-6 pt-0">
+      <CardContent className="flex-1 min-h-[550px] p-6 pt-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={data} 
-            margin={{ top: 30, right: 30, left: 10, bottom: 30 }}
+            margin={{ top: 40, right: 30, left: 10, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
             <XAxis 
@@ -75,11 +75,11 @@ export function SpendingChart() {
               tickLine={false} 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 600 }} 
               interval={0}
-              height={80}
+              height={100}
               angle={-45}
               textAnchor="end"
               dx={-8}
-              dy={5}
+              dy={10}
             />
             <YAxis 
               axisLine={false} 
@@ -102,7 +102,7 @@ export function SpendingChart() {
                 null
               ]}
             />
-            <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
+            <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={48}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
