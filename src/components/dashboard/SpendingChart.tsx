@@ -59,50 +59,50 @@ export function SpendingChart() {
 
   return (
     <Card className="shadow-sm border-none bg-card/80 backdrop-blur lg:col-span-2 h-full flex flex-col">
-      <CardHeader className="p-6 pb-2">
+      <CardHeader className="p-5 pb-2">
         <CardTitle className="text-[11px] font-headline uppercase font-bold tracking-widest text-muted-foreground">Category Spend</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[550px] p-6 pt-0">
+      <CardContent className="flex-1 min-h-[400px] md:min-h-[500px] p-4 pt-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={data} 
-            margin={{ top: 40, right: 30, left: 10, bottom: 60 }}
+            margin={{ top: 20, right: 10, left: -20, bottom: 60 }}
           >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" opacity={0.5} />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 600 }} 
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }} 
               interval={0}
-              height={100}
+              height={80}
               angle={-45}
               textAnchor="end"
-              dx={-8}
-              dy={10}
+              dx={-4}
+              dy={8}
             />
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }} 
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9, fontWeight: 500 }} 
               tickFormatter={(value) => `${currency.symbol}${value >= 1000 ? (value/1000).toFixed(0)+'k' : value}`}
             />
             <Tooltip 
-              cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
+              cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
               contentStyle={{ 
                 borderRadius: '12px', 
                 border: 'none', 
                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                 backgroundColor: 'hsl(var(--card))',
-                fontSize: '12px',
-                padding: '12px'
+                fontSize: '11px',
+                padding: '10px'
               }}
               formatter={(value: number) => [
                 <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
                 null
               ]}
             />
-            <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={48}>
+            <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={40}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
