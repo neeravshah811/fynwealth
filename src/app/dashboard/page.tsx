@@ -14,22 +14,13 @@ import { format } from "date-fns";
 import { 
   FileText, 
   CalendarRange, 
-  Calendar as CalendarIcon, 
   Loader2,
   Sparkles,
   TrendingUp,
   AlertCircle,
-  HelpCircle,
   Tag
 } from "lucide-react";
 import Link from "next/link";
-import { TutorialDialog } from "@/components/TutorialDialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 
 const SpendingChart = dynamic(() => import("@/components/dashboard/SpendingChart").then(mod => mod.SpendingChart), {
   loading: () => <Card className="h-[250px] animate-pulse bg-muted/20" />
@@ -44,7 +35,6 @@ export default function DashboardPage() {
   const { user } = useUser();
   const db = useFirestore();
   const [mounted, setMounted] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -89,12 +79,6 @@ export default function DashboardPage() {
     return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (date) {
-      setViewDate(date.getMonth(), date.getFullYear());
-    }
-  };
-
   const ExpenseRow = ({ expense }: { expense: any }) => {
     const displayDescription = expense.description || expense.note || (
       expense.subcategoryName && expense.subcategoryName !== 'Others' 
@@ -133,8 +117,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-20 max-w-7xl mx-auto">
-      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
-      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Dashboard</h1>
@@ -142,42 +124,6 @@ export default function DashboardPage() {
         </div>
         
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-11 w-11 rounded-xl shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-all"
-              onClick={() => setShowTutorial(true)}
-              title="Show Tutorial"
-            >
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-11 w-11 rounded-xl shadow-sm border-primary/20 text-primary hover:bg-primary/5 transition-all"
-                  title="Select Date"
-                >
-                  <CalendarIcon className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
-                <Calendar
-                  mode="single"
-                  selected={new Date(viewYear, viewMonth)}
-                  onSelect={handleCalendarSelect}
-                  initialFocus
-                  captionLayout="dropdown"
-                  fromYear={2020}
-                  toYear={2035}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
           <div className="flex items-center gap-2">
             <Select value={viewMonth.toString()} onValueChange={(v) => setViewDate(parseInt(v), viewYear)}>
               <SelectTrigger className="w-36 md:w-44 h-11 text-sm rounded-xl font-bold">

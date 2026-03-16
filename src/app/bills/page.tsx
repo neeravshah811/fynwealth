@@ -20,8 +20,6 @@ import {
   CreditCard,
   History,
   Loader2,
-  HelpCircle,
-  Calendar as CalendarIcon,
   Paperclip,
   FileText,
   MessageSquare
@@ -29,29 +27,13 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
-import { TutorialDialog } from "@/components/TutorialDialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
 
 export default function BillsPage() {
-  const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { currency, viewMonth, viewYear } = useFynWealthStore();
   const { user } = useUser();
   const db = useFirestore();
   
   const [showForm, setShowForm] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -181,12 +163,6 @@ export default function BillsPage() {
 
   const { data: bills, isLoading } = useCollection(billsQuery);
 
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (date) {
-      setViewDate(date.getMonth(), date.getFullYear());
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -285,8 +261,6 @@ export default function BillsPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24">
-      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
-      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
         <div className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Custom Reminders</h1>
@@ -294,21 +268,6 @@ export default function BillsPage() {
         </div>
         
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setShowTutorial(true)} className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5">
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5">
-                  <CalendarIcon className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="z-[100] w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
-                <Calendar mode="single" selected={new Date(viewYear, viewMonth)} onSelect={handleCalendarSelect} />
-              </PopoverContent>
-            </Popover>
-          </div>
           <Button id="tour-reminders-add" onClick={() => setShowForm(!showForm)} className="rounded-xl h-11 px-8 shadow-lg transition-all active:scale-95">
             {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
             {showForm ? "Cancel" : "Add Reminder"}

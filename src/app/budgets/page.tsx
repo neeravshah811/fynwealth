@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -25,28 +24,18 @@ import {
   TrendingUp, 
   Target, 
   PieChart, 
-  Calendar as CalendarIcon, 
   Loader2,
-  HelpCircle,
   Tag
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { TutorialDialog } from "@/components/TutorialDialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 
 export default function BudgetsPage() {
-  const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { currency, viewMonth, viewYear } = useFynWealthStore();
   const { user } = useUser();
   const firestore = useFirestore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [editedLimits, setEditedLimits] = useState<Record<string, string>>({});
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -184,12 +173,6 @@ export default function BudgetsPage() {
     }
   };
 
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (date) {
-      setViewDate(date.getMonth(), date.getFullYear());
-    }
-  };
-
   if (!mounted || budgetsLoading || expensesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -202,8 +185,6 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-24 max-w-7xl mx-auto">
-      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
-      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold font-headline text-primary tracking-tight">Budgets</h1>
@@ -211,37 +192,6 @@ export default function BudgetsPage() {
         </div>
         
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
-              onClick={() => setShowTutorial(true)}
-            >
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
-                >
-                  <CalendarIcon className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
-                <Calendar
-                  mode="single"
-                  selected={new Date(viewYear, viewMonth)}
-                  onSelect={handleCalendarSelect}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
           <Button onClick={() => handleOpenDialog()} className="h-11 px-8 rounded-xl font-bold shadow-lg transition-all active:scale-95">
             <Edit2 className="w-4 h-4 mr-2" />
             Adjust Limits
@@ -271,10 +221,10 @@ export default function BudgetsPage() {
                 </Label>
                 <div className="col-span-3 relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">{currency.symbol}</span>
-                  <Input 
+                  <input 
                     id={cat.id} 
                     type="number" 
-                    className="pl-9 h-11 text-sm font-bold rounded-xl bg-muted/30 border-transparent focus:bg-background focus:ring-2 focus:ring-primary shadow-inner" 
+                    className="flex h-11 w-full rounded-xl border border-input bg-muted/30 py-2 pl-9 pr-4 text-sm font-bold shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all" 
                     placeholder="0.00"
                     value={editedLimits[cat.id] ?? ""} 
                     onChange={(e) => setEditedLimits({ ...editedLimits, [cat.id]: e.target.value })} 

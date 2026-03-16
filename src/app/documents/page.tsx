@@ -20,8 +20,6 @@ import {
   MoreHorizontal,
   ArrowRightLeft,
   X,
-  HelpCircle,
-  Calendar as CalendarIcon,
   Loader2,
   Image as ImageIcon
 } from "lucide-react";
@@ -44,23 +42,15 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
-import { TutorialDialog } from "@/components/TutorialDialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 
 export default function DocumentsPage() {
-  const { currency, viewMonth, viewYear, setViewDate } = useFynWealthStore();
+  const { currency, viewMonth, viewYear } = useFynWealthStore();
   const { user } = useUser();
   const db = useFirestore();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<{ data: string; type: string } | null>(null);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
@@ -116,12 +106,6 @@ export default function DocumentsPage() {
     return 'image';
   };
 
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (date) {
-      setViewDate(date.getMonth(), date.getFullYear());
-    }
-  };
-
   const handleCreateFolder = async () => {
     if (!newFolderName.trim() || !db || !user?.uid) return;
     try {
@@ -172,8 +156,6 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-7xl mx-auto pb-24 px-1">
-      <TutorialDialog open={showTutorial} onOpenChange={setShowTutorial} />
-      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary tracking-tight">Document Safe</h1>
@@ -191,42 +173,6 @@ export default function DocumentsPage() {
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
-              onClick={() => setShowTutorial(true)}
-              title="Show Tutorial"
-            >
-              <HelpCircle className="w-5 h-5" />
-            </Button>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-11 w-11 rounded-xl shadow-sm border-primary/20 transition-all hover:bg-primary/5"
-                  title="Select Date"
-                >
-                  <CalendarIcon className="w-5 h-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-4" align="end">
-                <CalendarPicker
-                  mode="single"
-                  selected={new Date(viewYear, viewMonth)}
-                  onSelect={handleCalendarSelect}
-                  initialFocus
-                  captionLayout="dropdown"
-                  fromYear={2020}
-                  toYear={2035}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
           <Button 
             id="tour-doc-upload"
             onClick={() => setIsFolderDialogOpen(true)}

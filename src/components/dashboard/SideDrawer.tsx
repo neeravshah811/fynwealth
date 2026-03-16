@@ -17,7 +17,8 @@ import {
   Zap,
   MessageSquare,
   AlertCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
@@ -61,6 +62,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
+import { TutorialDialog } from "@/components/TutorialDialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 /**
  * SideDrawer manages the sliding dashboard content.
@@ -79,13 +87,15 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     viewYear,
     currency,
     setCurrency,
-    setTutorialCompleted
+    setTutorialCompleted,
+    setViewDate
   } = useFynWealthStore();
   
   const [isOpen, setIsOpen] = useState(false);
   const [legalDialog, setLegalDialog] = useState<"terms" | "privacy" | "faq" | "feature" | null>(null);
   const [featureText, setFeatureText] = useState("");
   const [isClearing, setIsClearing] = useState(false);
+  const [showTutorialGlobal, setShowTutorialGlobal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -180,6 +190,12 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       setLegalDialog(null);
     } catch (err) {
       toast({ variant: "destructive", title: "Submission Failed", description: "Could not log request. Please try again." });
+    }
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      setViewDate(date.getMonth(), date.getFullYear());
     }
   };
 
@@ -496,6 +512,40 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-10 w-10 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
+          onClick={() => setShowTutorialGlobal(true)}
+          title="Show Tutorial"
+        >
+          <HelpCircle className="w-5 h-5" />
+        </Button>
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
+              title="Select Date"
+            >
+              <CalendarIcon className="w-5 h-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-[20px] overflow-hidden mt-2" align="end">
+            <Calendar
+              mode="single"
+              selected={new Date(viewYear, viewMonth)}
+              onSelect={handleCalendarSelect}
+              initialFocus
+              captionLayout="dropdown"
+              fromYear={2020}
+              toYear={2035}
+            />
+          </PopoverContent>
+        </Popover>
+
         {displayName && (
           <div className="px-3.5 py-1.5 rounded-full bg-primary/5 border border-primary/10 flex items-center gap-2 shadow-sm">
             <ShieldCheck className="w-3.5 h-3.5 text-primary" />
@@ -506,6 +556,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         )}
       </div>
       {legalContent}
+      <TutorialDialog open={showTutorialGlobal} onOpenChange={setShowTutorialGlobal} />
     </div>
   );
 }
