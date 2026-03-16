@@ -36,6 +36,7 @@ interface FynWealthState {
   privacyMode: boolean;
   hasSeenTutorial: boolean;
   tutorialCompleted: boolean;
+  tourStepIndex: number;
   setCurrency: (code: string) => void;
   updateProfile: (profile: UserProfile) => void;
   setViewDate: (month: number, year: number) => void;
@@ -43,6 +44,7 @@ interface FynWealthState {
   togglePrivacyMode: () => void;
   setHasSeenTutorial: (seen: boolean) => void;
   setTutorialCompleted: (completed: boolean) => void;
+  setTourStepIndex: (index: number) => void;
   clearAllData: () => void;
 }
 
@@ -66,6 +68,7 @@ export const useFynWealthStore = create<FynWealthState>()(
       privacyMode: false,
       hasSeenTutorial: false,
       tutorialCompleted: false,
+      tourStepIndex: 0,
       setCurrency: (code) => set((state) => ({
         currency: SUPPORTED_CURRENCIES.find(c => c.code === code) || state.currency
       })),
@@ -76,10 +79,15 @@ export const useFynWealthStore = create<FynWealthState>()(
       })),
       togglePrivacyMode: () => set((state) => ({ privacyMode: !state.privacyMode })),
       setHasSeenTutorial: (seen) => set({ hasSeenTutorial: seen }),
-      setTutorialCompleted: (completed) => set({ tutorialCompleted: completed }),
+      setTutorialCompleted: (completed) => set({ 
+        tutorialCompleted: completed,
+        // Reset index when completing or starting a tour
+        tourStepIndex: 0 
+      }),
+      setTourStepIndex: (tourStepIndex) => set({ tourStepIndex }),
       clearAllData: () => set({ 
         profile: null, privacyMode: false,
-        hasSeenTutorial: false, tutorialCompleted: false,
+        hasSeenTutorial: false, tutorialCompleted: false, tourStepIndex: 0,
         insights: { predictions: null, unnecessary: null, lastGenerated: null },
         viewMonth: new Date().getMonth(), viewYear: new Date().getFullYear() 
       }),

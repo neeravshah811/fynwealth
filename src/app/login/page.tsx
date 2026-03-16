@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,7 +24,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const auth = useAuth();
-  const { updateProfile: updateStoreProfile, setTutorialCompleted } = useFynWealthStore();
+  const { updateProfile: updateStoreProfile, setTutorialCompleted, setTourStepIndex } = useFynWealthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -58,6 +59,7 @@ export default function LoginPage() {
           }
 
           // Reset walkthrough for every relogin
+          setTourStepIndex(0);
           setTutorialCompleted(false);
 
           toast({
@@ -78,7 +80,7 @@ export default function LoginPage() {
           });
         }
       });
-  }, [auth, updateStoreProfile, setTutorialCompleted]);
+  }, [auth, updateStoreProfile, setTutorialCompleted, setTourStepIndex]);
 
   const handleEmailAuth = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +100,7 @@ export default function LoginPage() {
           });
 
           // Reset walkthrough for new account
+          setTourStepIndex(0);
           setTutorialCompleted(false);
 
           toast({
@@ -134,6 +137,7 @@ export default function LoginPage() {
           }
 
           // Reset walkthrough for every relogin
+          setTourStepIndex(0);
           setTutorialCompleted(false);
 
           toast({
@@ -217,6 +221,7 @@ export default function LoginPage() {
           }
 
           // Reset walkthrough for every relogin
+          setTourStepIndex(0);
           setTutorialCompleted(false);
 
           toast({

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFynWealthStore } from "@/lib/store";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,8 @@ import {
   Bell,
   Receipt,
   PieChart,
-  Files
+  Files,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,34 +74,59 @@ const TOUR_STEPS: Step[] = [
 export function WalkthroughTour() {
   const router = useRouter();
   const pathname = usePathname();
-  const { tutorialCompleted, setTutorialCompleted } = useFynWealthStore();
+  const { tutorialCompleted, setTutorialCompleted, tourStepIndex, setTourStepIndex } = useFynWealthStore();
   
-  const [currentStepIndex, setCurrentStepStepIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (!tutorialCompleted) {
-      const timer = setTimeout(() => setIsVisible(true), 2000);
+      // Small initial delay to allow initial app render
+      const timer = setTimeout(() => setIsVisible(true), 1500);
       return () => clearTimeout(timer);
     }
   }, [tutorialCompleted]);
 
-  const currentStep = TOUR_STEPS[currentStepIndex];
+  const currentStep = TOUR_STEPS[tourStepIndex];
 
-  // Logic to calculate spotlight and navigate if needed
-  useEffect(() => {
+  const calculateSpotlight = useCallback(() => {
     if (!isVisible) return;
+    
+    const element = document.getElementById(currentStep.targetId);
+    if (element) {
+      // Ensure element is visible before calculating
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      
+      // Delay rect calculation slightly to allow smooth scroll to finish
+      setTimeout(() => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setSpotlightRect(rect);
+          setIsNavigating(false);
+        } else {
+          setSpotlightRect(null);
+        }
+      }, 400);
+    } else {
+      setSpotlightRect(null);
+    }
+  }, [isVisible, currentStep.targetId]);
+
+  // Logic to handle navigation and spotlight updates
+  useEffect(() => {
+    if (!isVisible || tutorialCompleted) return;
 
     if (pathname !== currentStep.path) {
+      setIsNavigating(true);
+      setSpotlightRect(null);
       router.push(currentStep.path);
-      // Give some time for navigation and element rendering
-      const timer = setTimeout(calculateSpotlight, 800);
-      return () => clearTimeout(timer);
     } else {
-      calculateSpotlight();
+      // Path matches, calculate spotlight
+      const timer = setTimeout(calculateSpotlight, 500);
+      return () => clearTimeout(timer);
     }
 
     window.addEventListener("resize", calculateSpotlight);
@@ -108,32 +135,21 @@ export function WalkthroughTour() {
       window.removeEventListener("resize", calculateSpotlight);
       window.removeEventListener("scroll", calculateSpotlight);
     };
-  }, [currentStepIndex, pathname, isVisible, currentStep.path, router]);
-
-  const calculateSpotlight = () => {
-    const element = document.getElementById(currentStep.targetId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(() => {
-        const rect = element.getBoundingClientRect();
-        setSpotlightRect(rect);
-      }, 300);
-    } else {
-      setSpotlightRect(null);
-    }
-  };
+  }, [tourStepIndex, pathname, isVisible, tutorialCompleted, currentStep.path, router, calculateSpotlight]);
 
   const handleNext = () => {
-    if (currentStepIndex < TOUR_STEPS.length - 1) {
-      setCurrentStepStepIndex(currentStepIndex + 1);
+    if (tourStepIndex < TOUR_STEPS.length - 1) {
+      setIsNavigating(true);
+      setTourStepIndex(tourStepIndex + 1);
     } else {
       handleFinish();
     }
   };
 
   const handleBack = () => {
-    if (currentStepIndex > 0) {
-      setCurrentStepStepIndex(currentStepIndex - 1);
+    if (tourStepIndex > 0) {
+      setIsNavigating(true);
+      setTourStepIndex(tourStepIndex - 1);
     }
   };
 
@@ -159,99 +175,113 @@ export function WalkthroughTour() {
       />
 
       {/* Tooltip Card */}
-      {spotlightRect && (
+      {isVisible && (
         <div 
           className="absolute pointer-events-auto transition-all duration-500 ease-out flex flex-col items-center"
           style={{
-            left: `${Math.min(Math.max(16, spotlightRect.left + (spotlightRect.width / 2) - 160), window.innerWidth - 336)}px`,
-            top: spotlightRect.bottom + 20 > window.innerHeight - 300 
-              ? `${Math.max(16, spotlightRect.top - 280)}px` 
-              : `${spotlightRect.bottom + 20}px`,
+            left: spotlightRect 
+              ? `${Math.min(Math.max(16, spotlightRect.left + (spotlightRect.width / 2) - 160), window.innerWidth - 336)}px`
+              : "50%",
+            top: spotlightRect
+              ? (spotlightRect.bottom + 20 > window.innerHeight - 300 
+                  ? `${Math.max(16, spotlightRect.top - 280)}px` 
+                  : `${spotlightRect.bottom + 20}px`)
+              : "50%",
+            transform: spotlightRect ? "none" : "translate(-50%, -50%)",
             width: "320px"
           }}
         >
-          <div className="bg-card shadow-2xl rounded-3xl p-6 border-none ring-1 ring-black/5 animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <div className={cn("p-2 rounded-xl bg-muted/50", currentStep.color)}>
-                <Icon className="w-6 h-6" />
+          {/* Welcome Screen Fallback (Only for step 0 if element not found yet) */}
+          {tourStepIndex === 0 && !spotlightRect && !isNavigating ? (
+            <div className="bg-card shadow-2xl rounded-[32px] p-10 text-center animate-in zoom-in duration-500 w-full max-w-sm">
+              <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-10 h-10" />
               </div>
+              <h2 className="text-2xl font-bold font-headline mb-4">Welcome to FynWealth</h2>
+              <p className="text-muted-foreground leading-relaxed mb-8 text-sm">
+                Take control of your finances with smart tracking and AI-powered insights. Let's show you around your new financial command center!
+              </p>
+              <Button onClick={handleNext} className="w-full h-12 rounded-xl font-bold text-base shadow-lg">
+                Start Walkthrough
+              </Button>
               <button 
                 onClick={handleFinish}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
               >
-                <X className="w-5 h-5" />
+                Skip Tour
               </button>
             </div>
-
-            <h3 className="text-lg font-bold font-headline mb-2">{currentStep.title}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-              {currentStep.description}
-            </p>
-
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                {TOUR_STEPS.map((_, i) => (
-                  <div 
-                    key={i}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all duration-300",
-                      i === currentStepIndex ? "w-6 bg-primary" : "w-1.5 bg-muted"
-                    )}
-                  />
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {currentStepIndex > 0 && (
-                  <Button variant="ghost" size="icon" onClick={handleBack} className="h-9 w-9 rounded-full">
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                )}
-                <Button 
-                  size="sm" 
-                  onClick={handleNext} 
-                  className="rounded-full h-9 px-5 font-bold shadow-lg shadow-primary/20"
+          ) : (
+            <div className="bg-card shadow-2xl rounded-3xl p-6 border-none ring-1 ring-black/5 animate-in fade-in zoom-in duration-300 w-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className={cn("p-2 rounded-xl bg-muted/50", currentStep.color)}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <button 
+                  onClick={handleFinish}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {currentStepIndex === TOUR_STEPS.length - 1 ? "Start Saving" : "Next"}
-                  {currentStepIndex < TOUR_STEPS.length - 1 && <ChevronRight className="w-4 h-4 ml-1" />}
-                </Button>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <h3 className="text-lg font-bold font-headline mb-2">{currentStep.title}</h3>
+              
+              {isNavigating ? (
+                <div className="flex flex-col items-center py-8 gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Entering {currentStep.path.substring(1)}...</span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                  {currentStep.description}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1.5">
+                  {TOUR_STEPS.map((_, i) => (
+                    <div 
+                      key={i}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all duration-300",
+                        i === tourStepIndex ? "w-6 bg-primary" : "w-1.5 bg-muted"
+                      )}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {tourStepIndex > 0 && (
+                    <Button variant="ghost" size="icon" onClick={handleBack} className="h-9 w-9 rounded-full">
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm" 
+                    onClick={handleNext} 
+                    disabled={isNavigating}
+                    className="rounded-full h-9 px-5 font-bold shadow-lg shadow-primary/20"
+                  >
+                    {tourStepIndex === TOUR_STEPS.length - 1 ? "Start Saving" : "Next"}
+                    {tourStepIndex < TOUR_STEPS.length - 1 && <ChevronRight className="w-4 h-4 ml-1" />}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           
-          {/* Arrow point */}
-          <div 
-            className={cn(
-              "w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent transition-all",
-              spotlightRect.bottom + 20 > window.innerHeight - 300
-                ? "border-t-[10px] border-t-card -mt-0.5"
-                : "border-b-[10px] border-b-card order-first -mb-0.5"
-            )}
-          />
-        </div>
-      )}
-
-      {/* Fallback Full-Center Welcome if no rect */}
-      {!spotlightRect && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
-          <div className="bg-card shadow-2xl rounded-3xl p-10 max-w-sm text-center pointer-events-auto animate-in zoom-in duration-500">
-            <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
-              <Sparkles className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-bold font-headline mb-4">Welcome to FynWealth</h2>
-            <p className="text-muted-foreground leading-relaxed mb-8">
-              Take control of your finances with smart tracking and AI-powered insights. Let's show you around your new financial command center!
-            </p>
-            <Button onClick={handleNext} className="w-full h-12 rounded-xl font-bold text-base">
-              Start Walkthrough
-            </Button>
-            <button 
-              onClick={handleFinish}
-              className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Skip Tour
-            </button>
-          </div>
+          {/* Arrow point (Only if spotlight exists) */}
+          {spotlightRect && (
+            <div 
+              className={cn(
+                "w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent transition-all",
+                spotlightRect.bottom + 20 > window.innerHeight - 300
+                  ? "border-t-[10px] border-t-card -mt-0.5"
+                  : "border-b-[10px] border-b-card order-first -mb-0.5"
+              )}
+            />
+          )}
         </div>
       )}
     </div>
