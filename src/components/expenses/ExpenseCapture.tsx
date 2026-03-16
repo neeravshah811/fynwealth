@@ -401,7 +401,7 @@ export function ExpenseCapture() {
       </CardHeader>
       <CardContent className="p-5 pt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList id="tour-expense-capture" className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
+          <TabsList className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="manual" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Manual</TabsTrigger>
             <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Voice</TabsTrigger>
             <TabsTrigger value="scan" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Scan</TabsTrigger>

@@ -36,6 +36,7 @@ export function BottomNav() {
                 "flex flex-col items-center justify-center flex-1 transition-all group relative",
                 item.isCenter ? "-mt-10" : "h-full"
               )}
+              {...(item.isCenter ? { id: "tour-expense-capture" } : {})}
             >
               {item.isCenter ? (
                 <div className={cn(
