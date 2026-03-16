@@ -5,7 +5,7 @@ import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wallet, PieChart, Clock, Coins } from "lucide-react";
+import { Receipt, Target, Clock, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -74,7 +74,7 @@ export function OverviewCards() {
     <Card className="border-none bg-card/80 backdrop-blur transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
         <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
-        <div className={cn("p-2 rounded-xl bg-muted/50", colorClass.replace('text-', 'bg-').replace('text-', 'text-opacity-20'))}>
+        <div className={cn("p-2.5 rounded-xl bg-muted/50", colorClass.replace('text-', 'bg-').replace('text-', 'text-opacity-20'))}>
           <Icon className={cn("w-4 h-4", colorClass)} />
         </div>
       </CardHeader>
@@ -91,10 +91,10 @@ export function OverviewCards() {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <MetricCard title="Spent" amount={stats.paidSpend} icon={Wallet} colorClass="text-primary" subtext="Month Total" />
+      <MetricCard title="Spent" amount={stats.paidSpend} icon={Receipt} colorClass="text-primary" subtext="Month Total" />
       <MetricCard title="Pending" amount={stats.pendingBills} icon={Clock} colorClass="text-accent" subtext="Upcoming" />
-      <MetricCard title="Budget" amount={stats.totalBudgetAmount} icon={PieChart} colorClass="text-emerald-500" subtext="Target" />
-      <MetricCard title="Balance" amount={stats.totalBalance} icon={Coins} colorClass={stats.totalBalance < 0 ? "text-destructive" : "text-primary"} subtext="Remaining" />
+      <MetricCard title="Budget" amount={stats.totalBudgetAmount} icon={Target} colorClass="text-emerald-500" subtext="Target" />
+      <MetricCard title="Balance" amount={stats.totalBalance} icon={Wallet} colorClass={stats.totalBalance < 0 ? "text-destructive" : "text-primary"} subtext="Remaining" />
     </div>
   );
 }
