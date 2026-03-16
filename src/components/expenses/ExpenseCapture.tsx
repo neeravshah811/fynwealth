@@ -421,7 +421,7 @@ export function ExpenseCapture() {
                       value={amount} 
                       onChange={(e) => setAmount(e.target.value)} 
                       required 
-                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 pl-9 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
+                      className="flex h-12 w-full rounded-xl border border-input bg-background py-2 pl-9 pr-4 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent transition-all"
                     />
                   </div>
                 </div>
@@ -556,7 +556,7 @@ export function ExpenseCapture() {
                     placeholder="e.g. Weekly Groceries" 
                     value={note} 
                     onChange={(e) => setNote(e.target.value)} 
-                    className="pl-11 h-12 rounded-xl shadow-sm px-4" 
+                    className="pl-11 pr-4 h-12 rounded-xl shadow-sm" 
                   />
                 </div>
               </div>

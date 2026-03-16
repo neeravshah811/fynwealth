@@ -589,7 +589,7 @@ export default function ExpensesPage() {
                   <div className="relative">
                     <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-50" />
                     <Input 
-                      className="h-12 pl-11 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-medium" 
+                      className="h-12 pl-11 pr-4 rounded-xl bg-muted/30 border-none shadow-inner font-medium" 
                       value={editingExpense.description || editingExpense.note || ""} 
                       onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} 
                     />

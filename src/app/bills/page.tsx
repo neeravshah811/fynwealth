@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -326,7 +325,6 @@ export default function BillsPage() {
           </CardHeader>
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Form fields remained unchanged */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Reminder Name</Label>
@@ -341,7 +339,7 @@ export default function BillsPage() {
                       value={formData.amount} 
                       onChange={(e) => setFormData({...formData, amount: e.target.value})} 
                       required 
-                      className="flex h-12 w-full rounded-xl border border-input bg-background px-4 py-2 pl-9 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all"
+                      className="flex h-12 w-full rounded-xl border border-input bg-background py-2 pl-9 pr-4 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all"
                     />
                   </div>
                 </div>
@@ -414,12 +412,15 @@ export default function BillsPage() {
 
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Description (Optional)</Label>
-                <Textarea 
-                  value={formData.note} 
-                  onChange={(e) => setFormData({...formData, note: e.target.value})} 
-                  placeholder="Additional details, account numbers, etc." 
-                  className="rounded-xl min-h-[100px] p-4 font-medium shadow-inner"
-                />
+                <div className="relative">
+                  <MessageSquare className="absolute left-4 top-4 w-4 h-4 text-muted-foreground opacity-50" />
+                  <Textarea 
+                    value={formData.note} 
+                    onChange={(e) => setFormData({...formData, note: e.target.value})} 
+                    placeholder="Additional details, account numbers, etc." 
+                    className="rounded-xl min-h-[100px] pl-11 pr-4 py-3 font-medium shadow-inner"
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
