@@ -383,7 +383,7 @@ export default function ExpensesPage() {
                           {currency.symbol}{formatAmount(expense.amount)}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end gap-2 transition-all">
                             <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense(expense)}>
                               <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
                             </Button>
