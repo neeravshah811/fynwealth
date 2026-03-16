@@ -77,6 +77,7 @@ export function WalkthroughTour() {
   const { tutorialCompleted, setTutorialCompleted, tourStepIndex, setTourStepIndex } = useFynWealthStore();
   
   const [isVisible, setIsVisible] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -84,15 +85,23 @@ export function WalkthroughTour() {
   useEffect(() => {
     setMounted(true);
     if (!tutorialCompleted) {
+      // Small delay to let the initial page settle
       const timer = setTimeout(() => setIsVisible(true), 1500);
       return () => clearTimeout(timer);
     }
   }, [tutorialCompleted]);
 
+  // If tour has already progressed past step 0, don't show welcome again
+  useEffect(() => {
+    if (tourStepIndex > 0) {
+      setShowWelcome(false);
+    }
+  }, [tourStepIndex]);
+
   const currentStep = TOUR_STEPS[tourStepIndex];
 
   const calculateSpotlight = useCallback(() => {
-    if (!isVisible) return;
+    if (!isVisible || showWelcome) return;
     
     const element = document.getElementById(currentStep.targetId);
     if (element) {
@@ -110,10 +119,10 @@ export function WalkthroughTour() {
     } else {
       setSpotlightRect(null);
     }
-  }, [isVisible, currentStep.targetId]);
+  }, [isVisible, showWelcome, currentStep.targetId]);
 
   useEffect(() => {
-    if (!isVisible || tutorialCompleted) return;
+    if (!isVisible || tutorialCompleted || showWelcome) return;
 
     if (pathname !== currentStep.path) {
       setIsNavigating(true);
@@ -130,7 +139,11 @@ export function WalkthroughTour() {
       window.removeEventListener("resize", calculateSpotlight);
       window.removeEventListener("scroll", calculateSpotlight);
     };
-  }, [tourStepIndex, pathname, isVisible, tutorialCompleted, currentStep.path, router, calculateSpotlight]);
+  }, [tourStepIndex, pathname, isVisible, tutorialCompleted, currentStep.path, router, calculateSpotlight, showWelcome]);
+
+  const handleStartTour = () => {
+    setShowWelcome(false);
+  };
 
   const handleNext = () => {
     if (tourStepIndex < TOUR_STEPS.length - 1) {
@@ -151,6 +164,8 @@ export function WalkthroughTour() {
   const handleFinish = () => {
     setIsVisible(false);
     setTutorialCompleted(true);
+    // Always return to dashboard on finish/skip
+    router.push('/dashboard');
   };
 
   if (!mounted || !isVisible || tutorialCompleted) return null;
@@ -165,7 +180,7 @@ export function WalkthroughTour() {
       <div 
         className="absolute inset-0 bg-black/60 pointer-events-auto transition-all duration-500"
         style={{
-          clipPath: spotlightRect 
+          clipPath: spotlightRect && !showWelcome
             ? `polygon(0% 0%, 0% 100%, ${spotlightRect.left - padding}px 100%, ${spotlightRect.left - padding}px ${spotlightRect.top - padding}px, ${spotlightRect.right + padding}px ${spotlightRect.top - padding}px, ${spotlightRect.right + padding}px ${spotlightRect.bottom + padding}px, ${spotlightRect.left - padding}px ${spotlightRect.bottom + padding}px, ${spotlightRect.left - padding}px 100%, 100% 100%, 100% 0%)`
             : "none"
         }}
@@ -176,19 +191,19 @@ export function WalkthroughTour() {
         <div 
           className="absolute pointer-events-auto transition-all duration-500 ease-out flex flex-col items-center"
           style={{
-            left: spotlightRect 
+            left: spotlightRect && !showWelcome
               ? `${Math.min(Math.max(16, spotlightRect.left + (spotlightRect.width / 2) - 160), window.innerWidth - 336)}px`
               : "50%",
-            top: spotlightRect
+            top: spotlightRect && !showWelcome
               ? (isTooLow 
                   ? `${Math.max(16, spotlightRect.top - 320)}px` 
                   : `${spotlightRect.bottom + 30}px`)
               : "50%",
-            transform: spotlightRect ? "none" : "translate(-50%, -50%)",
+            transform: spotlightRect && !showWelcome ? "none" : "translate(-50%, -50%)",
             width: "320px"
           }}
         >
-          {tourStepIndex === 0 && !spotlightRect && !isNavigating ? (
+          {showWelcome ? (
             <div className="bg-card shadow-2xl rounded-[32px] p-10 text-center animate-in zoom-in duration-500 w-full max-w-sm">
               <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
                 <Sparkles className="w-10 h-10" />
@@ -197,7 +212,7 @@ export function WalkthroughTour() {
               <p className="text-muted-foreground leading-relaxed mb-8 text-sm">
                 Take control of your finances with smart tracking and AI-powered insights. Let's show you around your new financial command center!
               </p>
-              <Button onClick={handleNext} className="w-full h-12 rounded-xl font-bold text-base shadow-lg">
+              <Button onClick={handleStartTour} className="w-full h-12 rounded-xl font-bold text-base shadow-lg">
                 Start Walkthrough
               </Button>
               <button 
@@ -267,7 +282,7 @@ export function WalkthroughTour() {
             </div>
           )}
           
-          {spotlightRect && (
+          {spotlightRect && !showWelcome && (
             <div 
               className={cn(
                 "w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent transition-all",
