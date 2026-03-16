@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -48,7 +47,7 @@ import { signOut } from "firebase/auth";
 import { collection, addDoc } from "firebase/firestore";
 
 export function ProfileDialog() {
-  const { profile, updateProfile, clearAllData } = useFynWealthStore();
+  const { profile, updateProfile, clearAllData, setTutorialCompleted } = useFynWealthStore();
   const { user } = useUser();
   const auth = useAuth();
   const db = useFirestore();
@@ -115,12 +114,11 @@ export function ProfileDialog() {
         status: 'pending'
       });
 
-      // 2. Prepare Direct Email with a safer method for opening external handlers
+      // 2. Prepare Direct Email
       const subject = encodeURIComponent("FynWealth Feature Request");
       const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
       const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
       
-      // Using window.open with _blank avoids frame-blocking connection errors
       window.open(mailtoUrl, '_blank');
 
       toast({ title: "Request Logged", description: "Your feedback was saved and your mail client should open." });
@@ -137,6 +135,8 @@ export function ProfileDialog() {
 
   const handleLogout = async () => {
     try {
+      // Reset walkthrough state for next login
+      setTutorialCompleted(false);
       await signOut(auth);
       setIsOpen(false);
       toast({ title: "Logged Out", description: "You have been signed out of your account." });

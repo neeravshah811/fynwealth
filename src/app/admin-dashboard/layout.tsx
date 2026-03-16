@@ -3,6 +3,7 @@
 import { AdminGuard } from '@/components/admin/AdminGuard';
 import { useUser, useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { useFynWealthStore } from '@/lib/store';
 import { 
   LayoutDashboard, 
   Users, 
@@ -33,8 +34,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user } = useUser();
   const auth = useAuth();
+  const { setTutorialCompleted } = useFynWealthStore();
 
   const handleLogout = async () => {
+    // Reset walkthrough state for next login
+    setTutorialCompleted(false);
     await signOut(auth);
     router.push('/login');
   };

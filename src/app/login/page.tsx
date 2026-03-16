@@ -23,7 +23,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const auth = useAuth();
-  const { updateProfile: updateStoreProfile } = useFynWealthStore();
+  const { updateProfile: updateStoreProfile, setTutorialCompleted } = useFynWealthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -57,6 +57,9 @@ export default function LoginPage() {
             });
           }
 
+          // Reset walkthrough for every relogin
+          setTutorialCompleted(false);
+
           toast({
             title: 'Welcome!',
             description: 'Signed in with Google successfully.',
@@ -75,7 +78,7 @@ export default function LoginPage() {
           });
         }
       });
-  }, [auth, updateStoreProfile]);
+  }, [auth, updateStoreProfile, setTutorialCompleted]);
 
   const handleEmailAuth = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +96,9 @@ export default function LoginPage() {
             lastName: rest.join(' '),
             email: user.email || email
           });
+
+          // Reset walkthrough for new account
+          setTutorialCompleted(false);
 
           toast({
             title: 'Welcome to FynWealth!',
@@ -126,6 +132,9 @@ export default function LoginPage() {
               email: user.email || email
             });
           }
+
+          // Reset walkthrough for every relogin
+          setTutorialCompleted(false);
 
           toast({
             title: 'Welcome Back!',
@@ -191,7 +200,6 @@ export default function LoginPage() {
 
     if (isMobile) {
       // Use redirect for mobile to bypass popup blockers
-      // Loading state will persist until redirect occurs
       signInWithRedirect(auth, provider);
     } else {
       // Use popup for desktop for better UX
@@ -207,6 +215,9 @@ export default function LoginPage() {
               email: user.email || ''
             });
           }
+
+          // Reset walkthrough for every relogin
+          setTutorialCompleted(false);
 
           toast({
             title: 'Welcome!',

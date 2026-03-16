@@ -78,16 +78,19 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     viewMonth, 
     viewYear,
     currency,
-    setCurrency
+    setCurrency,
+    setTutorialCompleted
   } = useFynWealthStore();
   
   const [isOpen, setIsOpen] = useState(false);
   const [legalDialog, setLegalDialog] = useState<"terms" | "privacy" | "faq" | "feature" | null>(null);
   const [featureText, setFeatureText] = useState("");
-  const [isClearing, setIsRecording] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const handleLogout = async () => {
     try {
+      // Reset walkthrough state for next login
+      setTutorialCompleted(false);
       await signOut(auth);
       setIsOpen(false);
       toast({ title: "Signed Out", description: "Successfully logged out." });
@@ -99,7 +102,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const handleClearAllData = async () => {
     if (!db || !user?.uid) return;
     
-    setIsRecording(true);
+    setIsClearing(true);
     try {
       const collectionsToClear = ['expenses', 'budgets', 'bills', 'folders'];
       const batch = writeBatch(db);
@@ -118,14 +121,14 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       console.error(error);
       toast({ variant: "destructive", title: "Reset Failed", description: "Could not clear all cloud data." });
     } finally {
-      setIsRecording(false);
+      setIsClearing(false);
     }
   };
 
   const handleClearMonthlyData = async () => {
     if (!db || !user?.uid) return;
     
-    setIsRecording(true);
+    setIsClearing(true);
     try {
       const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
       const endDate = format(new Date(viewYear, viewMonth + 1, 0), 'yyyy-MM-dd');
@@ -149,7 +152,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to clear cloud data." });
     } finally {
-      setIsRecording(false);
+      setIsClearing(false);
     }
   };
 
