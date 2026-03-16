@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
@@ -319,6 +318,11 @@ export default function DocumentsPage() {
               {filteredExpenses.map((expense) => {
                 const docUri = expense.billImageData || "";
                 const isPdf = getDocType(docUri) === 'pdf';
+                const displayDescription = expense.description || expense.note || (
+                  expense.subcategoryName && expense.subcategoryName !== 'Others' 
+                    ? `${expense.categoryName} - ${expense.subcategoryName}` 
+                    : expense.categoryName
+                );
                 
                 return (
                   <Card key={expense.id} className="border-none group hover:shadow-xl transition-all duration-300 overflow-hidden bg-card flex flex-col ring-1 ring-primary/5">
@@ -336,7 +340,7 @@ export default function DocumentsPage() {
                       ) : docUri ? (
                         <img 
                           src={docUri} 
-                          alt={expense.description || expense.note} 
+                          alt={displayDescription} 
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />
                       ) : (
@@ -355,7 +359,7 @@ export default function DocumentsPage() {
                     <CardContent className="p-5 space-y-4 flex-1 flex flex-col justify-between">
                       <div className="space-y-3">
                         <div className="flex justify-between items-start gap-3">
-                          <h4 className="font-bold text-sm truncate leading-tight text-foreground flex-1" title={expense.description || expense.note}>{expense.description || expense.note || "No description"}</h4>
+                          <h4 className="font-bold text-sm truncate leading-tight text-foreground flex-1" title={displayDescription}>{displayDescription}</h4>
                           <span className="font-bold text-sm text-primary tracking-tight">{currency.symbol}{formatAmount(expense.amount)}</span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -410,7 +414,7 @@ export default function DocumentsPage() {
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = docUri;
-                            link.download = `doc-${(expense.description || expense.note || "doc").replace(/\s+/g, '-').toLowerCase()}-${expense.date}.${isPdf ? 'pdf' : 'png'}`;
+                            link.download = `doc-${(displayDescription || "doc").replace(/\s+/g, '-').toLowerCase()}-${expense.date}.${isPdf ? 'pdf' : 'png'}`;
                             link.click();
                           }}
                         >

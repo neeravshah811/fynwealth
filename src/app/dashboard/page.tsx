@@ -95,30 +95,38 @@ export default function DashboardPage() {
     }
   };
 
-  const ExpenseRow = ({ expense }: { expense: any }) => (
-    <div key={expense.id} className="flex items-center justify-between p-4 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
-      <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="w-10 h-10 rounded-xl bg-muted/30 flex items-center justify-center text-muted-foreground shrink-0 transition-colors group-hover:text-primary">
-          <Tag className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold truncate text-foreground leading-none mb-1.5" title={expense.description || expense.note}>{expense.description || expense.note || "No description"}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] text-muted-foreground truncate uppercase tracking-tight font-bold">
-              {format(new Date(expense.date), 'MMM dd')}
-            </span>
-            <span className="text-[8px] text-muted-foreground/30">•</span>
-            <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
-              {expense.categoryName || expense.category || "General"}
-            </Badge>
+  const ExpenseRow = ({ expense }: { expense: any }) => {
+    const displayDescription = expense.description || expense.note || (
+      expense.subcategoryName && expense.subcategoryName !== 'Others' 
+        ? `${expense.categoryName} - ${expense.subcategoryName}` 
+        : expense.categoryName
+    );
+
+    return (
+      <div key={expense.id} className="flex items-center justify-between p-4 hover:bg-primary/5 transition-colors group min-w-0 border-b border-muted/30 last:border-0">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-xl bg-muted/30 flex items-center justify-center text-muted-foreground shrink-0 transition-colors group-hover:text-primary">
+            <Tag className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold truncate text-foreground leading-none mb-1.5" title={displayDescription}>{displayDescription}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] text-muted-foreground truncate uppercase tracking-tight font-bold">
+                {format(new Date(expense.date), 'MMM dd')}
+              </span>
+              <span className="text-[8px] text-muted-foreground/30">•</span>
+              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+                {expense.categoryName || expense.category || "General"}
+              </Badge>
+            </div>
           </div>
         </div>
+        <div className="text-sm font-bold text-foreground shrink-0 whitespace-nowrap ml-4">
+          {currency.symbol}{formatAmount(expense.amount)}
+        </div>
       </div>
-      <div className="text-sm font-bold text-foreground shrink-0 whitespace-nowrap ml-4">
-        {currency.symbol}{formatAmount(expense.amount)}
-      </div>
-    </div>
-  );
+    );
+  };
 
   const months = Array.from({ length: 12 }, (_, i) => i);
   const years = Array.from({ length: 16 }, (_, i) => 2020 + i);

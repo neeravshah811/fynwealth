@@ -173,8 +173,8 @@ export default function ExpensesPage() {
         category: categoryObj?.name || editingExpense.category || "Unknown",
         subcategoryName: subcategoryObj?.name || "Others",
         subCategory: subcategoryObj?.name || "Others",
-        description: editingExpense.description || editingExpense.note || "Updated Expense",
-        note: editingExpense.description || editingExpense.note || "Updated Expense",
+        description: editingExpense.description || editingExpense.note || "",
+        note: editingExpense.description || editingExpense.note || "",
         updatedAt: serverTimestamp()
       });
       setEditingExpense(null);
@@ -284,8 +284,8 @@ export default function ExpensesPage() {
             addDoc(collection(db, 'users', user.uid, 'expenses'), {
               userId: user.uid,
               date: date || format(new Date(), 'yyyy-MM-dd'),
-              note: desc || "Imported Expense",
-              description: desc || "Imported Expense",
+              note: desc || "",
+              description: desc || "",
               categoryName: cat || "Miscellaneous",
               category: cat || "Miscellaneous",
               subcategoryName: sub || "Others",
@@ -439,59 +439,67 @@ export default function ExpensesPage() {
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-24"><Loader2 className="w-10 h-10 animate-spin mx-auto text-primary/30" /></TableCell>
                       </TableRow>
-                    ) : filteredExpenses.map((expense) => (
-                      <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-b border-muted/30 group">
-                        <TableCell className="pl-6 py-5">
-                          <button 
-                            onClick={() => handleToggleStatus(expense.id, expense.status)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-all active:scale-95 ${
-                              expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
-                            }`}
-                          >
-                            {(expense.status || 'paid').toUpperCase()}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-xs font-bold text-muted-foreground">{format(new Date(expense.date), 'MMM dd')}</TableCell>
-                        <TableCell className="py-5">
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-sm truncate max-w-[200px] text-foreground mb-1">{expense.description || expense.note || "No description"}</span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
-                                {expense.categoryName || expense.category || "General"}
-                              </Badge>
-                              {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
-                                <span className="text-[8px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-0.5 rounded-full tracking-tighter">/ {expense.subcategoryName || expense.subCategory}</span>
-                              )}
+                    ) : filteredExpenses.map((expense) => {
+                      const displayDescription = expense.description || expense.note || (
+                        expense.subcategoryName && expense.subcategoryName !== 'Others' 
+                          ? `${expense.categoryName} - ${expense.subcategoryName}` 
+                          : expense.categoryName
+                      );
+
+                      return (
+                        <TableRow key={expense.id} className="hover:bg-primary/5 transition-colors border-b border-muted/30 group">
+                          <TableCell className="pl-6 py-5">
+                            <button 
+                              onClick={() => handleToggleStatus(expense.id, expense.status)}
+                              className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-all active:scale-95 ${
+                                expense.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                              }`}
+                            >
+                              {(expense.status || 'paid').toUpperCase()}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-xs font-bold text-muted-foreground">{format(new Date(expense.date), 'MMM dd')}</TableCell>
+                          <TableCell className="py-5">
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-sm truncate max-w-[200px] text-foreground mb-1">{displayDescription}</span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="secondary" className="bg-primary/5 text-primary text-[8px] px-2 py-0.5 h-auto border-none font-bold uppercase inline-flex items-center text-center">
+                                  {expense.categoryName || expense.category || "General"}
+                                </Badge>
+                                {(expense.subcategoryName || expense.subCategory) && (expense.subcategoryName || expense.subCategory) !== 'Others' && (
+                                  <span className="text-[8px] text-muted-foreground uppercase font-bold bg-muted/30 px-2 py-0.5 rounded-full tracking-tighter">/ {expense.subcategoryName || expense.subCategory}</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-sm text-foreground">
-                          {currency.symbol}{formatAmount(expense.amount)}
-                        </TableCell>
-                        <TableCell className="text-right pr-6">
-                          <div className="flex justify-end gap-2 transition-all">
-                            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense({ ...expense, amount: expense.amount.toString() })}>
-                              <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-destructive/10 group transition-all"><Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="rounded-[20px] p-8 border-none shadow-2xl">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-xl font-bold font-headline">Delete Record?</AlertDialogTitle>
-                                  <AlertDialogDescription className="text-sm mt-2">This will permanently remove this expense from your vault. This action cannot be reversed.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="mt-8 gap-3">
-                                  <AlertDialogCancel className="rounded-xl h-12 font-bold px-6">Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive rounded-xl h-12 font-bold px-6 shadow-lg shadow-destructive/20 transition-all active:scale-95">Confirm Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-sm text-foreground">
+                            {currency.symbol}{formatAmount(expense.amount)}
+                          </TableCell>
+                          <TableCell className="text-right pr-6">
+                            <div className="flex justify-end gap-2 transition-all">
+                              <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense({ ...expense, amount: expense.amount.toString() })}>
+                                <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-destructive/10 group transition-all"><Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-[20px] p-8 border-none shadow-2xl">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="text-xl font-bold font-headline">Delete Record?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-sm mt-2">This will permanently remove this expense from your vault. This action cannot be reversed.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter className="mt-8 gap-3">
+                                    <AlertDialogCancel className="rounded-xl h-12 font-bold px-6">Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(expense.id)} className="bg-destructive rounded-xl h-12 font-bold px-6 shadow-lg shadow-destructive/20 transition-all active:scale-95">Confirm Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {filteredExpenses.length === 0 && !isLoading && (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-32 text-muted-foreground font-medium italic text-sm">
@@ -584,7 +592,6 @@ export default function ExpensesPage() {
                       className="h-12 pl-11 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-medium" 
                       value={editingExpense.description || editingExpense.note || ""} 
                       onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} 
-                      required 
                     />
                   </div>
                 </div>

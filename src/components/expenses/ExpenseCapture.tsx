@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -204,7 +203,7 @@ export function ExpenseCapture() {
       const categoryObj = categories.find(c => c.id === selectedCategory);
       const subcategoryObj = selectedSubcategory ? subcategories.find(s => s.id === selectedSubcategory) : null;
 
-      const finalNote = note.trim() || "No description provided";
+      const finalNote = note.trim();
       
       // Smart Status Logic:
       // Future dates are marked 'unpaid', Today/Past dates are marked 'paid'

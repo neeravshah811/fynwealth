@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirestore } from '@/firebase';
@@ -176,24 +175,32 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expenses.map((exp) => (
-                      <TableRow key={exp.id} className="hover:bg-muted/10 border-b border-black/5">
-                        <TableCell className="pl-6 text-xs font-medium">
-                          {safeFormatDate(exp.date)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="bg-primary/5 text-primary border-none text-[9px] font-bold uppercase py-0 px-1.5 h-5">
-                            {exp.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
-                          {exp.description || exp.note || '-'}
-                        </TableCell>
-                        <TableCell className="text-right pr-6 font-bold text-sm">
-                          ${exp.amount?.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {expenses.map((exp) => {
+                      const displayDescription = exp.description || exp.note || (
+                        exp.subcategoryName && exp.subcategoryName !== 'Others' 
+                          ? `${exp.categoryName} - ${exp.subcategoryName}` 
+                          : exp.categoryName
+                      );
+
+                      return (
+                        <TableRow key={exp.id} className="hover:bg-muted/10 border-b border-black/5">
+                          <TableCell className="pl-6 text-xs font-medium">
+                            {safeFormatDate(exp.date)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="bg-primary/5 text-primary border-none text-[9px] font-bold uppercase py-0 px-1.5 h-5">
+                              {exp.categoryName || exp.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
+                            {displayDescription}
+                          </TableCell>
+                          <TableCell className="text-right pr-6 font-bold text-sm">
+                            ${exp.amount?.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {expenses.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic text-sm">
