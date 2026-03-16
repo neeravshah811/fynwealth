@@ -1,15 +1,30 @@
+
 "use client";
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc, getDocs } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Edit2, Trash2, Loader2, Filter, Download, Upload } from "lucide-react";
-import { useState, useMemo, useRef } from "react";
+import { 
+  Search, 
+  Edit2, 
+  Trash2, 
+  Loader2, 
+  Filter, 
+  Download, 
+  Upload, 
+  Calendar as CalendarIcon, 
+  Tag, 
+  Repeat, 
+  Paperclip, 
+  FileText, 
+  X 
+} from "lucide-react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { ExpenseCapture } from "@/components/expenses/ExpenseCapture";
 import {
   Dialog,
@@ -31,19 +46,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ExpensesPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
   const { user } = useUser();
   const db = useFirestore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Edit form taxonomy state
+  const [editSubcategories, setEditSubcategories] = useState<any[]>([]);
+  const [isEditSubLoading, setIsEditSubLoading] = useState(false);
 
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
@@ -73,10 +96,17 @@ export default function ExpensesPage() {
   const { data: budgetsData } = useCollection(budgetsQuery);
 
   const categoriesList = useMemo(() => {
-    const systemCats = Object.keys(SYSTEM_CATEGORIES);
-    const cloudCats = (categoriesData || []).map(c => c.name);
-    return Array.from(new Set([...systemCats, ...cloudCats])).sort();
-  }, [categoriesData]);
+    if (!categoriesData) return [];
+    const catMap = new Map();
+    categoriesData.forEach(cat => {
+      const normalized = cat.name?.trim().toLowerCase();
+      if (!normalized) return;
+      if (!catMap.has(normalized) || cat.userId === user?.uid) {
+        catMap.set(normalized, cat);
+      }
+    });
+    return Array.from(catMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [categoriesData, user?.uid]);
 
   const filteredExpenses = useMemo(() => {
     if (!expenses) return [];
@@ -94,6 +124,33 @@ export default function ExpensesPage() {
       });
   }, [expenses, searchTerm, statusFilter, categoryFilter]);
 
+  const loadEditSubcategories = async (categoryId: string) => {
+    if (!db || !categoryId) {
+      setEditSubcategories([]);
+      return;
+    }
+    setIsEditSubLoading(true);
+    try {
+      const q = query(
+        collection(db, "subcategories"),
+        where("categoryId", "==", categoryId)
+      );
+      const snapshot = await getDocs(q);
+      const fetchedSubs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEditSubcategories(fetchedSubs.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")));
+    } catch (err) {
+      console.error("Failed to load edit subcategories", err);
+    } finally {
+      setIsEditSubLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (editingExpense?.categoryId) {
+      loadEditSubcategories(editingExpense.categoryId);
+    }
+  }, [editingExpense?.categoryId]);
+
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!db || !user?.uid) return;
     const docRef = doc(db, 'users', user.uid, 'expenses', id);
@@ -102,15 +159,45 @@ export default function ExpensesPage() {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingExpense && db && user?.uid) {
+    if (!editingExpense || !db || !user?.uid) return;
+
+    setIsSaving(true);
+    try {
+      const categoryObj = categoriesList.find(c => c.id === editingExpense.categoryId);
+      const subcategoryObj = editSubcategories.find(s => s.id === editingExpense.subcategoryId);
+
       const docRef = doc(db, 'users', user.uid, 'expenses', editingExpense.id);
-      updateDoc(docRef, {
+      await updateDoc(docRef, {
         ...editingExpense,
-        amount: Math.abs(parseFloat(editingExpense.amount))
+        amount: Math.abs(parseFloat(editingExpense.amount)),
+        categoryName: categoryObj?.name || editingExpense.categoryName || "Unknown",
+        category: categoryObj?.name || editingExpense.category || "Unknown",
+        subcategoryName: subcategoryObj?.name || editingExpense.subcategoryName || "Unknown",
+        subCategory: subcategoryObj?.name || editingExpense.subCategory || "Unknown",
+        description: editingExpense.description || editingExpense.note || "Updated Expense",
+        note: editingExpense.description || editingExpense.note || "Updated Expense",
+        updatedAt: serverTimestamp()
       });
       setEditingExpense(null);
-      toast({ title: "Updated", description: "Record synchronized." });
+      toast({ title: "Updated", description: "Record synchronized with cloud." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Update Failed", description: "Could not save changes." });
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditingExpense({
+        ...editingExpense,
+        billImageData: reader.result as string
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id: string) => {
@@ -328,7 +415,7 @@ export default function ExpensesPage() {
                       <SelectContent className="max-h-[300px] rounded-xl">
                         <SelectItem value="all">All Categories</SelectItem>
                         {categoriesList.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -384,7 +471,7 @@ export default function ExpensesPage() {
                         </TableCell>
                         <TableCell className="text-right pr-6">
                           <div className="flex justify-end gap-2 transition-all">
-                            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense(expense)}>
+                            <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl hover:bg-primary/10 transition-all" onClick={() => setEditingExpense({ ...expense, amount: expense.amount.toString() })}>
                               <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
                             </Button>
                             <AlertDialog>
@@ -423,19 +510,185 @@ export default function ExpensesPage() {
 
       {editingExpense && (
         <Dialog open={!!editingExpense} onOpenChange={(open) => !open && setEditingExpense(null)}>
-          <DialogContent className="sm:max-w-[480px] rounded-[20px] p-8 border-none shadow-2xl gap-0">
-            <DialogHeader className="pb-6 border-b border-muted/50 mb-8"><DialogTitle className="font-headline text-2xl font-bold text-primary">Edit Transaction</DialogTitle></DialogHeader>
-            <form onSubmit={handleSaveEdit} className="space-y-8">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Amount ({currency.symbol})</Label>
-                <input type="number" className="flex h-14 w-full rounded-xl bg-muted/30 border-none shadow-inner px-4 py-2 text-2xl font-bold transition-all focus:ring-2 focus:ring-primary" value={editingExpense.amount} onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} required />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Description</Label>
-                <Input className="h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-medium" value={editingExpense.description || editingExpense.note || ""} onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} required />
-              </div>
-              <Button type="submit" className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95 text-base mt-4">Save Changes</Button>
-            </form>
+          <DialogContent className="sm:max-w-[550px] rounded-[24px] p-0 overflow-hidden border-none shadow-2xl gap-0">
+            <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
+              <DialogTitle className="font-headline text-2xl font-bold text-primary">Edit Transaction</DialogTitle>
+            </DialogHeader>
+            
+            <ScrollArea className="max-h-[70vh]">
+              <form onSubmit={handleSaveEdit} className="p-8 space-y-8">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Amount ({currency.symbol})</Label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="flex h-12 w-full rounded-xl bg-muted/30 border-none shadow-inner px-4 text-xl font-bold transition-all focus:ring-2 focus:ring-primary" 
+                      value={editingExpense.amount} 
+                      onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Date</Label>
+                    <Input 
+                      type="date" 
+                      className="h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-bold" 
+                      value={editingExpense.date} 
+                      onChange={(e) => setEditingExpense({...editingExpense, date: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Category</Label>
+                    <Select 
+                      value={editingExpense.categoryId || ""} 
+                      onValueChange={(v) => setEditingExpense({...editingExpense, categoryId: v, subcategoryId: ""})}
+                    >
+                      <SelectTrigger className="h-12 rounded-xl font-bold shadow-inner bg-muted/30 border-none px-4">
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl z-[150] max-h-[250px]">
+                        {categoriesList.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Subcategory</Label>
+                    <Select 
+                      value={editingExpense.subcategoryId || ""} 
+                      onValueChange={(v) => setEditingExpense({...editingExpense, subcategoryId: v})}
+                      disabled={!editingExpense.categoryId || isEditSubLoading}
+                    >
+                      <SelectTrigger className="h-12 rounded-xl font-medium shadow-inner bg-muted/30 border-none px-4">
+                        <SelectValue placeholder={isEditSubLoading ? "Loading..." : "Select Subcategory"} />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl z-[150] max-h-[200px]">
+                        {editSubcategories.map(sub => (
+                          <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Description</Label>
+                  <div className="relative">
+                    <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-50" />
+                    <Input 
+                      className="h-12 pl-11 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-medium" 
+                      value={editingExpense.description || editingExpense.note || ""} 
+                      onChange={(e) => setEditingExpense({...editingExpense, description: e.target.value, note: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-5 bg-muted/20 rounded-[20px] border border-muted/50">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                        <Repeat className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-bold block">Recurring expense</Label>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Auto-record monthly</p>
+                      </div>
+                    </div>
+                    <Switch 
+                      checked={editingExpense.isRecurring || false} 
+                      onCheckedChange={(val) => setEditingExpense({...editingExpense, isRecurring: val})} 
+                      className="scale-110"
+                    />
+                  </div>
+
+                  {editingExpense.isRecurring && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Frequency</Label>
+                      <Select 
+                        value={editingExpense.frequency || "Monthly"} 
+                        onValueChange={(v) => setEditingExpense({...editingExpense, frequency: v})}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl font-medium shadow-inner bg-muted/30 border-none px-4">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl z-[150]">
+                          {['Weekly', 'Monthly', 'Quarterly', 'Annually'].map(f => (
+                            <SelectItem key={f} value={f}>{f}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Attachment</Label>
+                  {!editingExpense.billImageData ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full h-12 rounded-xl border-dashed border-primary/30 text-primary hover:bg-primary/5 font-bold"
+                      onClick={() => editFileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-4 h-4 mr-2" />
+                      Attach Bill / PDF
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10 shadow-sm">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-10 h-10 rounded-lg bg-white shadow-inner flex items-center justify-center overflow-hidden">
+                          {editingExpense.billImageData.startsWith('data:application/pdf') ? (
+                            <FileText className="w-6 h-6 text-primary" />
+                          ) : (
+                            <img src={editingExpense.billImageData} alt="Preview" className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        <span className="text-xs font-bold truncate pr-4 text-primary uppercase tracking-widest">Document Attached</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingExpense({...editingExpense, billImageData: null})} 
+                        className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-full transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={editFileInputRef} 
+                    className="hidden" 
+                    accept="image/*,application/pdf"
+                    onChange={handleEditFileChange}
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4 pb-2">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    className="flex-1 h-14 rounded-xl font-bold" 
+                    onClick={() => setEditingExpense(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving} 
+                    className="flex-[2] h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95 text-base"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}
