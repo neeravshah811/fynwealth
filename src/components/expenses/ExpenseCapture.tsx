@@ -205,6 +205,11 @@ export function ExpenseCapture() {
       const subcategoryObj = selectedSubcategory ? subcategories.find(s => s.id === selectedSubcategory) : null;
 
       const finalNote = note.trim() || "No description provided";
+      
+      // Smart Status Logic:
+      // Future dates are marked 'unpaid', Today/Past dates are marked 'paid'
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const status = date > today ? 'unpaid' : 'paid';
 
       const payload: any = {
         userId: user.uid,
@@ -219,7 +224,7 @@ export function ExpenseCapture() {
         description: finalNote,
         date: date,
         billImageData: attachmentData,
-        status: 'paid',
+        status: status,
         createdAt: serverTimestamp()
       };
 
@@ -251,7 +256,10 @@ export function ExpenseCapture() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Expense Saved", description: "Synchronized with your cloud vault." });
+      toast({ 
+        title: status === 'paid' ? "Expense Saved" : "Future Payment Logged", 
+        description: status === 'paid' ? "Synchronized with your cloud vault." : "Marked as unpaid until the due date." 
+      });
       resetForm();
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed", description: "Check your internet connection." });
@@ -349,7 +357,7 @@ export function ExpenseCapture() {
   };
 
   return (
-    <Card className="shadow-lg border-none bg-card ring-1 ring-primary/5">
+    <Card className="shadow-lg border-none bg-card ring-1 ring-black/5">
       <CardHeader className="bg-primary/5 rounded-t-[20px]">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-headline text-primary font-bold">Record Spend</CardTitle>
@@ -451,7 +459,6 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              {/* Warranty and recurring sections remained unchanged */}
               {isWarrantyCategory && (
                 <div className="p-5 bg-primary/5 rounded-[20px] border border-primary/10 space-y-4 animate-in fade-in slide-in-from-top-4">
                   <div className="flex items-center gap-3 mb-2">
@@ -591,7 +598,6 @@ export function ExpenseCapture() {
             </form>
           </TabsContent>
 
-          {/* Voice and Scan tabs remained unchanged */}
           <TabsContent value="voice">
             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-muted rounded-[20px] bg-muted/10">
               <div className={`p-8 rounded-full mb-6 transition-all duration-500 ${isRecording ? 'bg-destructive/20 animate-pulse scale-110 shadow-xl' : 'bg-primary/10'}`}>
