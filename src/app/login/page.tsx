@@ -385,7 +385,7 @@ export default function LoginPage() {
                 <button 
                   type="button"
                   className="text-xs font-bold text-primary hover:underline transition-all"
-                  onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                  onClick={(): void => setMode(mode === 'signin' ? 'signup' : 'signin')}
                 >
                   {mode === 'signin' ? "Don't have an account? Create one" : "Already have an account? Sign in"}
                 </button>
