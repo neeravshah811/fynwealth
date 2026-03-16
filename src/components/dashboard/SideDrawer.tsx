@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -296,7 +295,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-base md:text-lg">Clear {monthName} Data?</AlertDialogTitle>
                     <AlertDialogDescription className="text-sm">
-                      This removes all expenses recorded for this specific month from your cloud vault.
+                      This removes all expenses recorded for this specific month from your cloud vault. <strong>We recommend exporting your data from the Expenses tab before deleting it.</strong>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -322,7 +321,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-base md:text-lg">Permanent Reset?</AlertDialogTitle>
                     <AlertDialogDescription className="text-sm">
-                      This will clear ALL expenses, budgets, reminders, and documents for ALL months from the whole app. This cannot be undone.
+                      This will clear ALL expenses, budgets, reminders, and documents for ALL months from the whole app. This cannot be undone. <strong>Please ensure you have exported your data from the Expenses tab if you need a backup before proceeding.</strong>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
