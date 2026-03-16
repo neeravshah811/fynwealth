@@ -50,30 +50,23 @@ export async function voiceExpenseCapture(
   return voiceExpenseCaptureFlow(input);
 }
 
-// Prompt to transcribe audio into text using the default configured multimodal model.
-const transcribeAudioPrompt = ai.definePrompt({
-  name: 'transcribeAudioPrompt',
-  input: {schema: VoiceExpenseCaptureInputSchema},
-  output: {schema: z.string().describe('The transcribed text from the audio.')},
-  prompt: `Transcribe the following audio into text: {{media url=audioDataUri}}`,
-});
-
-// Prompt to extract structured expense details from transcribed text.
-const extractExpenseDetailsPrompt = ai.definePrompt({
-  name: 'extractExpenseDetailsPrompt',
+// Single combined prompt to extract structured details directly from audio
+const extractFromAudioPrompt = ai.definePrompt({
+  name: 'extractFromAudioPrompt',
   input: {
     schema: z.object({
-      transcribedText: z.string().describe('The transcribed text containing expense details.'),
+      audioDataUri: z.string(),
+      today: z.string(),
     }),
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
-  prompt: `Given the following transcribed expense details, extract the amount, category, description, and date.
+  prompt: `You are an AI financial assistant called FynWealth. Listen to the provided audio and extract the following details: amount, category, description, and date.
       
-Categories should be one of: 'Food', 'Transport', 'Utilities', 'Rent', 'Subscriptions', 'Shopping', 'Entertainment', 'Healthcare', 'Education', 'Other'. If the category is unclear, default to 'Other'.
-The date should be in YYYY-MM-DD format. If no date is mentioned, infer from context or use today's date.
-The amount should be a numerical value. If no amount is clear, infer from context or return 0.
+Categories MUST be one of: 'Food', 'Transport', 'Utilities', 'Rent', 'Subscriptions', 'Shopping', 'Entertainment', 'Healthcare', 'Education', 'Other'. If the category is unclear, default to 'Other'.
+The date should be in YYYY-MM-DD format. If no date is mentioned, use today's date: {{today}}.
+The amount should be a numerical value. If no amount is clear, return 0.
 
-Transcribed text: {{{transcribedText}}}`,
+Audio: {{media url=audioDataUri}}`,
 });
 
 const voiceExpenseCaptureFlow = ai.defineFlow(
@@ -83,30 +76,26 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
     outputSchema: VoiceExpenseCaptureOutputSchema,
   },
   async input => {
-    // Step 1: Transcribe the audio into text.
-    const transcriptionResult = await transcribeAudioPrompt(input);
-    const transcribedText = transcriptionResult.output!;
+    // Get current date for context
+    const today = new Date().toISOString().split('T')[0];
 
-    // Step 2: Extract structured expense details from the transcribed text.
-    const extractionResult = await extractExpenseDetailsPrompt({
-      transcribedText,
+    // Perform direct extraction from audio
+    const result = await extractFromAudioPrompt({
+      audioDataUri: input.audioDataUri,
+      today,
     });
 
-    let {amount, category, description, date} = extractionResult.output!;
+    let {amount, category, description, date} = result.output!;
 
     // Post-processing and validation for extracted fields
-
-    // Validate and set default for date
     if (!date || isNaN(new Date(date) as any)) {
-      date = new Date().toISOString().split('T')[0]; // Set to today's date in YYYY-MM-DD
+      date = today;
     }
 
-    // Validate and set default for amount
     if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0; // Default to 0 if not a valid number
+      amount = 0;
     }
 
-    // Validate and set default for category
     const validCategories: VoiceExpenseCaptureOutput['category'][] = [
       'Food',
       'Transport',
@@ -120,7 +109,7 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
       'Other',
     ];
     if (!validCategories.includes(category)) {
-      category = 'Other'; // Default to 'Other' if not a valid category
+      category = 'Other';
     }
 
     return {
