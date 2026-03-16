@@ -50,12 +50,11 @@ export async function voiceExpenseCapture(
   return voiceExpenseCaptureFlow(input);
 }
 
-// Prompt to transcribe audio into text using a multimodal model.
+// Prompt to transcribe audio into text using the default configured multimodal model.
 const transcribeAudioPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: VoiceExpenseCaptureInputSchema},
   output: {schema: z.string().describe('The transcribed text from the audio.')},
-  model: 'googleai/gemini-1.5-flash', // Using a multimodal model for audio input
   prompt: `Transcribe the following audio into text: {{media url=audioDataUri}}`,
 });
 
