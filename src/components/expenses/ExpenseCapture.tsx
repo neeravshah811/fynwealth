@@ -47,6 +47,7 @@ export function ExpenseCapture() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [activeTab, setActiveTab] = useState("manual");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,8 +206,6 @@ export function ExpenseCapture() {
 
       const finalNote = note.trim();
       
-      // Smart Status Logic:
-      // Future dates are marked 'unpaid', Today/Past dates are marked 'paid'
       const today = format(new Date(), 'yyyy-MM-dd');
       const status = date > today ? 'unpaid' : 'paid';
 
@@ -318,10 +317,22 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result) {
-          toast({ title: "AI Transcribed", description: "Review extracted data and save." });
           setAmount(result.amount.toString());
           setNote(result.description);
           if (result.date) setDate(result.date);
+          
+          if (result.category) {
+            const matchedCat = categories.find(c => 
+              c.name.toLowerCase().includes(result.category.toLowerCase()) ||
+              result.category.toLowerCase().includes(c.name.toLowerCase())
+            );
+            if (matchedCat) {
+              handleCategoryChange(matchedCat.id);
+            }
+          }
+
+          setActiveTab("manual");
+          toast({ title: "AI Transcribed", description: "Review extracted data and save." });
         }
       };
       reader.readAsDataURL(audioBlob);
@@ -335,21 +346,46 @@ export function ExpenseCapture() {
   const processImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
+    
+    // Set attachment early for preview
+    const previewReader = new FileReader();
+    previewReader.onloadend = () => {
+      setAttachmentData(previewReader.result as string);
+      setAttachmentName(file.name);
+    };
+    previewReader.readAsDataURL(file);
+
     setLoading(true);
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         const result = await scanBillExpenseCapture({ billImage: base64String });
-        if (result.totalAmount) {
-          setAmount(Math.abs(result.totalAmount).toString());
-          setNote(result.merchantName || "");
-          toast({ title: "Bill Scanned", description: "Merchant and amount extracted." });
+        if (result) {
+          if (result.totalAmount) setAmount(Math.abs(result.totalAmount).toString());
+          if (result.merchantName) setNote(result.merchantName);
+          if (result.transactionDate) setDate(result.transactionDate);
+          
+          if (result.categorySuggestion) {
+            const matchedCat = categories.find(c => 
+              c.name.toLowerCase().includes(result.categorySuggestion!.toLowerCase()) ||
+              result.categorySuggestion!.toLowerCase().includes(c.name.toLowerCase())
+            );
+            if (matchedCat) {
+              handleCategoryChange(matchedCat.id);
+            }
+          }
+          
+          setActiveTab("manual");
+          toast({ 
+            title: "Receipt Analyzed", 
+            description: "Merchant, amount, date and category extracted. Please review." 
+          });
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast({ variant: "destructive", title: "Scan Error", description: "Failed to process bill image." });
+      toast({ variant: "destructive", title: "Scan Error", description: "AI failed to process receipt." });
     } finally {
       setLoading(false);
     }
@@ -364,7 +400,7 @@ export function ExpenseCapture() {
         </div>
       </CardHeader>
       <CardContent className="p-5 pt-6">
-        <Tabs defaultValue="manual" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="manual" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Manual</TabsTrigger>
             <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Voice</TabsTrigger>
@@ -627,12 +663,22 @@ export function ExpenseCapture() {
               <div className="p-8 rounded-full bg-primary/10 mb-6">
                 <Camera className="w-14 h-14 text-primary opacity-60" />
               </div>
-              <p className="text-xs text-muted-foreground mb-8 max-w-xs px-8 leading-relaxed">AI will extract Merchant and Amount from the receipt instantly.</p>
-              <input type="file" className="hidden" id="scan-upload" accept="image/*" onChange={processImage} />
+              <h3 className="font-bold text-base mb-2">Scan Receipt</h3>
+              <p className="text-xs text-muted-foreground mb-8 max-w-xs px-8 leading-relaxed">
+                AI will extract Merchant, Amount, Date and Category from your receipt instantly.
+              </p>
+              <input 
+                type="file" 
+                className="hidden" 
+                id="scan-upload" 
+                accept="image/*" 
+                capture="environment"
+                onChange={processImage} 
+              />
               <Button asChild className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all active:scale-95" disabled={loading}>
                 <label htmlFor="scan-upload" className="cursor-pointer">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
-                  Upload Receipt
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Scan Now
                 </label>
               </Button>
             </div>
