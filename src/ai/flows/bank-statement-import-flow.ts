@@ -50,7 +50,7 @@ const prompt = ai.definePrompt({
   prompt: `You are an expert financial auditor. Your task is to extract transactions from the provided bank statement.
 
 Analyze the provided data and extract every transaction.
-1. Date: Ensure it is in YYYY-MM-DD format. If the year is missing, assume it is 2024.
+1. Date: Ensure it is in YYYY-MM-DD format. If the year is missing, assume it is 2024 or 2025 based on context.
 2. Description: The merchant name or transaction details.
 3. Amount: The absolute numerical value.
 4. Type: Mark as 'debit' for payments/expenses and 'credit' for income/refunds.
@@ -60,6 +60,7 @@ CRITICAL INSTRUCTIONS:
 - Focus primarily on capturing DEBITS (expenses).
 - Only include CREDITS if they appear to be REFUNDS for a previous expense. Ignore salary, transfers-in, or general income.
 - If the format is a CSV or table, parse the columns carefully to identify Date, Description, and Amount.
+- If multiple pages are present, process all of them.
 
 Statement Data:
 {{#if fileDataUri}}{{media url=fileDataUri}}{{/if}}

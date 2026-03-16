@@ -54,25 +54,41 @@ export function BankStatementImport() {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
 
+    // Validate file type
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isCsv = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv') || file.type === 'text/plain';
+    
+    if (!isPdf && !isCsv) {
+      toast({ 
+        variant: "destructive", 
+        title: "Unsupported Format", 
+        description: "Please upload a PDF or CSV statement. Excel files should be exported to CSV first." 
+      });
+      return;
+    }
+
     setLoading(true);
     const reader = new FileReader();
     
-    // Check if it's a text-based file (CSV) or a binary file (PDF/Image)
-    const isTextFile = file.type === 'text/csv' || file.name.endsWith('.csv') || file.type === 'text/plain';
-
     reader.onloadend = async () => {
       try {
         const content = reader.result as string;
+        
+        // Ensure content is not empty
+        if (!content || content.length < 50) {
+          throw new Error("The selected file appears to be empty or invalid.");
+        }
+
         const result = await processBankStatement({
-          fileDataUri: isTextFile ? undefined : content,
-          rawText: isTextFile ? content : undefined,
+          fileDataUri: isCsv ? undefined : content,
+          rawText: isCsv ? content : undefined,
           categories: Object.keys(SYSTEM_CATEGORIES)
         });
 
-        if (result && result.transactions) {
+        if (result && result.transactions && result.transactions.length > 0) {
           handleResult(result);
         } else {
-          throw new Error("No transactions detected in this file.");
+          throw new Error("No transactions were detected in this statement. Please ensure it contains expense records.");
         }
       } catch (err: any) {
         console.error("Statement Parse Error:", err);
@@ -87,7 +103,7 @@ export function BankStatementImport() {
       }
     };
 
-    if (isTextFile) {
+    if (isCsv) {
       reader.readAsText(file);
     } else {
       reader.readAsDataURL(file);
