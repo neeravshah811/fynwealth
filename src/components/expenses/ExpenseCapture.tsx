@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -347,7 +348,6 @@ export function ExpenseCapture() {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
     
-    // Set attachment early for preview
     const previewReader = new FileReader();
     previewReader.onloadend = () => {
       setAttachmentData(previewReader.result as string);
@@ -401,7 +401,7 @@ export function ExpenseCapture() {
       </CardHeader>
       <CardContent className="p-5 pt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
+          <TabsList id="tour-expense-capture" className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="manual" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Manual</TabsTrigger>
             <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Voice</TabsTrigger>
             <TabsTrigger value="scan" className="text-[10px] md:text-xs font-bold uppercase rounded-lg">Scan</TabsTrigger>
@@ -415,7 +415,6 @@ export function ExpenseCapture() {
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
                     <input 
-                      id="tour-expense-amount"
                       type="number" 
                       placeholder="0.00" 
                       value={amount} 
@@ -450,7 +449,7 @@ export function ExpenseCapture() {
                     </button>
                   </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                    <SelectTrigger id="tour-expense-category" className="h-12 rounded-xl font-bold shadow-sm px-4">
+                    <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4">
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px] rounded-xl">
@@ -626,7 +625,7 @@ export function ExpenseCapture() {
                 </div>
               </div>
 
-              <Button id="tour-expense-save" type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg transition-all active:scale-95 mt-4">
+              <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg transition-all active:scale-95 mt-4">
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
                 Add Expense
               </Button>

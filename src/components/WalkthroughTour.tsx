@@ -48,7 +48,7 @@ const TOUR_STEPS: Step[] = [
   {
     title: "Capture Everything",
     description: "Add expenses manually, scan physical bills with your camera, or just use your voice to record transactions instantly.",
-    targetId: "tour-expense-amount",
+    targetId: "tour-expense-capture",
     path: "/expenses",
     icon: Receipt,
     color: "text-accent"
@@ -84,7 +84,6 @@ export function WalkthroughTour() {
   useEffect(() => {
     setMounted(true);
     if (!tutorialCompleted) {
-      // Small initial delay to allow initial app render
       const timer = setTimeout(() => setIsVisible(true), 1500);
       return () => clearTimeout(timer);
     }
@@ -97,10 +96,8 @@ export function WalkthroughTour() {
     
     const element = document.getElementById(currentStep.targetId);
     if (element) {
-      // Ensure element is visible before calculating
       element.scrollIntoView({ behavior: "smooth", block: "center" });
       
-      // Delay rect calculation slightly to allow smooth scroll to finish
       setTimeout(() => {
         const rect = element.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
@@ -115,7 +112,6 @@ export function WalkthroughTour() {
     }
   }, [isVisible, currentStep.targetId]);
 
-  // Logic to handle navigation and spotlight updates
   useEffect(() => {
     if (!isVisible || tutorialCompleted) return;
 
@@ -124,7 +120,6 @@ export function WalkthroughTour() {
       setSpotlightRect(null);
       router.push(currentStep.path);
     } else {
-      // Path matches, calculate spotlight
       const timer = setTimeout(calculateSpotlight, 500);
       return () => clearTimeout(timer);
     }
@@ -161,6 +156,8 @@ export function WalkthroughTour() {
   if (!mounted || !isVisible || tutorialCompleted) return null;
 
   const Icon = currentStep.icon;
+  const padding = 12;
+  const isTooLow = spotlightRect ? (spotlightRect.bottom + 320 > window.innerHeight) : false;
 
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
@@ -169,7 +166,7 @@ export function WalkthroughTour() {
         className="absolute inset-0 bg-black/60 pointer-events-auto transition-all duration-500"
         style={{
           clipPath: spotlightRect 
-            ? `polygon(0% 0%, 0% 100%, ${spotlightRect.left - 8}px 100%, ${spotlightRect.left - 8}px ${spotlightRect.top - 8}px, ${spotlightRect.right + 8}px ${spotlightRect.top - 8}px, ${spotlightRect.right + 8}px ${spotlightRect.bottom + 8}px, ${spotlightRect.left - 8}px ${spotlightRect.bottom + 8}px, ${spotlightRect.left - 8}px 100%, 100% 100%, 100% 0%)`
+            ? `polygon(0% 0%, 0% 100%, ${spotlightRect.left - padding}px 100%, ${spotlightRect.left - padding}px ${spotlightRect.top - padding}px, ${spotlightRect.right + padding}px ${spotlightRect.top - padding}px, ${spotlightRect.right + padding}px ${spotlightRect.bottom + padding}px, ${spotlightRect.left - padding}px ${spotlightRect.bottom + padding}px, ${spotlightRect.left - padding}px 100%, 100% 100%, 100% 0%)`
             : "none"
         }}
       />
@@ -183,15 +180,14 @@ export function WalkthroughTour() {
               ? `${Math.min(Math.max(16, spotlightRect.left + (spotlightRect.width / 2) - 160), window.innerWidth - 336)}px`
               : "50%",
             top: spotlightRect
-              ? (spotlightRect.bottom + 20 > window.innerHeight - 300 
-                  ? `${Math.max(16, spotlightRect.top - 280)}px` 
-                  : `${spotlightRect.bottom + 20}px`)
+              ? (isTooLow 
+                  ? `${Math.max(16, spotlightRect.top - 320)}px` 
+                  : `${spotlightRect.bottom + 30}px`)
               : "50%",
             transform: spotlightRect ? "none" : "translate(-50%, -50%)",
             width: "320px"
           }}
         >
-          {/* Welcome Screen Fallback (Only for step 0 if element not found yet) */}
           {tourStepIndex === 0 && !spotlightRect && !isNavigating ? (
             <div className="bg-card shadow-2xl rounded-[32px] p-10 text-center animate-in zoom-in duration-500 w-full max-w-sm">
               <div className="w-20 h-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
@@ -271,12 +267,11 @@ export function WalkthroughTour() {
             </div>
           )}
           
-          {/* Arrow point (Only if spotlight exists) */}
           {spotlightRect && (
             <div 
               className={cn(
                 "w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent transition-all",
-                spotlightRect.bottom + 20 > window.innerHeight - 300
+                isTooLow
                   ? "border-t-[10px] border-t-card -mt-0.5"
                   : "border-b-[10px] border-b-card order-first -mb-0.5"
               )}
