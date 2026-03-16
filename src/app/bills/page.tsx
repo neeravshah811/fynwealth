@@ -236,15 +236,10 @@ export default function BillsPage() {
       return;
     }
 
-    if (!selectedSubcategory || selectedSubcategory === 'empty' || selectedSubcategory === 'loading') {
-      toast({ variant: "destructive", title: "Subcategory Required", description: "Please pick a subcategory." });
-      return;
-    }
-
     setLoading(true);
     try {
       const categoryObj = categories.find(c => c.id === selectedCategory);
-      const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
+      const subcategoryObj = selectedSubcategory ? subcategories.find(s => s.id === selectedSubcategory) : null;
 
       await addDoc(collection(db, 'users', user.uid, 'bills'), {
         name: formData.name,
@@ -254,8 +249,8 @@ export default function BillsPage() {
         frequency: formData.frequency,
         categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown",
-        subcategoryId: selectedSubcategory,
-        subcategoryName: subcategoryObj?.name || "Unknown",
+        subcategoryId: selectedSubcategory || "",
+        subcategoryName: subcategoryObj?.name || "Others",
         attachmentData: formData.attachmentData,
         note: formData.note,
         userId: user.uid,
@@ -399,7 +394,7 @@ export default function BillsPage() {
                     onValueChange={setSelectedSubcategory}
                     disabled={!selectedCategory || isSubLoading}
                   >
-                    <SelectTrigger className="h-12 rounded-xl shadow-sm px-4"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} /></SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-xl shadow-sm px-4"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory (Optional)"} /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[250px] rounded-xl">
                       {isSubLoading ? (
                         <SelectItem value="loading" disabled>
@@ -466,39 +461,6 @@ export default function BillsPage() {
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-[20px] border-none shadow-2xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-xl md:text-2xl font-headline font-bold text-primary">New Category</DialogTitle>
-            <DialogDescription className="text-sm font-medium mt-2">
-              Add a personalized label to your records.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Name</label>
-              <Input 
-                placeholder="e.g. Side Hustle" 
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-12 rounded-xl text-sm font-bold shadow-sm px-4"
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95" 
-              onClick={handleAddCustomCategory}
-              disabled={isCreatingCategory || !newCategoryName.trim()}
-            >
-              {isCreatingCategory ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
-              Create Category
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="space-y-8">

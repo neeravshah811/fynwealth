@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
@@ -172,8 +171,8 @@ export default function ExpensesPage() {
         amount: Math.abs(parseFloat(editingExpense.amount)),
         categoryName: categoryObj?.name || editingExpense.categoryName || "Unknown",
         category: categoryObj?.name || editingExpense.category || "Unknown",
-        subcategoryName: subcategoryObj?.name || editingExpense.subcategoryName || "Unknown",
-        subCategory: subcategoryObj?.name || editingExpense.subCategory || "Unknown",
+        subcategoryName: subcategoryObj?.name || "Others",
+        subCategory: subcategoryObj?.name || "Others",
         description: editingExpense.description || editingExpense.note || "Updated Expense",
         note: editingExpense.description || editingExpense.note || "Updated Expense",
         updatedAt: serverTimestamp()
@@ -566,7 +565,7 @@ export default function ExpensesPage() {
                       disabled={!editingExpense.categoryId || isEditSubLoading}
                     >
                       <SelectTrigger className="h-12 rounded-xl font-medium shadow-inner bg-muted/30 border-none px-4">
-                        <SelectValue placeholder={isEditSubLoading ? "Loading..." : "Select Subcategory"} />
+                        <SelectValue placeholder={isEditSubLoading ? "Loading..." : "Select Subcategory (Optional)"} />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl z-[150] max-h-[200px]">
                         {editSubcategories.map(sub => (

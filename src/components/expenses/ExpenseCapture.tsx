@@ -193,11 +193,6 @@ export function ExpenseCapture() {
       return;
     }
 
-    if (!selectedSubcategory || selectedSubcategory === 'empty' || selectedSubcategory === 'loading') {
-      toast({ variant: "destructive", title: "Subcategory Required", description: "Please pick a subcategory." });
-      return;
-    }
-
     if (!amount || isNaN(parseFloat(amount))) {
       toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid numeric amount." });
       return;
@@ -206,7 +201,7 @@ export function ExpenseCapture() {
     setLoading(true);
     try {
       const categoryObj = categories.find(c => c.id === selectedCategory);
-      const subcategoryObj = subcategories.find(s => s.id === selectedSubcategory);
+      const subcategoryObj = selectedSubcategory ? subcategories.find(s => s.id === selectedSubcategory) : null;
 
       const finalNote = note.trim() || "No description provided";
 
@@ -216,9 +211,9 @@ export function ExpenseCapture() {
         categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown",
         category: categoryObj?.name || "Unknown",
-        subcategoryId: selectedSubcategory,
-        subcategoryName: subcategoryObj?.name || "Unknown",
-        subCategory: subcategoryObj?.name || "Unknown",
+        subcategoryId: selectedSubcategory || "",
+        subcategoryName: subcategoryObj?.name || "Others",
+        subCategory: subcategoryObj?.name || "Others",
         note: finalNote,
         description: finalNote,
         date: date,
@@ -241,8 +236,8 @@ export function ExpenseCapture() {
           frequency: 'One-time',
           categoryId: selectedCategory,
           categoryName: 'Warranties',
-          subcategoryId: selectedSubcategory,
-          subcategoryName: subcategoryObj?.name || "Unknown",
+          subcategoryId: selectedSubcategory || "",
+          subcategoryName: subcategoryObj?.name || "Others",
           userId: user.uid,
           status: 'pending',
           notified: false,
@@ -435,7 +430,7 @@ export function ExpenseCapture() {
                     disabled={!selectedCategory || isSubLoading}
                   >
                     <SelectTrigger className="h-12 rounded-xl font-medium shadow-sm px-4">
-                      <SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory"} />
+                      <SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory (Optional)"} />
                     </SelectTrigger>
                     <SelectContent className="z-[100] max-h-[250px] rounded-xl">
                       {isSubLoading ? (
