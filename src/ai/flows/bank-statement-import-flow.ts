@@ -77,6 +77,7 @@ const processBankStatementFlow = ai.defineFlow(
     outputSchema: BankStatementOutputSchema,
   },
   async (input) => {
+    // Explicitly using the default model via the ai instance
     const { output } = await prompt(input);
     return output!;
   }
