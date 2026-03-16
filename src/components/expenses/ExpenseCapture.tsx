@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -37,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { scanBillExpenseCapture } from "@/ai/flows/scan-bill-expense-capture";
 import { voiceExpenseCapture } from "@/ai/flows/voice-expense-capture-flow";
+import { BankStatementImport } from "./BankStatementImport";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -393,11 +393,12 @@ export function ExpenseCapture() {
 
   return (
     <Card className="shadow-lg border-none bg-card ring-1 ring-black/5">
-      <CardHeader className="bg-primary/5 rounded-t-[20px]">
-        <div className="flex items-center justify-between">
+      <CardHeader className="bg-primary/5 rounded-t-[20px] flex flex-row items-center justify-between space-y-0 pb-4">
+        <div className="flex items-center gap-3">
           <CardTitle className="text-xl font-headline text-primary font-bold">Record Spend</CardTitle>
-          {success && <CheckCircle2 className="text-emerald-500 w-8 h-8 animate-in zoom-in" />}
+          {success && <CheckCircle2 className="text-emerald-500 w-6 h-6 animate-in zoom-in" />}
         </div>
+        <BankStatementImport />
       </CardHeader>
       <CardContent className="p-5 pt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

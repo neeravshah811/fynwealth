@@ -5,3 +5,4 @@ import '@/ai/flows/unnecessary-expense-identification.ts';
 import '@/ai/flows/scan-bill-expense-capture.ts';
 import '@/ai/flows/heavy-spending-month-prediction.ts';
 import '@/ai/flows/voice-expense-capture-flow.ts';
+import '@/ai/flows/bank-statement-import-flow.ts';
