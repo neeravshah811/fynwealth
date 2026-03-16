@@ -114,7 +114,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      <div className="text-sm font-bold text-destructive shrink-0 whitespace-nowrap ml-4">
+      <div className="text-sm font-bold text-foreground shrink-0 whitespace-nowrap ml-4">
         {currency.symbol}{formatAmount(expense.amount)}
       </div>
     </div>
