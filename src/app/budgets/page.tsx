@@ -329,10 +329,19 @@ export default function BudgetsPage() {
                     </CardTitle>
                     {isOver && <Badge variant="destructive" className="py-0 h-5 text-[9px] uppercase font-bold shadow-sm shadow-destructive/20">Over</Badge>}
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-sm font-bold text-foreground">{currency.symbol}{formatAmount(spent)}</span>
-                    <span className="text-muted-foreground mx-2 text-[10px] opacity-50">/</span>
-                    <span className="text-xs font-bold text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={handleOpenDialog}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                      title="Edit Limit"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-foreground">{currency.symbol}{formatAmount(spent)}</span>
+                      <span className="text-muted-foreground mx-2 text-[10px] opacity-50">/</span>
+                      <span className="text-xs font-bold text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
+                    </div>
                   </div>
                 </div>
                 <Progress value={percent} className={`h-2.5 rounded-full ${isOver ? 'bg-destructive/20' : 'bg-muted/50'}`} />
