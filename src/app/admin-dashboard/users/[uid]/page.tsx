@@ -22,6 +22,7 @@ import { format, isValid } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { SUPPORTED_CURRENCIES } from '@/lib/constants';
 
 export default function UserDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const resolvedParams = use(params);
@@ -65,6 +66,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
     }
     fetchData();
   }, [db, uid]);
+
+  const currencySymbol = useMemo(() => {
+    if (!user) return '$';
+    const code = user.preferredCurrency || 'USD';
+    return SUPPORTED_CURRENCIES.find(c => c.code === code)?.symbol || '$';
+  }, [user]);
 
   const totalSpent = useMemo(() => {
     return expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
@@ -144,6 +151,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                 </div>
                 <span className="font-bold">{safeFormatDate(user.lastActive, 'MMM dd, HH:mm')}</span>
               </div>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Preferred Currency</span>
+                </div>
+                <Badge variant="outline" className="font-bold uppercase text-[10px]">{user.preferredCurrency || 'USD'}</Badge>
+              </div>
             </CardContent>
           </Card>
 
@@ -172,7 +186,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">Total Volume</span>
                 </div>
-                <p className="text-base font-bold text-emerald-700">${totalSpent.toLocaleString()}</p>
+                <p className="text-base font-bold text-emerald-700">{currencySymbol}{totalSpent.toLocaleString()}</p>
               </div>
             </CardContent>
           </Card>
@@ -222,7 +236,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                             {displayDescription}
                           </TableCell>
                           <TableCell className="text-right pr-6 font-bold text-sm">
-                            ${exp.amount?.toLocaleString()}
+                            {currencySymbol}{exp.amount?.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       );

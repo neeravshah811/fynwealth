@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
 import { useAuth, useUser, useFirestore } from "@/firebase";
 import { signOut } from "firebase/auth";
-import { collection, addDoc, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, writeBatch, doc, updateDoc } from "firebase/firestore";
 import {
   Sheet,
   SheetContent,
@@ -106,6 +106,17 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       toast({ title: "Signed Out", description: "Successfully logged out." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to sign out." });
+    }
+  };
+
+  const handleCurrencyChange = async (v: string) => {
+    setCurrency(v);
+    if (db && user?.uid) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { preferredCurrency: v });
+      } catch (err) {
+        console.error("Failed to sync currency preference", err);
+      }
     }
   };
 
@@ -281,7 +292,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate">Display Settings</p>
                     </div>
                   </div>
-                  <Select value={currency.code} onValueChange={(v) => setCurrency(v)}>
+                  <Select value={currency.code} onValueChange={handleCurrencyChange}>
                     <SelectTrigger className="w-24 h-9 text-xs md:text-sm rounded-lg border-none bg-background shadow-sm">
                       <SelectValue />
                     </SelectTrigger>

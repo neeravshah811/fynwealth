@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +26,7 @@ import { toast } from '@/hooks/use-toast';
 export default function LoginPage() {
   const auth = useAuth();
   const db = useFirestore();
-  const { updateProfile: updateStoreProfile, setTutorialCompleted, setTourStepIndex } = useFynWealthStore();
+  const { updateProfile: updateStoreProfile, setTutorialCompleted, setTourStepIndex, currency } = useFynWealthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -51,7 +50,8 @@ export default function LoginPage() {
         email: user.email,
         name: user.displayName || name || 'Anonymous User',
         lastActive: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        preferredCurrency: currency.code || 'USD'
       };
 
       if (isNew) {
