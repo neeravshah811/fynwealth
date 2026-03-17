@@ -1,10 +1,10 @@
-
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useFynWealthStore } from '@/lib/store';
 import { SplashScreen } from '@/components/SplashScreen';
 import { TutorialTrigger } from '@/components/TutorialTrigger';
 import { NotificationManager } from '@/components/NotificationManager';
@@ -15,18 +15,50 @@ import { BottomNav } from "@/components/dashboard/BottomNav";
  * AppShell manages the visibility of the Dashboard UI elements.
  * It hides navigation, notifications, and tutorials when the user
  * is on the login page or is on administrative routes.
+ * It also handles synchronization of user preferences between local store and Firestore.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
   const db = useFirestore();
+  const { currency, setCurrency } = useFynWealthStore();
+  const hasSyncedPreferences = useRef(false);
 
   const isLoginPage = pathname === '/login';
   const isAdminRoute = pathname.startsWith('/admin-dashboard');
   
-  // Navigation elements should only show if we have a user and aren't on the gate (login page)
-  // We also skip consumer navigation for admin-specific routes
   const showDashboardShell = user && !isLoginPage && !isAdminRoute;
+
+  // Preference Synchronization Logic
+  useEffect(() => {
+    if (!user?.uid || !db || hasSyncedPreferences.current) return;
+
+    const syncUserPreferences = async () => {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          
+          // 1. If cloud has a currency and it differs from local, cloud wins
+          if (data.preferredCurrency && data.preferredCurrency !== currency.code) {
+            setCurrency(data.preferredCurrency);
+          } 
+          // 2. If cloud is missing currency but local has one, push local to cloud
+          else if (!data.preferredCurrency && currency.code) {
+            await updateDoc(userRef, { preferredCurrency: currency.code });
+          }
+          
+          hasSyncedPreferences.current = true;
+        }
+      } catch (err) {
+        console.error("Preference sync failed", err);
+      }
+    };
+
+    syncUserPreferences();
+  }, [user?.uid, db, currency.code, setCurrency]);
 
   // Background activity tracking
   useEffect(() => {
@@ -46,11 +78,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [user?.uid, db]);
 
-  // For Admin routes or Login page, we render a simpler shell without consumer nav
   if (!showDashboardShell) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        {/* Background logic still runs if authenticated */}
         {user && <SplashScreen />}
         <main className="flex-1 w-full">
           {children}
@@ -61,12 +91,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Background App Logic & Initial Entry Animations */}
       <SplashScreen />
       <TutorialTrigger />
       <NotificationManager />
       
-      {/* Structural Navigation */}
       <SideDrawer />
       
       <main className="flex-1 pb-24 overflow-y-auto">
