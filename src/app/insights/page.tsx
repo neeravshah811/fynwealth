@@ -84,10 +84,11 @@ export default function InsightsPage() {
       }
     } catch (err: any) {
       console.error("Failed to load insights", err);
-      if (err.message?.includes("429") || err.message?.includes("Quota")) {
-        setError("High demand on AI services. Please try again in a few moments.");
+      const errorMessage = err.message || "";
+      if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.includes("limit")) {
+        setError("High demand on AI services. Please wait about 30 seconds and try refreshing.");
       } else {
-        setError("Issue analyzing your data. Please check your connection.");
+        setError("Issue analyzing your data. Please check your connection and try again.");
       }
     } finally {
       setLoading(false);
@@ -95,8 +96,9 @@ export default function InsightsPage() {
     }
   }, [expenses, setInsights]);
 
+  // Handle automatic loading, but prevent loops if an error is present
   useEffect(() => {
-    if (mounted && expenses.length > 0 && !expensesLoading) {
+    if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const sixHours = 6 * 60 * 60 * 1000;
       const needsUpdate = !insights.predictions || !insights.unnecessary || (Date.now() - lastGen > sixHours);
@@ -105,7 +107,7 @@ export default function InsightsPage() {
         loadInsights();
       }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated, error, loading]);
 
   if (!mounted) {
     return (
@@ -192,15 +194,18 @@ export default function InsightsPage() {
             )}
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => loadInsights(true)} 
-          className="h-11 px-8 font-bold shadow-sm rounded-xl border-primary/20 text-primary hover:bg-primary/5 transition-all"
-          disabled={loading}
-        >
-          {loading ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-3" />}
-          {loading ? "Analyzing..." : "Refresh Now"}
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => loadInsights(true)} 
+            className="h-11 px-8 font-bold shadow-sm rounded-xl border-primary/20 text-primary hover:bg-primary/5 transition-all"
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-3" />}
+            {loading ? "Analyzing..." : "Refresh Now"}
+          </Button>
+          {error && <p className="text-[10px] text-rose-500 font-bold max-w-[200px] text-right">{error}</p>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
