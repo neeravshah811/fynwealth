@@ -92,10 +92,17 @@ export function BankStatementImport() {
         }
       } catch (err: any) {
         console.error("Statement Parse Error:", err);
+        let message = err.message || "The AI could not read this statement format. Try a different export type.";
+        
+        // Specific handling for rate limiting/quota errors
+        if (err.message?.includes("429") || err.message?.toLowerCase().includes("quota")) {
+          message = "AI service is busy (Rate limit exceeded). Please wait 20-30 seconds and try uploading again.";
+        }
+
         toast({ 
           variant: "destructive", 
           title: "Import Failed", 
-          description: err.message || "The AI could not read this statement format. Try a different export type." 
+          description: message 
         });
       } finally {
         setLoading(false);
@@ -258,7 +265,7 @@ export function BankStatementImport() {
                   disabled={loading || transactions.length === 0}
                   className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                   Confirm Import
                 </Button>
               </DialogFooter>
