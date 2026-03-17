@@ -12,14 +12,15 @@ import {
   LogOut, 
   Search,
   Bell,
-  Menu
+  Menu,
+  HelpCircle,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
-import { SideDrawer } from '@/components/dashboard/SideDrawer';
 import {
   Sheet,
   SheetContent,
@@ -28,6 +29,7 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,7 +39,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { setTutorialCompleted } = useFynWealthStore();
 
   const handleLogout = async () => {
-    // Reset walkthrough state for next login
     setTutorialCompleted(false);
     await signOut(auth);
     router.push('/login');
@@ -83,7 +84,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           
           <AdminNav />
 
-          <div className="p-4 border-t bg-muted/10">
+          <div className="p-4 border-t bg-muted/10 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <ThemeToggle />
+              <span className="text-[9px] font-bold text-muted-foreground uppercase">System Theme</span>
+            </div>
             <Button 
               variant="ghost" 
               className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-xs uppercase tracking-widest"
@@ -100,7 +105,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Header */}
           <header className="h-16 border-b bg-white dark:bg-card px-4 md:px-8 flex items-center justify-between z-10 shadow-sm">
             <div className="flex items-center flex-1 max-w-xl gap-2">
-              {/* Mobile Sidebar Trigger */}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="md:hidden">
@@ -130,21 +134,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
 
-            <div className="flex items-center gap-2 md:gap-6">
-              {/* Three dots settings drawer (like normal users) */}
-              <SideDrawer standalone />
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="hidden sm:flex items-center gap-1 mr-2">
+                <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground">
+                  <HelpCircle className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground">
+                  <CalendarIcon className="w-5 h-5" />
+                </Button>
+              </div>
 
               <button className="relative p-2 text-muted-foreground hover:text-primary transition-colors hidden sm:block">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full border-2 border-white"></span>
               </button>
               
-              <div className="flex items-center gap-3 pl-2 md:pl-6 border-l">
+              <div className="flex items-center gap-3 pl-2 md:pl-4 border-l">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold truncate max-w-[120px]">{user?.email}</p>
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Super Admin</p>
                 </div>
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shadow-inner uppercase">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shadow-inner uppercase border border-primary/20">
                   {user?.email?.[0]}
                 </div>
               </div>
