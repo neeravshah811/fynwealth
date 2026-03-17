@@ -57,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const auth = useAuth();
   const { setTutorialCompleted } = useFynWealthStore();
   const [adminDate, setAdminDate] = useState<Date | undefined>(new Date());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Notification Fetching (Feature Requests)
   const notificationsQuery = useMemoFirebase(() => {
@@ -119,13 +120,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Settings', href: '/admin-dashboard/settings', icon: Settings },
   ];
 
-  const AdminNav = () => (
+  const AdminNav = ({ onLinkClick }: { onItemClick?: () => void }) => (
     <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-4 mt-2">Main Menu</p>
       {navItems.map((item) => (
         <Link
           key={item.href}
           href={item.href}
+          onClick={onItemClick}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all group",
             pathname === item.href 
@@ -176,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Header */}
           <header className="h-16 border-b bg-white dark:bg-card px-4 md:px-8 flex items-center justify-between z-10 shadow-sm">
             <div className="flex items-center flex-1 max-w-xl gap-2">
-              <Sheet>
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="md:hidden">
                     <Menu className="w-5 h-5" />
@@ -191,7 +193,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Logo className="scale-90 origin-left" />
                     <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">Admin</span>
                   </div>
-                  <AdminNav />
+                  <AdminNav onItemClick={() => setIsMobileMenuOpen(false)} />
                   <AdminFooter />
                 </SheetContent>
               </Sheet>

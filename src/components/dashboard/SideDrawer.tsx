@@ -99,7 +99,6 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
 
   const handleLogout = async () => {
     try {
-      // Reset walkthrough state for next login
       setTutorialCompleted(false);
       await signOut(auth);
       setIsOpen(false);
@@ -111,6 +110,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
 
   const handleCurrencyChange = async (v: string) => {
     setCurrency(v);
+    setIsOpen(false); // Auto-close drawer on selection
     if (db && user?.uid) {
       try {
         await updateDoc(doc(db, 'users', user.uid), { preferredCurrency: v });
@@ -275,7 +275,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                   <Switch 
                     id="privacy-toggle-drawer"
                     checked={privacyMode}
-                    onCheckedChange={togglePrivacyMode}
+                    onCheckedChange={(val) => {
+                      togglePrivacyMode();
+                      setIsOpen(false); // Auto-close drawer
+                    }}
                     className="scale-90"
                   />
                 </div>
@@ -368,7 +371,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Legal & Support</p>
               
               <button 
-                onClick={() => setLegalDialog("terms")}
+                onClick={() => {
+                  setLegalDialog("terms");
+                  setIsOpen(false); // Auto-close drawer
+                }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
                 <div className="flex items-center gap-3">
@@ -379,7 +385,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               </button>
 
               <button 
-                onClick={() => setLegalDialog("privacy")}
+                onClick={() => {
+                  setLegalDialog("privacy");
+                  setIsOpen(false); // Auto-close drawer
+                }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
                 <div className="flex items-center gap-3">
@@ -390,7 +399,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               </button>
 
               <button 
-                onClick={() => setLegalDialog("faq")}
+                onClick={() => {
+                  setLegalDialog("faq");
+                  setIsOpen(false); // Auto-close drawer
+                }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
                 <div className="flex items-center gap-3">
@@ -401,7 +413,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               </button>
 
               <button 
-                onClick={() => setLegalDialog("feature")}
+                onClick={() => {
+                  setLegalDialog("feature");
+                  setIsOpen(false); // Auto-close drawer
+                }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
                 <div className="flex items-center gap-3">
@@ -527,7 +542,10 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
           variant="ghost" 
           size="icon" 
           className="h-10 w-10 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
-          onClick={() => setShowTutorialGlobal(true)}
+          onClick={() => {
+            setShowTutorialGlobal(true);
+            setIsOpen(false); // Auto-close drawer
+          }}
           title="Show Tutorial"
         >
           <HelpCircle className="w-5 h-5" />
