@@ -95,7 +95,8 @@ service cloud.firestore {
      */
     match /featureRequests/{requestId} {
       allow create: if isSignedIn();
-      allow get, list: if isAdmin();
+      // Allow admins to manage (read, update, delete) feature requests
+      allow get, list, update, delete: if isAdmin();
     }
   }
 }

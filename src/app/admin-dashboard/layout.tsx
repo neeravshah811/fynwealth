@@ -45,6 +45,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -74,25 +76,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/login');
   };
 
-  const handleMarkRead = async (id: string) => {
-    try {
-      const docRef = doc(db, 'featureRequests', id);
-      await updateDoc(docRef, { status: 'read' });
-    } catch (err) {
-      console.error("Failed to mark notification as read", err);
-    }
+  const handleMarkRead = (id: string) => {
+    const docRef = doc(db, 'featureRequests', id);
+    updateDoc(docRef, { status: 'read' })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'update',
+          requestResourceData: { status: 'read' }
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = () => {
     if (!notifications) return;
     const pending = notifications.filter(n => n.status === 'pending');
-    try {
-      const promises = pending.map(n => updateDoc(doc(db, 'featureRequests', n.id), { status: 'read' }));
-      await Promise.all(promises);
-      toast({ title: "Inbox Cleared", description: "All notifications marked as read." });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to update notifications." });
-    }
+    
+    if (pending.length === 0) return;
+
+    pending.forEach((n) => {
+      const docRef = doc(db, 'featureRequests', n.id);
+      updateDoc(docRef, { status: 'read' })
+        .catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: { status: 'read' }
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
+        });
+    });
+
+    toast({ title: "Inbox Cleared", description: "All notifications marked as read." });
   };
 
   const navItems = [
