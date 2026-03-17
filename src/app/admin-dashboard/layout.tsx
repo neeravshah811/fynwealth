@@ -2,8 +2,9 @@
 'use client';
 
 import { AdminGuard } from '@/components/admin/AdminGuard';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { collection, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
 import { 
   LayoutDashboard, 
@@ -14,7 +15,10 @@ import {
   Search,
   Bell,
   Menu,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  MessageSquare,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -36,15 +40,32 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const db = useFirestore();
   const { user } = useUser();
   const auth = useAuth();
   const { setTutorialCompleted } = useFynWealthStore();
   const [adminDate, setAdminDate] = useState<Date | undefined>(new Date());
+
+  // Notification Fetching (Feature Requests)
+  const notificationsQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(
+      collection(db, 'featureRequests'),
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+  }, [db]);
+
+  const { data: notifications } = useCollection(notificationsQuery);
+  const unreadCount = notifications?.filter(n => n.status === 'pending').length || 0;
 
   const handleLogout = async () => {
     setTutorialCompleted(false);
@@ -143,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
-              <div className="hidden sm:flex items-center gap-1 mr-2">
+              <div className="flex items-center gap-1 mr-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary transition-colors">
@@ -159,12 +180,66 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     />
                   </PopoverContent>
                 </Popover>
-              </div>
 
-              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary transition-colors hidden sm:flex rounded-full">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-white"></span>
-              </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary transition-colors rounded-full">
+                      <Bell className="w-5 h-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-2 right-2 w-4 h-4 bg-destructive text-destructive-foreground text-[8px] font-bold rounded-full border-2 border-white flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
+                    <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-widest">Admin Notifications</h3>
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{unreadCount} New</Badge>
+                    </div>
+                    <ScrollArea className="max-h-[400px]">
+                      {notifications && notifications.length > 0 ? (
+                        <div className="divide-y divide-black/5">
+                          {notifications.map((n) => (
+                            <div key={n.id} className="p-4 hover:bg-muted/10 transition-colors">
+                              <div className="flex items-start gap-3">
+                                <div className={cn(
+                                  "p-2 rounded-lg shrink-0",
+                                  n.status === 'pending' ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
+                                )}>
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center gap-1.5 mb-1">
+                                    <Clock className="w-3 h-3" />
+                                    {formatDistanceToNow(new Date(n.timestamp))} ago
+                                  </p>
+                                  <p className="text-xs font-semibold text-foreground line-clamp-2 leading-relaxed">
+                                    {n.request}
+                                  </p>
+                                  <p className="text-[10px] text-primary font-bold mt-1.5 truncate">
+                                    From: {n.email}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-12 text-center text-muted-foreground">
+                          <CheckCircle2 className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                          <p className="text-xs font-medium italic">No new feature requests.</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                    <div className="p-3 bg-muted/10 border-t text-center">
+                      <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold tracking-widest w-full">
+                        View All Activity
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
               
               <div className="flex items-center gap-3 pl-2 md:pl-4 border-l">
                 <div className="text-right hidden sm:block">
