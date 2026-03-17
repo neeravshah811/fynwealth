@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Clock,
   CheckCircle2,
-  Mail
+  Mail,
+  SunMoon
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -139,6 +140,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </nav>
   );
 
+  const AdminFooter = () => (
+    <div className="p-4 border-t bg-muted/10 space-y-4">
+      <div className="flex items-center justify-between px-2">
+        <ThemeToggle />
+        <span className="text-[9px] font-bold text-muted-foreground uppercase">System Theme</span>
+      </div>
+      <Button 
+        variant="ghost" 
+        className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-xs uppercase tracking-widest"
+        onClick={handleLogout}
+      >
+        <LogOut className="w-4 h-4 mr-2" />
+        Sign Out
+      </Button>
+    </div>
+  );
+
   return (
     <AdminGuard>
       <div className="flex h-screen bg-[#F8F9FC] dark:bg-background overflow-hidden">
@@ -150,21 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           
           <AdminNav />
-
-          <div className="p-4 border-t bg-muted/10 space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <ThemeToggle />
-              <span className="text-[9px] font-bold text-muted-foreground uppercase">System Theme</span>
-            </div>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-xs uppercase tracking-widest"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+          <AdminFooter />
         </aside>
 
         {/* Main Content */}
@@ -178,7 +182,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-64">
+                <SheetContent side="left" className="p-0 w-64 flex flex-col">
                   <SheetHeader className="sr-only">
                     <SheetTitle>Admin Navigation Menu</SheetTitle>
                     <SheetDescription>Main navigation menu for administrative tasks.</SheetDescription>
@@ -188,6 +192,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-tighter">Admin</span>
                   </div>
                   <AdminNav />
+                  <AdminFooter />
                 </SheetContent>
               </Sheet>
 
@@ -203,6 +208,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="flex items-center gap-2 md:gap-4">
               <div className="flex items-center gap-1 mr-2">
+                <div className="hidden sm:flex mr-1">
+                  <ThemeToggle />
+                </div>
+                
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-primary transition-colors">
