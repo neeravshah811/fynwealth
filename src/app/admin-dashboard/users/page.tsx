@@ -2,7 +2,7 @@
 
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -14,7 +14,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { 
   Search, 
   Eye, 
@@ -98,6 +97,41 @@ export default function UserManagementPage() {
     );
   }, [users, searchTerm]);
 
+  const handleExportCSV = () => {
+    if (!filteredUsers || filteredUsers.length === 0) {
+      toast({ variant: "destructive", title: "Export Failed", description: "No user data available to export." });
+      return;
+    }
+
+    const headers = ["UID", "Name", "Email", "Signup Date", "Last Active", "Total Expenses", "Total Reminders"];
+    const rows = filteredUsers.map(u => [
+      u.id,
+      u.name || "N/A",
+      u.email,
+      u.createdAt ? format(new Date(u.createdAt.toDate ? u.createdAt.toDate() : u.createdAt), 'yyyy-MM-dd') : "Legacy",
+      u.lastActive ? format(new Date(u.lastActive.toDate ? u.lastActive.toDate() : u.lastActive), 'yyyy-MM-dd HH:mm') : "Never",
+      u.stats?.totalExpenses || 0,
+      u.stats?.totalReminders || 0
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `fynwealth-users-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Export Complete", description: "User list has been downloaded." });
+  };
+
   const safeFormatDate = (dateValue: any, formatStr: string = 'MMM dd, yyyy') => {
     if (!dateValue) return 'Legacy Account';
     
@@ -130,13 +164,19 @@ export default function UserManagementPage() {
           <p className="text-sm text-muted-foreground">Monitor live account growth and financial engagement.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="h-11 rounded-xl bg-white shadow-sm border-black/5 font-bold">
+          <Button 
+            variant="outline" 
+            className="h-11 rounded-xl bg-white shadow-sm border-black/5 font-bold"
+            onClick={handleExportCSV}
+          >
             <Filter className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
-          <Button className="h-11 rounded-xl shadow-lg shadow-primary/20 font-bold">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Invite Admin
+          <Button className="h-11 rounded-xl shadow-lg shadow-primary/20 font-bold" asChild>
+            <Link href="/admin-dashboard/settings">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Invite Admin
+            </Link>
           </Button>
         </div>
       </div>

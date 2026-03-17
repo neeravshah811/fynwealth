@@ -18,8 +18,7 @@ import {
   MessageSquare,
   Clock,
   CheckCircle2,
-  Mail,
-  SunMoon
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -144,10 +143,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const AdminFooter = () => (
     <div className="p-4 border-t bg-muted/10 space-y-4">
-      <div className="flex items-center justify-between px-2">
-        <ThemeToggle />
-        <span className="text-[9px] font-bold text-muted-foreground uppercase">System Theme</span>
-      </div>
       <Button 
         variant="ghost" 
         className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-xs uppercase tracking-widest"
@@ -210,7 +205,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="flex items-center gap-2 md:gap-4">
               <div className="flex items-center gap-1 mr-2">
-                <div className="hidden sm:flex mr-1">
+                <div className="flex mr-1">
                   <ThemeToggle />
                 </div>
                 
