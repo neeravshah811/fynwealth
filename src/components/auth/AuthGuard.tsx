@@ -1,11 +1,13 @@
 
 'use client';
 
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useAuth } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
+  const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isVerifyingRole, setIsVerifyingRole] = useState(true);
@@ -38,26 +41,40 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
 
       try {
-        // If email is missing (some anonymous logins), assume regular user
-        if (!user.email) {
-          setIsVerifyingRole(false);
-          if (pathname === '/login') router.push('/dashboard');
+        // 1. Check Blacklist (Ban logic)
+        const blacklistDoc = await getDoc(doc(db, 'blacklist', user.uid));
+        if (blacklistDoc.exists()) {
+          await signOut(auth);
+          router.push('/login');
+          toast({
+            variant: 'destructive',
+            title: 'Session Expired',
+            description: 'Your account is no longer authorized to access this platform.',
+          });
           return;
         }
 
-        const adminRef = collection(db, 'admins');
-        const q = query(adminRef, where('email', '==', user.email), limit(1));
-        const snapshot = await getDocs(q);
-        const adminExists = !snapshot.empty || user.email === 'admin@fynwealth.com';
-        
-        verifyAttempted.current = true;
+        // 2. Check Admin Status
+        if (user.email) {
+          const adminRef = collection(db, 'admins');
+          const q = query(adminRef, where('email', '==', user.email), limit(1));
+          const snapshot = await getDocs(q);
+          const adminExists = !snapshot.empty || user.email === 'admin@fynwealth.com';
+          
+          verifyAttempted.current = true;
 
-        if (pathname === '/login') {
-          if (adminExists) {
-            router.push('/admin-dashboard');
-          } else {
-            router.push('/dashboard');
+          if (pathname === '/login') {
+            if (adminExists) {
+              router.push('/admin-dashboard');
+            } else {
+              router.push('/dashboard');
+            }
           }
+        } else {
+          // If email is missing (some anonymous logins), assume regular user
+          setIsVerifyingRole(false);
+          if (pathname === '/login') router.push('/dashboard');
+          return;
         }
       } catch (error) {
         // Default to safe behavior on error
@@ -70,7 +87,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     verifyRole();
-  }, [user, isUserLoading, pathname, router, db]);
+  }, [user, isUserLoading, pathname, router, db, auth]);
 
   if (isUserLoading || isVerifyingRole) {
     return (

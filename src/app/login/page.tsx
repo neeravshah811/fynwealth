@@ -11,9 +11,10 @@ import {
   signInWithRedirect,
   getRedirectResult,
   updateProfile as updateFirebaseProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  signOut
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,13 @@ export default function LoginPage() {
 
   const syncUserToFirestore = async (user: any, isNew: boolean = false) => {
     try {
+      // 1. Check Blacklist before proceeding
+      const blacklistDoc = await getDoc(doc(db, 'blacklist', user.uid));
+      if (blacklistDoc.exists()) {
+        await signOut(auth);
+        throw new Error('BAN_ACTIVE');
+      }
+
       const userRef = doc(db, 'users', user.uid);
       const userData: any = {
         email: user.email,
@@ -56,7 +64,8 @@ export default function LoginPage() {
       }
 
       await setDoc(userRef, userData, { merge: true });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'BAN_ACTIVE') throw error;
       console.error("Failed to sync user profile", error);
     }
   };
@@ -73,24 +82,34 @@ export default function LoginPage() {
       .then(async (result) => {
         if (result?.user) {
           const user = result.user;
-          await syncUserToFirestore(user, false);
-          
-          if (user.displayName) {
-            const [firstName = '', ...rest] = user.displayName.split(' ');
-            updateStoreProfile({
-              firstName,
-              lastName: rest.join(' '),
-              email: user.email || ''
+          try {
+            await syncUserToFirestore(user, false);
+            
+            if (user.displayName) {
+              const [firstName = '', ...rest] = user.displayName.split(' ');
+              updateStoreProfile({
+                firstName,
+                lastName: rest.join(' '),
+                email: user.email || ''
+              });
+            }
+
+            setTourStepIndex(0);
+            setTutorialCompleted(false);
+
+            toast({
+              title: 'Welcome!',
+              description: 'Signed in with Google successfully.',
             });
+          } catch (err: any) {
+            if (err.message === 'BAN_ACTIVE') {
+              toast({
+                variant: 'destructive',
+                title: 'Account Disabled',
+                description: 'This account has been terminated by an administrator.',
+              });
+            }
           }
-
-          setTourStepIndex(0);
-          setTutorialCompleted(false);
-
-          toast({
-            title: 'Welcome!',
-            description: 'Signed in with Google successfully.',
-          });
         }
         setCheckingRedirect(false);
       })
@@ -154,6 +173,7 @@ export default function LoginPage() {
       let message = 'An authentication error occurred.';
       if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
       if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
+      if (error.message === 'BAN_ACTIVE') message = 'This account has been disabled by an administrator.';
       
       toast({
         variant: 'destructive',
@@ -196,21 +216,31 @@ export default function LoginPage() {
       signInWithPopup(auth, provider)
         .then(async (result) => {
           const user = result.user;
-          await syncUserToFirestore(user, false);
+          try {
+            await syncUserToFirestore(user, false);
 
-          if (user.displayName) {
-            const [firstName = '', ...rest] = user.displayName.split(' ');
-            updateStoreProfile({
-              firstName,
-              lastName: rest.join(' '),
-              email: user.email || ''
-            });
+            if (user.displayName) {
+              const [firstName = '', ...rest] = user.displayName.split(' ');
+              updateStoreProfile({
+                firstName,
+                lastName: rest.join(' '),
+                email: user.email || ''
+              });
+            }
+
+            setTourStepIndex(0);
+            setTutorialCompleted(false);
+
+            toast({ title: 'Welcome!', description: 'Signed in with Google.' });
+          } catch (err: any) {
+            if (err.message === 'BAN_ACTIVE') {
+              toast({
+                variant: 'destructive',
+                title: 'Account Disabled',
+                description: 'This account has been terminated by an administrator.',
+              });
+            }
           }
-
-          setTourStepIndex(0);
-          setTutorialCompleted(false);
-
-          toast({ title: 'Welcome!', description: 'Signed in with Google.' });
         })
         .catch(() => {
           toast({ variant: 'destructive', title: 'Google Login Failed', description: 'Could not complete Google sign in.' });

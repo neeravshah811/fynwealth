@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirestore } from '@/firebase';
-import { collection, query, getDocs, orderBy, limit, startAfter, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, startAfter, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useEffect, useState, useMemo } from 'react';
 import { 
   Table, 
@@ -100,17 +100,34 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
+      const userToDelete = users.find(u => u.id === userId);
       const userDocRef = doc(db, 'users', userId);
-      await deleteDoc(userDocRef);
+      const blacklistRef = doc(db, 'blacklist', userId);
+      
+      const batch = writeBatch(db);
+      
+      // Delete user profile
+      batch.delete(userDocRef);
+      
+      // Blacklist UID to prevent re-login
+      batch.set(blacklistRef, {
+        uid: userId,
+        email: userToDelete?.email || 'unknown',
+        deletedAt: serverTimestamp(),
+        reason: 'Administrative action'
+      });
+      
+      await batch.commit();
+      
       setUsers(users.filter(u => u.id !== userId));
-      toast({ title: "User Deleted", description: "User profile removed from records." });
+      toast({ title: "User Deleted & Banned", description: "User removed and barred from logging in again." });
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
         path: `users/${userId}`,
         operation: 'delete',
       } satisfies SecurityRuleContext);
       errorEmitter.emit('permission-error', permissionError);
-      toast({ variant: "destructive", title: "Error", description: "Could not delete user document." });
+      toast({ variant: "destructive", title: "Error", description: "Could not complete user deletion." });
     }
   };
 
@@ -264,7 +281,7 @@ export default function UserManagementPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete User Record?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will remove the user's document and stats from the database. This action is permanent.
+                              This will remove the user's document and stats from the database. <strong>The user will also be blacklisted and barred from logging in again.</strong> This action is permanent.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -273,7 +290,7 @@ export default function UserManagementPage() {
                               onClick={() => handleDeleteUser(user.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl h-11"
                             >
-                              Confirm Delete
+                              Confirm Delete & Ban
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

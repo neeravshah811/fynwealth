@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -97,6 +98,14 @@ service cloud.firestore {
       allow create: if isSignedIn();
       // Allow admins to manage (read, update, delete) feature requests
       allow get, list, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description List of blacklisted UIDs who are banned from logging in.
+     */
+    match /blacklist/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isAdmin();
     }
   }
 }
