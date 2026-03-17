@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -138,6 +138,11 @@ export function BankStatementImport() {
 
       await Promise.all(promises);
       
+      // Update global user stats
+      await updateDoc(doc(db, 'users', user.uid), {
+        'stats.totalExpenses': increment(transactions.length)
+      });
+
       toast({ title: "Import Successful", description: `${transactions.length} expenses synced to your vault.` });
       setIsOpen(false);
       setReviewMode(false);

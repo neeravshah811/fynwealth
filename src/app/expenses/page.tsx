@@ -2,7 +2,7 @@
 
 import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc, getDocs } from "firebase/firestore";
+import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc, getDocs, increment } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,6 +201,12 @@ export default function ExpensesPage() {
 
   const handleDelete = async (id: string) => {
     if (!db || !user?.uid) return;
+    
+    // Update user stats
+    updateDoc(doc(db, 'users', user.uid), {
+      'stats.totalExpenses': increment(-1)
+    }).catch(() => {});
+
     deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
     toast({ title: "Deleted", description: "Record removed." });
   };
@@ -317,6 +323,12 @@ export default function ExpensesPage() {
         } catch (err) {
           // skip
         }
+      }
+
+      if (successCount > 0) {
+        updateDoc(doc(db, 'users', user.uid), {
+          'stats.totalExpenses': increment(successCount)
+        }).catch(() => {});
       }
 
       toast({ 

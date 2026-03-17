@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useFirestore } from '@/firebase';
-import { collection, query, getDocs, orderBy, limit, startAfter, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useEffect, useState, useMemo } from 'react';
 import { 
   Table, 
@@ -20,7 +19,6 @@ import {
   Search, 
   Eye, 
   Trash2, 
-  ChevronRight, 
   Loader2, 
   UserPlus, 
   Filter,
@@ -45,62 +43,24 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/e
 
 export default function UserManagementPage() {
   const db = useFirestore();
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [lastDoc, setLastDoc] = useState<any>(null);
-  const [hasNext, setHasNext] = useState(true);
   const [filter, setFilter] = useState<'newest' | 'active'>('newest');
 
-  const fetchUsers = async (isNext = false) => {
-    setLoading(true);
-    try {
-      const usersRef = collection(db, 'users');
-      let q = query(
-        usersRef, 
-        orderBy(filter === 'newest' ? 'createdAt' : 'lastActive', 'desc'), 
-        limit(10)
-      );
+  // Real-time query for users
+  const usersQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(
+      collection(db, 'users'),
+      orderBy(filter === 'newest' ? 'createdAt' : 'lastActive', 'desc'),
+      limit(50)
+    );
+  }, [db, filter]);
 
-      if (isNext && lastDoc) {
-        q = query(
-          usersRef, 
-          orderBy(filter === 'newest' ? 'createdAt' : 'lastActive', 'desc'), 
-          startAfter(lastDoc), 
-          limit(10)
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      if (isNext) {
-        setUsers(prev => [...prev, ...fetchedUsers]);
-      } else {
-        setUsers(fetchedUsers);
-      }
-
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-      setHasNext(snapshot.docs.length === 10);
-    } catch (error: any) {
-      const permissionError = new FirestorePermissionError({
-        path: 'users',
-        operation: 'list',
-      } satisfies SecurityRuleContext);
-      errorEmitter.emit('permission-error', permissionError);
-      toast({ variant: "destructive", title: "Query Failed", description: "Could not retrieve user list." });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [filter]);
+  const { data: users, isLoading } = useCollection(usersQuery);
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const userToDelete = users.find(u => u.id === userId);
+      const userToDelete = users?.find(u => u.id === userId);
       const userDocRef = doc(db, 'users', userId);
       const blacklistRef = doc(db, 'blacklist', userId);
       
@@ -118,8 +78,6 @@ export default function UserManagementPage() {
       });
       
       await batch.commit();
-      
-      setUsers(users.filter(u => u.id !== userId));
       toast({ title: "User Deleted & Banned", description: "User removed and barred from logging in again." });
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
@@ -132,6 +90,7 @@ export default function UserManagementPage() {
   };
 
   const filteredUsers = useMemo(() => {
+    if (!users) return [];
     return users.filter(u => 
       u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -140,7 +99,7 @@ export default function UserManagementPage() {
   }, [users, searchTerm]);
 
   const safeFormatDate = (dateValue: any, formatStr: string = 'MMM dd, yyyy') => {
-    if (!dateValue) return 'N/A';
+    if (!dateValue) return 'Legacy Account';
     
     let date: Date;
     if (typeof dateValue.toDate === 'function') {
@@ -153,7 +112,7 @@ export default function UserManagementPage() {
   };
 
   const formatLastActive = (dateValue: any) => {
-    if (!dateValue) return 'N/A';
+    if (!dateValue) return 'Never';
     let date: Date;
     if (typeof dateValue.toDate === 'function') {
       date = dateValue.toDate();
@@ -168,7 +127,7 @@ export default function UserManagementPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-2xl font-bold font-headline tracking-tight">User Management</h1>
-          <p className="text-sm text-muted-foreground">Manage and monitor all application accounts.</p>
+          <p className="text-sm text-muted-foreground">Monitor live account growth and financial engagement.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="h-11 rounded-xl bg-white shadow-sm border-black/5 font-bold">
@@ -221,21 +180,27 @@ export default function UserManagementPage() {
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest pl-6">User Identity</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest">Last Active</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest">Signup Date</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold tracking-widest text-center">Stats</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold tracking-widest text-center">Live Stats</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest text-right pr-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id} className="hover:bg-muted/10 border-b border-black/5">
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-24">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary/30" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.map((user) => (
+                <TableRow key={user.id} className="hover:bg-muted/10 border-b border-black/5 group">
                   <TableCell className="pl-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold text-sm uppercase">
+                      <div className="w-10 h-10 rounded-full bg-primary/5 text-primary flex items-center justify-center font-bold text-sm uppercase border border-primary/10">
                         {user.name?.[0] || user.email?.[0]}
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-sm leading-none mb-1 truncate">{user.name || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
                   </TableCell>
@@ -265,30 +230,30 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm" asChild title="View Details">
+                      <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm hover:bg-primary/5 hover:border-primary/20 transition-all" asChild title="View Details">
                         <Link href={`/admin-dashboard/users/${user.id}`}>
-                          <Eye className="w-4 h-4 text-muted-foreground" />
+                          <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                         </Link>
                       </Button>
                       
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm hover:bg-destructive/5 hover:border-destructive/20 group">
+                          <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm hover:bg-destructive/5 hover:border-destructive/20 group transition-all">
                             <Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-2xl">
+                        <AlertDialogContent className="rounded-[24px] p-8 border-none shadow-2xl">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete User Record?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will remove the user's document and stats from the database. <strong>The user will also be blacklisted and barred from logging in again.</strong> This action is permanent.
+                            <AlertDialogTitle className="text-xl font-headline font-bold">Delete User Record?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm mt-2">
+                              This will remove the user's profile and data. <strong>The user will be blacklisted and permanently barred from re-registering or logging in.</strong>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel className="rounded-xl h-11">Cancel</AlertDialogCancel>
+                          <AlertDialogFooter className="mt-8">
+                            <AlertDialogCancel className="rounded-xl h-12 font-bold">Cancel</AlertDialogCancel>
                             <AlertDialogAction 
                               onClick={() => handleDeleteUser(user.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl h-11"
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl h-12 font-bold"
                             >
                               Confirm Delete & Ban
                             </AlertDialogAction>
@@ -299,7 +264,7 @@ export default function UserManagementPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredUsers.length === 0 && !loading && (
+              {!isLoading && filteredUsers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic text-sm">
                     No users found matching your criteria.
@@ -308,20 +273,6 @@ export default function UserManagementPage() {
               )}
             </TableBody>
           </Table>
-          
-          {hasNext && (
-            <div className="p-6 flex justify-center border-t border-black/5">
-              <Button 
-                variant="ghost" 
-                onClick={() => fetchUsers(true)} 
-                disabled={loading}
-                className="text-primary font-bold text-xs uppercase tracking-widest hover:bg-primary/5"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-                Load More Users
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
