@@ -1,8 +1,8 @@
 'use client';
 
 import { useFirestore, useUser } from '@/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { collection, query, getDocs, limit, orderBy } from 'firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -17,8 +17,7 @@ import {
   Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { subDays, isAfter, startOfDay, format } from 'date-fns';
 
 // Lazy load Recharts for better performance
 const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
@@ -32,54 +31,62 @@ const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.Cartesian
 export default function AdminDashboardPage() {
   const db = useFirestore();
   const { user } = useUser();
-  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
 
   useEffect(() => {
     if (!db || !user) return;
 
-    const appStatsDoc = doc(db, 'analytics', 'appStats');
-    
-    const unsub = onSnapshot(appStatsDoc, 
-      (snapshot) => {
-        if (snapshot.exists()) {
-          setStats(snapshot.data());
-        } else {
-          setStats({
-            totalUsers: 0,
-            totalExpenses: 0,
-            totalReminders: 0,
-            activeUsers24h: 0
-          });
-        }
-        setLoading(false);
-      },
-      async (error) => {
-        if (error.code === 'permission-denied') {
-          const permissionError = new FirestorePermissionError({
-            path: appStatsDoc.path,
-            operation: 'get',
-          } satisfies SecurityRuleContext);
-          
-          errorEmitter.emit('permission-error', permissionError);
-        }
+    async function fetchAllUsers() {
+      try {
+        const usersRef = collection(db, 'users');
+        const snapshot = await getDocs(usersRef);
+        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAllUsers(fetched);
+      } catch (error) {
+        console.error("Failed to fetch user aggregation", error);
+      } finally {
         setLoading(false);
       }
-    );
-    return () => unsub();
+    }
+
+    fetchAllUsers();
   }, [db, user]);
 
-  const mockChartData = [
-    { name: 'Mon', signups: 4, spend: 2400 },
-    { name: 'Tue', signups: 7, spend: 1398 },
-    { name: 'Wed', signups: 12, spend: 9800 },
-    { name: 'Thu', signups: 9, spend: 3908 },
-    { name: 'Fri', signups: 15, spend: 4800 },
-    { name: 'Sat', signups: 8, spend: 3800 },
-    { name: 'Sun', signups: 11, spend: 4300 },
-  ];
+  const stats = useMemo(() => {
+    const now = new Date();
+    const twentyFourHoursAgo = subDays(now, 1);
 
-  if (loading && !stats) {
+    return {
+      totalUsers: allUsers.length,
+      totalExpenses: allUsers.reduce((sum, u) => sum + (u.stats?.totalExpenses || 0), 0),
+      totalReminders: allUsers.reduce((sum, u) => sum + (u.stats?.totalReminders || 0), 0),
+      activeUsers24h: allUsers.filter(u => {
+        if (!u.lastActive) return false;
+        const date = typeof u.lastActive.toDate === 'function' ? u.lastActive.toDate() : new Date(u.lastActive);
+        return isAfter(date, twentyFourHoursAgo);
+      }).length
+    };
+  }, [allUsers]);
+
+  const onboardingData = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, i) => startOfDay(subDays(new Date(), i))).reverse();
+    
+    return days.map(day => {
+      const count = allUsers.filter(u => {
+        if (!u.createdAt) return false;
+        const created = typeof u.createdAt.toDate === 'function' ? u.createdAt.toDate() : new Date(u.createdAt);
+        return format(created, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
+      }).length;
+
+      return {
+        name: format(day, 'EEE'),
+        signups: count
+      };
+    });
+  }, [allUsers]);
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -119,27 +126,27 @@ export default function AdminDashboardPage() {
           <h1 className="text-2xl font-bold font-headline text-foreground tracking-tight">Dashboard Overview</h1>
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <Activity className="w-3 h-3 text-emerald-500" />
-            Live application health from Firestore.
+            Live application health aggregated from user records.
           </p>
         </div>
         <div className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-widest border border-emerald-100 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Connected to Cloud
+          Real-time Aggregation
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard 
           title="Total Users" 
-          value={stats?.totalUsers || 0} 
+          value={stats.totalUsers} 
           icon={Users} 
           color="bg-primary" 
           trend="up" 
-          trendValue="Live" 
+          trendValue="Growth" 
         />
         <MetricCard 
           title="Expense Entries" 
-          value={stats?.totalExpenses || 0} 
+          value={stats.totalExpenses} 
           icon={Receipt} 
           color="bg-emerald-500" 
           trend="up" 
@@ -147,7 +154,7 @@ export default function AdminDashboardPage() {
         />
         <MetricCard 
           title="Active Reminders" 
-          value={stats?.totalReminders || 0} 
+          value={stats.totalReminders} 
           icon={Bell} 
           color="bg-amber-500" 
           trend="up" 
@@ -155,11 +162,11 @@ export default function AdminDashboardPage() {
         />
         <MetricCard 
           title="Active (24h)" 
-          value={stats?.activeUsers24h || 0} 
+          value={stats.activeUsers24h} 
           icon={Activity} 
           color="bg-indigo-500" 
           trend="up" 
-          trendValue="Sessions" 
+          trendValue="Retention" 
         />
       </div>
 
@@ -171,12 +178,12 @@ export default function AdminDashboardPage() {
                 <TrendingUp className="w-4 h-4 text-primary" />
                 Live Onboarding Trend
               </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">Real-time daily registration metrics.</p>
+              <p className="text-xs text-muted-foreground mt-1">Real registration volume from the last 7 days.</p>
             </div>
           </CardHeader>
           <CardContent className="h-[300px] w-full px-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockChartData}>
+              <BarChart data={onboardingData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="name" 
@@ -238,7 +245,7 @@ export default function AdminDashboardPage() {
             
             <div className="pt-4">
               <p className="text-[10px] italic opacity-70 leading-relaxed">
-                Application data is currently syncing from Firebase production environment.
+                Application metrics are calculated on-the-fly from live Firestore production data.
               </p>
             </div>
           </CardContent>

@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy, getDocs, where } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy, getDocs, where, increment } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -235,6 +235,11 @@ export default function BillsPage() {
         createdAt: serverTimestamp()
       });
 
+      // Update user stats
+      await updateDoc(doc(db, 'users', user.uid), {
+        'stats.totalReminders': increment(1)
+      });
+
       resetForm();
       setShowForm(false);
       toast({ title: "Reminder Sync", description: "Saved to your cloud vault." });
@@ -254,6 +259,11 @@ export default function BillsPage() {
   const handleDelete = async (id: string) => {
     if (!db || !user?.uid) return;
     await deleteDoc(doc(db, 'users', user.uid, 'bills', id));
+    
+    // Update user stats (decrement)
+    await updateDoc(doc(db, 'users', user.uid), {
+      'stats.totalReminders': increment(-1)
+    });
   };
 
   const pendingReminders = (bills || []).filter(b => b.status === 'pending');

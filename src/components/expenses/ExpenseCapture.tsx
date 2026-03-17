@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, updateDoc, increment } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -249,9 +249,19 @@ export function ExpenseCapture() {
           createdAt: serverTimestamp(),
           note: `Warranty reminder for ${warrantyData.productName}. Contact: ${warrantyData.contact}`
         });
+        
+        // Update user reminders stat
+        await updateDoc(doc(db, 'users', user.uid), {
+          'stats.totalReminders': increment(1)
+        });
       }
 
       await addDoc(collection(db, 'users', user.uid, 'expenses'), payload);
+      
+      // Update global user stats
+      await updateDoc(doc(db, 'users', user.uid), {
+        'stats.totalExpenses': increment(1)
+      });
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
