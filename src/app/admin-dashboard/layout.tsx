@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Settings', href: '/admin-dashboard/settings', icon: Settings },
   ];
 
-  const AdminNav = ({ onLinkClick }: { onItemClick?: () => void }) => (
+  const AdminNav = ({ onItemClick }: { onItemClick?: () => void }) => (
     <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 mb-4 mt-2">Main Menu</p>
       {navItems.map((item) => (
