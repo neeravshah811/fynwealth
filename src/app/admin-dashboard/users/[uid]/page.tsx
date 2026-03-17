@@ -2,7 +2,7 @@
 
 import { useFirestore } from '@/firebase';
 import { doc, getDoc, collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,8 @@ import {
   Clock, 
   Receipt, 
   CreditCard,
-  Loader2
+  Loader2,
+  TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, isValid } from 'date-fns';
@@ -28,21 +29,30 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
   const db = useFirestore();
   const [user, setUser] = useState<any>(null);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [billsCount, setBillsCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // 1. Fetch User Profile
         const userDocRef = doc(db, 'users', uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           setUser({ id: userDoc.id, ...userDoc.data() });
         }
 
+        // 2. Fetch Expenses (Limit 100 for overview)
         const expensesRef = collection(db, 'users', uid, 'expenses');
-        const q = query(expensesRef, orderBy('date', 'desc'), limit(50));
+        const q = query(expensesRef, orderBy('date', 'desc'), limit(100));
         const expSnapshot = await getDocs(q);
         setExpenses(expSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 3. Fetch Bills/Reminders Count
+        const billsRef = collection(db, 'users', uid, 'bills');
+        const billsSnapshot = await getDocs(billsRef);
+        setBillsCount(billsSnapshot.size);
+
       } catch (error: any) {
         const permissionError = new FirestorePermissionError({
           path: `users/${uid}`,
@@ -55,6 +65,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
     }
     fetchData();
   }, [db, uid]);
+
+  const totalSpent = useMemo(() => {
+    return expenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  }, [expenses]);
 
   const safeFormatDate = (dateValue: any, formatStr: string = 'MMM dd, yyyy') => {
     if (!dateValue) return 'N/A';
@@ -137,16 +151,28 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Activity Snapshot</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 py-4">
-              <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 text-center">
-                <Receipt className="w-5 h-5 text-primary mx-auto mb-2" />
-                <p className="text-lg font-bold text-primary">{user.stats?.totalExpenses || 0}</p>
-                <p className="text-[9px] uppercase font-bold text-muted-foreground">Expenses</p>
+            <CardContent className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 text-center">
+                  <Receipt className="w-5 h-5 text-primary mx-auto mb-2" />
+                  <p className="text-lg font-bold text-primary">{expenses.length}</p>
+                  <p className="text-[9px] uppercase font-bold text-muted-foreground">Total Expenses</p>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-center">
+                  <CreditCard className="w-5 h-5 text-amber-600 mx-auto mb-2" />
+                  <p className="text-lg font-bold text-amber-600">{billsCount}</p>
+                  <p className="text-[9px] uppercase font-bold text-muted-foreground">Total Reminders</p>
+                </div>
               </div>
-              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-center">
-                <CreditCard className="w-5 h-5 text-amber-600 mx-auto mb-2" />
-                <p className="text-lg font-bold text-amber-600">{user.stats?.totalReminders || 0}</p>
-                <p className="text-[9px] uppercase font-bold text-muted-foreground">Reminders</p>
+              
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/50">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">Total Volume</span>
+                </div>
+                <p className="text-base font-bold text-emerald-700">${totalSpent.toLocaleString()}</p>
               </div>
             </CardContent>
           </Card>
@@ -157,10 +183,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
             <CardHeader className="flex flex-row items-center justify-between border-b border-black/5 pb-4">
               <div>
                 <CardTitle className="text-base font-bold">Recent Financial Records</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Transaction history from this user's vault.</p>
+                <p className="text-xs text-muted-foreground mt-1">Transaction history from this user's vault (Last 100).</p>
               </div>
               <Badge variant="outline" className="bg-muted/50 border-black/5 text-[10px] font-bold py-1">
-                {expenses.length} Total
+                {expenses.length} Records
               </Badge>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">
