@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AdminGuard } from '@/components/admin/AdminGuard';
@@ -18,7 +17,8 @@ import {
   Calendar as CalendarIcon,
   MessageSquare,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -40,10 +40,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -60,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return query(
       collection(db, 'featureRequests'),
       orderBy('timestamp', 'desc'),
-      limit(10)
+      limit(20)
     );
   }, [db]);
 
@@ -71,6 +72,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setTutorialCompleted(false);
     await signOut(auth);
     router.push('/login');
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      const docRef = doc(db, 'featureRequests', id);
+      await updateDoc(docRef, { status: 'read' });
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!notifications) return;
+    const pending = notifications.filter(n => n.status === 'pending');
+    try {
+      const promises = pending.map(n => updateDoc(doc(db, 'featureRequests', n.id), { status: 'read' }));
+      await Promise.all(promises);
+      toast({ title: "Inbox Cleared", description: "All notifications marked as read." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to update notifications." });
+    }
   };
 
   const navItems = [
@@ -194,35 +216,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-0 border-none shadow-2xl rounded-2xl overflow-hidden mt-2" align="end">
                     <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-widest">Admin Notifications</h3>
-                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{unreadCount} New</Badge>
+                      <h3 className="text-xs font-bold uppercase tracking-widest">Notifications</h3>
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{unreadCount} Unread</Badge>
                     </div>
                     <ScrollArea className="max-h-[400px]">
                       {notifications && notifications.length > 0 ? (
                         <div className="divide-y divide-black/5">
                           {notifications.map((n) => (
-                            <div key={n.id} className="p-4 hover:bg-muted/10 transition-colors">
-                              <div className="flex items-start gap-3">
-                                <div className={cn(
-                                  "p-2 rounded-lg shrink-0",
-                                  n.status === 'pending' ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
-                                )}>
-                                  <MessageSquare className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center gap-1.5 mb-1">
+                            <button 
+                              key={n.id} 
+                              className={cn(
+                                "w-full text-left p-4 hover:bg-muted/10 transition-colors flex items-start gap-3 group",
+                                n.status !== 'pending' && "opacity-50 grayscale-[0.5]"
+                              )}
+                              onClick={() => handleMarkRead(n.id)}
+                            >
+                              <div className={cn(
+                                "p-2 rounded-lg shrink-0 transition-colors",
+                                n.status === 'pending' ? "bg-amber-100 text-amber-600" : "bg-muted text-muted-foreground"
+                              )}>
+                                {n.status === 'pending' ? <MessageSquare className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center gap-1.5">
                                     <Clock className="w-3 h-3" />
                                     {formatDistanceToNow(new Date(n.timestamp))} ago
                                   </p>
-                                  <p className="text-xs font-semibold text-foreground line-clamp-2 leading-relaxed">
-                                    {n.request}
-                                  </p>
-                                  <p className="text-[10px] text-primary font-bold mt-1.5 truncate">
-                                    From: {n.email}
+                                  {n.status === 'pending' && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  )}
+                                </div>
+                                <p className="text-xs font-semibold text-foreground line-clamp-2 leading-relaxed">
+                                  {n.request}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                  <Mail className="w-2.5 h-2.5 text-primary/50" />
+                                  <p className="text-[9px] text-primary font-bold truncate">
+                                    {n.email}
                                   </p>
                                 </div>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       ) : (
@@ -232,9 +267,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </div>
                       )}
                     </ScrollArea>
-                    <div className="p-3 bg-muted/10 border-t text-center">
-                      <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold tracking-widest w-full">
-                        View All Activity
+                    <div className="p-3 bg-muted/10 border-t flex gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-[10px] uppercase font-bold tracking-widest flex-1 h-9 rounded-lg"
+                        onClick={markAllAsRead}
+                        disabled={unreadCount === 0}
+                      >
+                        Mark All Read
                       </Button>
                     </div>
                   </PopoverContent>
