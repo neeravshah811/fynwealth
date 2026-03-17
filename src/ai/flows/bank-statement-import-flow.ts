@@ -77,7 +77,7 @@ const processBankStatementFlow = ai.defineFlow(
     outputSchema: BankStatementOutputSchema,
   },
   async (input) => {
-    // Rely on the default model configured in the ai instance
+    // Rely on the global default model (Gemini 2.0 Flash) configured in the ai instance
     const { output } = await prompt(input);
     return output!;
   }
