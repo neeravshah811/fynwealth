@@ -1,7 +1,10 @@
+
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { SplashScreen } from '@/components/SplashScreen';
 import { TutorialTrigger } from '@/components/TutorialTrigger';
 import { NotificationManager } from '@/components/NotificationManager';
@@ -16,6 +19,7 @@ import { BottomNav } from "@/components/dashboard/BottomNav";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
+  const db = useFirestore();
 
   const isLoginPage = pathname === '/login';
   const isAdminRoute = pathname.startsWith('/admin-dashboard');
@@ -23,6 +27,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Navigation elements should only show if we have a user and aren't on the gate (login page)
   // We also skip consumer navigation for admin-specific routes
   const showDashboardShell = user && !isLoginPage && !isAdminRoute;
+
+  // Background activity tracking
+  useEffect(() => {
+    if (!user?.uid || !db) return;
+
+    const updatePresence = async () => {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, { lastActive: serverTimestamp() }, { merge: true });
+      } catch (err) {
+        // Silent failure for presence tracking
+      }
+    };
+
+    updatePresence();
+    const interval = setInterval(updatePresence, 5 * 60 * 1000); // Every 5 mins
+    return () => clearInterval(interval);
+  }, [user?.uid, db]);
 
   // For Admin routes or Login page, we render a simpler shell without consumer nav
   if (!showDashboardShell) {

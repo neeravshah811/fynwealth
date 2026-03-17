@@ -23,9 +23,10 @@ import {
   ChevronRight, 
   Loader2, 
   UserPlus, 
-  Filter
+  Filter,
+  Activity
 } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import { format, isValid, formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -134,6 +135,17 @@ export default function UserManagementPage() {
     return isValid(date) ? format(date, formatStr) : 'N/A';
   };
 
+  const formatLastActive = (dateValue: any) => {
+    if (!dateValue) return 'N/A';
+    let date: Date;
+    if (typeof dateValue.toDate === 'function') {
+      date = dateValue.toDate();
+    } else {
+      date = new Date(dateValue);
+    }
+    return isValid(date) ? formatDistanceToNow(date, { addSuffix: true }) : 'N/A';
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -180,7 +192,7 @@ export default function UserManagementPage() {
                 className="rounded-lg font-bold text-[10px] uppercase tracking-wider h-11 px-4"
                 onClick={() => setFilter('active')}
               >
-                Most Active
+                Recently Active
               </Button>
             </div>
           </div>
@@ -190,7 +202,7 @@ export default function UserManagementPage() {
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30 border-b border-black/5">
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest pl-6">User Identity</TableHead>
-                <TableHead className="text-[10px] uppercase font-bold tracking-widest">UID</TableHead>
+                <TableHead className="text-[10px] uppercase font-bold tracking-widest">Last Active</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest">Signup Date</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest text-center">Stats</TableHead>
                 <TableHead className="text-[10px] uppercase font-bold tracking-widest text-right pr-6">Actions</TableHead>
@@ -204,14 +216,17 @@ export default function UserManagementPage() {
                       <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold text-sm uppercase">
                         {user.name?.[0] || user.email?.[0]}
                       </div>
-                      <div>
-                        <p className="font-bold text-sm leading-none mb-1">{user.name || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm leading-none mb-1 truncate">{user.name || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-[10px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground">{user.id}</code>
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-3 h-3 text-emerald-500" />
+                      <span className="text-xs font-medium">{formatLastActive(user.lastActive)}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <p className="text-xs font-medium">
@@ -233,7 +248,7 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-right pr-6">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm" asChild>
+                      <Button variant="outline" size="icon" className="w-9 h-9 rounded-xl border-black/5 shadow-sm" asChild title="View Details">
                         <Link href={`/admin-dashboard/users/${user.id}`}>
                           <Eye className="w-4 h-4 text-muted-foreground" />
                         </Link>

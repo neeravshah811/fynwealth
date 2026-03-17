@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
@@ -13,6 +13,7 @@ import {
   updateProfile as updateFirebaseProfile,
   sendPasswordResetEmail
 } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const auth = useAuth();
+  const db = useFirestore();
   const { updateProfile: updateStoreProfile, setTutorialCompleted, setTourStepIndex } = useFynWealthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,20 +36,44 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
-  // Handle returning from a Google redirect (standard for mobile)
+  const syncUserToFirestore = async (user: any, isNew: boolean = false) => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userData: any = {
+        email: user.email,
+        name: user.displayName || name || 'Anonymous User',
+        lastActive: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (isNew) {
+        userData.createdAt = serverTimestamp();
+        userData.stats = { totalExpenses: 0, totalReminders: 0 };
+        
+        // Update global stats
+        const statsRef = doc(db, 'analytics', 'appStats');
+        setDoc(statsRef, { totalUsers: increment(1) }, { merge: true }).catch(() => {});
+      }
+
+      await setDoc(userRef, userData, { merge: true });
+    } catch (error) {
+      console.error("Failed to sync user profile", error);
+    }
+  };
+
   useEffect(() => {
     if (!auth) return;
 
-    // Check if we already have a user from a previous session or immediate login
     if (auth.currentUser) {
       setCheckingRedirect(false);
       return;
     }
 
     getRedirectResult(auth)
-      .then((result) => {
+      .then(async (result) => {
         if (result?.user) {
           const user = result.user;
+          await syncUserToFirestore(user, false);
           
           if (user.displayName) {
             const [firstName = '', ...rest] = user.displayName.split(' ');
@@ -58,7 +84,6 @@ export default function LoginPage() {
             });
           }
 
-          // Reset walkthrough for every relogin
           setTourStepIndex(0);
           setTutorialCompleted(false);
 
@@ -72,126 +97,90 @@ export default function LoginPage() {
       .catch((error: any) => {
         setCheckingRedirect(false);
         if (error.code !== 'auth/no-current-user') {
-          console.error('Redirect Sign-in Error:', error);
           toast({
             variant: 'destructive',
             title: 'Google Login Failed',
-            description: 'Could not complete the mobile sign-in process. Please try again.',
+            description: 'Could not complete the mobile sign-in process.',
           });
         }
       });
-  }, [auth, updateStoreProfile, setTutorialCompleted, setTourStepIndex]);
+  }, [auth, updateStoreProfile, setTutorialCompleted, setTourStepIndex, db]);
 
-  const handleEmailAuth = (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (mode === 'signup') {
-      createUserWithEmailAndPassword(auth, email, password)
-        .then((userCredential) => {
-          const user = userCredential.user;
-          updateFirebaseProfile(user, { displayName: name }).catch(() => {});
-          
-          const [firstName = '', ...rest] = name.split(' ');
+    try {
+      if (mode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await updateFirebaseProfile(user, { displayName: name });
+        await syncUserToFirestore(user, true);
+        
+        const [firstName = '', ...rest] = name.split(' ');
+        updateStoreProfile({
+          firstName,
+          lastName: rest.join(' '),
+          email: user.email || email
+        });
+
+        setTourStepIndex(0);
+        setTutorialCompleted(false);
+
+        toast({
+          title: 'Welcome to FynWealth!',
+          description: 'Your account has been created successfully.',
+        });
+      } else if (mode === 'signin') {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await syncUserToFirestore(user, false);
+        
+        if (user.displayName) {
+          const [firstName = '', ...rest] = user.displayName.split(' ');
           updateStoreProfile({
             firstName,
             lastName: rest.join(' '),
             email: user.email || email
           });
+        }
 
-          // Reset walkthrough for new account
-          setTourStepIndex(0);
-          setTutorialCompleted(false);
+        setTourStepIndex(0);
+        setTutorialCompleted(false);
 
-          toast({
-            title: 'Welcome to FynWealth!',
-            description: 'Your account has been created successfully.',
-          });
-          setLoading(false);
-        })
-        .catch((error: any) => {
-          let message = 'Could not create account.';
-          if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
-          if (error.code === 'auth/invalid-email') message = 'Invalid email address.';
-          if (error.code === 'auth/weak-password') message = 'Password is too weak.';
-          
-          toast({
-            variant: 'destructive',
-            title: 'Sign Up Failed',
-            description: message,
-          });
-          setLoading(false);
-        });
-    } else if (mode === 'signin') {
-      signInWithEmailAndPassword(auth, email, password)
-        .then((userCredential) => {
-          const user = userCredential.user;
-          
-          if (user.displayName) {
-            const [firstName = '', ...rest] = user.displayName.split(' ');
-            updateStoreProfile({
-              firstName,
-              lastName: rest.join(' '),
-              email: user.email || email
-            });
-          }
-
-          // Reset walkthrough for every relogin
-          setTourStepIndex(0);
-          setTutorialCompleted(false);
-
-          toast({
-            title: 'Welcome Back!',
-            description: 'Successfully signed in.',
-          });
-          setLoading(false);
-        })
-        .catch((error: any) => {
-          let message = 'Check your email and password.';
-          if (
-            error.code === 'auth/user-not-found' || 
-            error.code === 'auth/wrong-password' || 
-            error.code === 'auth/invalid-credential'
-          ) {
-            message = 'Invalid email or password.';
-          } else if (error.code === 'auth/too-many-requests') {
-            message = 'Too many failed attempts. Please try again later.';
-          }
-          
-          toast({
-            variant: 'destructive',
-            title: 'Sign In Failed',
-            description: message,
-          });
-          setLoading(false);
-        });
+        toast({ title: 'Welcome Back!', description: 'Successfully signed in.' });
+      }
+    } catch (error: any) {
+      let message = 'An authentication error occurred.';
+      if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
+      if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
+      
+      toast({
+        variant: 'destructive',
+        title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed',
+        description: message,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter your email to reset password.' });
+      toast({ variant: "destructive", title: "Email Required", description: "Please enter your email." });
       return;
     }
     setLoading(true);
     sendPasswordResetEmail(auth, email)
       .then(() => {
-        toast({
-          title: 'Reset Link Sent',
-          description: `Check your inbox at ${email} for instructions.`,
-        });
+        toast({ title: 'Reset Link Sent', description: `Check your inbox at ${email}.` });
         setMode('signin');
-        setLoading(false);
       })
-      .catch((error: any) => {
-        toast({
-          variant: 'destructive',
-          title: 'Reset Failed',
-          description: 'Could not send reset email. Check if the address is correct.',
-        });
-        setLoading(false);
-      });
+      .catch(() => {
+        toast({ variant: 'destructive', title: 'Reset Failed', description: 'Could not send reset email.' });
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleGoogleLogin = () => {
@@ -199,17 +188,15 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Detection for mobile environments where popups are often blocked
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     if (isMobile) {
-      // Use redirect for mobile to bypass popup blockers
       signInWithRedirect(auth, provider);
     } else {
-      // Use popup for desktop for better UX
       signInWithPopup(auth, provider)
-        .then((result) => {
+        .then(async (result) => {
           const user = result.user;
+          await syncUserToFirestore(user, false);
 
           if (user.displayName) {
             const [firstName = '', ...rest] = user.displayName.split(' ');
@@ -220,29 +207,15 @@ export default function LoginPage() {
             });
           }
 
-          // Reset walkthrough for every relogin
           setTourStepIndex(0);
           setTutorialCompleted(false);
 
-          toast({
-            title: 'Welcome!',
-            description: 'Signed in with Google.',
-          });
-          setGoogleLoading(false);
+          toast({ title: 'Welcome!', description: 'Signed in with Google.' });
         })
-        .catch((error: any) => {
-          console.error('Google Sign In Error:', error);
-          let message = 'Could not complete Google sign in.';
-          if (error.code === 'auth/popup-closed-by-user') message = 'Sign-in window was closed.';
-          if (error.code === 'auth/cancelled-by-user') message = 'Sign-in was cancelled.';
-          
-          toast({
-            variant: 'destructive',
-            title: 'Google Login Failed',
-            description: message,
-          });
-          setGoogleLoading(false);
-        });
+        .catch(() => {
+          toast({ variant: 'destructive', title: 'Google Login Failed', description: 'Could not complete Google sign in.' });
+        })
+        .finally(() => setGoogleLoading(false));
     }
   };
 
