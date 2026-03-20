@@ -15,6 +15,9 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+  // Determine if we are in dropdown mode to prevent duplication of month/year text
+  const isDropdown = props.captionLayout === "dropdown" || props.captionLayout === "dropdown-buttons"
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -23,7 +26,16 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         month_caption: "flex justify-center pt-1 relative items-center h-12 w-full mb-4",
-        caption_label: "text-sm font-bold text-primary flex items-center h-7 [.rdp-has-dropdowns_&]:hidden", 
+        
+        // Hide the static caption label if dropdowns are enabled to prevent duplication
+        caption_label: cn(
+          "text-sm font-bold text-primary flex items-center h-7",
+          isDropdown && "hidden"
+        ),
+        
+        // Ensure dropdowns are centered and aligned side-by-side horizontally
+        dropdowns: "flex items-center justify-center gap-2 z-20",
+        
         nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
@@ -49,7 +61,8 @@ function Calendar({
         disabled: "text-muted-foreground opacity-50",
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        dropdowns: "flex items-center justify-center gap-2 z-20",
+        
+        // Select styling for dropdown mode
         dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-2 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none inline-flex items-center",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
