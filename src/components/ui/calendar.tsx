@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -24,7 +23,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         month_caption: "flex justify-center pt-1 relative items-center h-10 mb-2",
-        caption_label: "text-sm font-bold text-primary", 
+        caption_label: "text-sm font-bold text-primary h-full flex items-center", 
         nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
@@ -50,8 +49,8 @@ function Calendar({
         disabled: "text-muted-foreground opacity-50",
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        caption_dropdowns: "flex justify-center gap-2 items-center absolute inset-0 pointer-events-auto",
-        dropdown: "bg-transparent font-bold text-xs text-primary cursor-pointer hover:bg-primary/5 px-2 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none",
+        caption_dropdowns: "flex justify-center gap-1.5 items-center z-20 h-full",
+        dropdown: "bg-transparent font-bold text-xs text-primary cursor-pointer hover:bg-primary/5 px-1.5 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
         ...classNames,
