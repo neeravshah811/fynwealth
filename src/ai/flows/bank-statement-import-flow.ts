@@ -1,11 +1,10 @@
-
 'use server';
 /**
  * @fileOverview A specialized Genkit flow for processing bank statements into structured debit transactions.
  * 
  * - processBankStatement - Extracts cleaned debit transactions with mandatory category mapping.
  * - BankStatementInput - Input containing file URI or raw text.
- * - BankStatementOutput - Return type with summary and categorized transactions.
+ * - BankStatementOutput - Return type with summary and categorized transactions for review.
  */
 
 import { ai } from '@/ai/genkit';
@@ -24,26 +23,33 @@ const BankStatementInputSchema = z.object({
 export type BankStatementInput = z.infer<typeof BankStatementInputSchema>;
 
 const TransactionSchema = z.object({
+  id: z.string().describe('A unique identifier for this transaction (e.g., txn_1).'),
   date: z.string().describe('The date of the transaction in YYYY-MM-DD format.'),
-  description: z.string().describe('The cleaned merchant name without transaction IDs or codes.'),
+  description: z.string().describe('The cleaned merchant name without transaction IDs, numbers, or codes.'),
   amount: z.number().describe('The absolute numerical value of the debit.'),
   category: z.enum([
-    'Food & Dining',
-    'Groceries',
-    'Shopping',
-    'Travel',
-    'Bills & Utilities',
-    'Rent',
-    'Entertainment',
-    'Health & Fitness',
-    'Subscriptions',
-    'Transfers',
-    'EMI & Loans',
-    'Insurance',
+    'Education / Kids',
+    'Essentials',
+    'Financial Commitments',
+    'Food and Groceries',
+    'Health & Personal',
+    'Household & Family',
     'Investments',
+    'Life & Entertainment',
+    'Warranties',
+    'Transportation',
+    'Subscriptions',
+    'Shopping',
+    'Personal',
     'Miscellaneous'
   ]).describe('One of the mandatory categories.'),
   confidence: z.number().min(0).max(1).describe('The confidence level of the extraction and classification.'),
+  status: z.literal('pending').describe('All transactions must start as pending.'),
+  actions: z.object({
+    canEdit: z.boolean().default(true),
+    canApprove: z.boolean().default(true),
+    canReject: z.boolean().default(true)
+  })
 });
 
 const BankStatementOutputSchema = z.object({
@@ -51,7 +57,15 @@ const BankStatementOutputSchema = z.object({
     totalTransactions: z.number(),
     totalExpense: z.number()
   }).describe('Aggregated totals for the processed debit transactions.'),
-  transactions: z.array(TransactionSchema).describe('List of structured debit transactions.'),
+  review: z.object({
+    editable: z.boolean().default(true),
+    bulkActions: z.object({
+      approveAll: z.boolean().default(true),
+      rejectAll: z.boolean().default(true)
+    }),
+    instructions: z.string()
+  }),
+  transactions: z.array(TransactionSchema).describe('List of structured debit transactions for review.'),
 });
 export type BankStatementOutput = z.infer<typeof BankStatementOutputSchema>;
 
@@ -63,44 +77,37 @@ const prompt = ai.definePrompt({
   name: 'processBankStatementPrompt',
   input: { schema: BankStatementInputSchema },
   output: { schema: BankStatementOutputSchema },
-  prompt: `You are a financial data processing engine for the FynWealth app.
-Your task is to process uploaded bank statement data and return structured expense transactions.
+  prompt: `You are the transaction processing engine for the FynWealth app.
+Your task is to process bank transactions and return structured debit entries for user review.
 
-STRICT RULES:
-1. ONLY process DEBIT transactions. Ignore all CREDIT entries (salary, refunds, interest, deposits, etc).
-2. Extract and normalize each transaction into the requested format.
-3. Category mapping (MANDATORY): Map every transaction into EXACTLY ONE of these categories:
-   - Food & Dining
-   - Groceries
-   - Shopping
-   - Travel
-   - Bills & Utilities
-   - Rent
-   - Entertainment
-   - Health & Fitness
-   - Subscriptions
-   - Transfers
-   - EMI & Loans
-   - Insurance
-   - Investments
-   - Miscellaneous
+STRICT PROCESSING RULES:
+1. ONLY include transactions where: DEBIT > 0.
+2. IGNORE: Credit transactions, salary entries, refunds, and interest credits.
+3. Remove exact duplicates (same date + amount + description).
+4. Description Cleaning: Remove transaction IDs, numbers, and codes. Keep only the meaningful merchant name in a readable format.
+   Example: "UPI-SWIGGY-12345-BLR" → "Swiggy"
 
-4. Smart classification rules:
-   - Swiggy, Zomato, Starbucks, McDonald's → Food & Dining
-   - Blinkit, BigBasket, Dmart, Zepto, MilkBasket → Groceries
-   - Amazon, Flipkart, Myntra, Ajio, Nykaa → Shopping
-   - Uber, Ola, IRCTC, Petrol, Diesel, Indigo, Air India → Travel
-   - Electricity, Gas, Water, Mobile recharge, Broadband, WiFi → Bills & Utilities
-   - Netflix, Spotify, YouTube, Prime, Disney+ → Subscriptions
-   - Gym, Cult.fit, Pharmacy, Medical, Doctor → Health & Fitness
-   - Bank transfer to person, UPI to friend → Transfers
-   - EMI, NACH, Loan payment, Mortgage → EMI & Loans
-   - Insurance premium, LIC, ICICI Lombard → Insurance
-   - Mutual fund, Zerodha, Groww, Stocks, SIP → Investments
+CATEGORY RULES (MANDATORY):
+Assign ONLY one category from this list based on keywords:
+- Food and Groceries: swiggy, zomato, restaurant, cafe, blinkit, bigbasket, dmart, grocery
+- Shopping: amazon, flipkart, myntra, clothes, fashion
+- Transportation: uber, ola, irctc, fuel, petrol, shell
+- Essentials: electricity, recharge, airtel, jio, water, gas
+- Subscriptions: netflix, spotify, youtube, prime, hotstar
+- Health & Personal: pharmacy, apollo, 1mg, gym, cult.fit, doctor
+- Financial Commitments: emi, nach, loan, lic, insurance, policy, premium
+- Investments: sip, mutual fund, zerodha, groww, stocks, upstox
+- Education / Kids: school, fees, tuition, books
+- Life & Entertainment: movies, pvr, trips, travel bookings, events
+- Household & Family: repairs, helper, maid, pets
+- Warranties: electronics protection, extended warranty
+- Personal: personal care, salon, spa
+- Miscellaneous: If unsure or generic (upi, imps, neft, bank transfer without merchant)
 
-5. Clean description: Remove transaction IDs, reference numbers, and IFSC codes. Keep only the meaningful merchant name (e.g., "Amazon" instead of "AMZN*123456789-BLR").
-6. Remove exact duplicates if they occur on the same date with the same amount.
-7. Return valid JSON only. DO NOT include explanations.
+OUTPUT BEHAVIOR:
+- ALL transactions status = "pending".
+- DO NOT auto-approve.
+- Return valid JSON only. NO explanations.
 
 Statement Data:
 {{#if fileDataUri}}{{media url=fileDataUri}}{{/if}}
