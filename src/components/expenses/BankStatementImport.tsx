@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -88,10 +89,12 @@ export function BankStatementImport() {
         }
       } catch (err: any) {
         console.error("Statement Parse Error:", err);
-        let message = err.message || "Could not read this statement. Try a CSV export.";
+        let message = "Could not read this statement. Please try a cleaner CSV export.";
         
-        if (err.message?.includes("429") || err.message?.toLowerCase().includes("quota")) {
-          message = "AI service busy. Please wait 30s and try again.";
+        // Handle Quota/Rate Limit Errors (429)
+        const errString = String(err).toLowerCase();
+        if (errString.includes("429") || errString.includes("quota") || errString.includes("too many requests")) {
+          message = "High demand on AI engine. Please wait 10-15 seconds and try uploading again.";
         }
 
         toast({ variant: "destructive", title: "Import Failed", description: message });

@@ -16,6 +16,7 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+  // Detect if we are in dropdown mode to prevent header duplication
   const isDropdown = props.captionLayout === "dropdown" || props.captionLayout === "dropdown-buttons"
 
   return (
@@ -27,14 +28,14 @@ function Calendar({
         month: "space-y-4",
         month_caption: "flex justify-center pt-1 relative items-center h-10 w-full mb-4",
         
-        // CRITICAL FIX: Hide the caption_label row completely when dropdowns are active to prevent duplication
+        // CRITICAL: Force hide the static caption label when dropdowns are active to prevent Row 1 duplication
         caption_label: cn(
-          "text-sm font-bold text-primary flex items-center",
-          isDropdown && "hidden invisible h-0 w-0 p-0 m-0"
+          "text-sm font-bold text-primary flex items-center justify-center",
+          isDropdown && "hidden !invisible !h-0 !w-0 !p-0 !m-0 overflow-hidden"
         ),
         
-        // CRITICAL FIX: Ensure dropdowns are aligned horizontally in a single row
-        dropdowns: "flex items-center justify-center gap-2 z-20 relative",
+        // CRITICAL: Ensure selectors are side-by-side on a single line
+        dropdowns: "flex items-center justify-center gap-2 z-20 relative px-8",
         
         nav: "flex items-center",
         button_previous: cn(
@@ -62,8 +63,8 @@ function Calendar({
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
         
-        // Select styling for dropdown mode
-        dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-2 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none inline-flex items-center",
+        // Dropdown specific selectors
+        dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-1 py-0.5 rounded transition-colors focus:outline-none appearance-none border-none outline-none inline-flex items-center",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
         ...classNames,
