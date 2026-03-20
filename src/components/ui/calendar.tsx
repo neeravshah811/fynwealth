@@ -22,16 +22,16 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        month_caption: "flex justify-center pt-1 relative items-center h-10 mb-2",
-        caption_label: "text-sm font-bold text-primary h-full flex items-center", 
+        month_caption: "flex justify-center pt-1 relative items-center h-10",
+        caption_label: "text-sm font-bold text-primary flex items-center h-7", 
         nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 z-30 absolute left-1 top-1 rounded-md"
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 z-30 absolute left-1 top-1 rounded-full border-none shadow-none hover:bg-primary/5"
         ),
         button_next: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 z-30 absolute right-1 top-1 rounded-md"
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 z-30 absolute right-1 top-1 rounded-full border-none shadow-none hover:bg-primary/5"
         ),
         month_grid: "w-full border-collapse space-y-1",
         weekdays: "flex w-full justify-between",
@@ -49,8 +49,8 @@ function Calendar({
         disabled: "text-muted-foreground opacity-50",
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        caption_dropdowns: "flex justify-center gap-1.5 items-center z-20 h-full",
-        dropdown: "bg-transparent font-bold text-xs text-primary cursor-pointer hover:bg-primary/5 px-1.5 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none",
+        caption_dropdowns: "flex justify-center gap-1 items-center z-20 h-7",
+        dropdown: "bg-transparent font-bold text-xs text-primary cursor-pointer hover:bg-primary/5 px-1.5 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none flex items-center gap-1",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
         ...classNames,
