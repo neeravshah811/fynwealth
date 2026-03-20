@@ -22,8 +22,8 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        month_caption: "flex justify-center pt-1 relative items-center h-10 w-full mb-2",
-        caption_label: "text-sm font-bold text-primary flex items-center h-7", 
+        month_caption: "flex justify-center pt-1 relative items-center h-12 w-full mb-4",
+        caption_label: "text-sm font-bold text-primary flex items-center h-7 [.rdp-has-dropdowns_&]:hidden", 
         nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
@@ -49,8 +49,7 @@ function Calendar({
         disabled: "text-muted-foreground opacity-50",
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        // Correct classes for react-day-picker v9
-        dropdowns: "flex items-center justify-center gap-1.5 z-20",
+        dropdowns: "flex items-center justify-center gap-2 z-20",
         dropdown: "bg-transparent font-bold text-sm text-primary cursor-pointer hover:bg-primary/5 px-2 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none inline-flex items-center",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
