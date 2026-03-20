@@ -23,7 +23,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         month_caption: "flex justify-center pt-1 relative items-center h-10",
-        caption_label: "text-sm font-bold text-primary flex items-center h-7", 
+        caption_label: "text-sm font-bold text-primary flex items-center h-7 [.rdp-has-dropdowns_&]:hidden", 
         nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
@@ -49,7 +49,7 @@ function Calendar({
         disabled: "text-muted-foreground opacity-50",
         range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
-        caption_dropdowns: "flex justify-center gap-1 items-center z-20 h-7",
+        caption_dropdowns: "flex justify-center gap-2 items-center z-20 h-7",
         dropdown: "bg-transparent font-bold text-xs text-primary cursor-pointer hover:bg-primary/5 px-1.5 py-1 rounded transition-colors focus:outline-none appearance-none border-none outline-none flex items-center gap-1",
         dropdown_month: "relative inline-flex items-center",
         dropdown_year: "relative inline-flex items-center",
