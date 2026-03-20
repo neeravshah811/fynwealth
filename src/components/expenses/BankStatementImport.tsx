@@ -19,20 +19,20 @@ import {
   Loader2, 
   CheckCircle2, 
   Trash2, 
-  AlertCircle,
   FileText,
-  X,
-  Plus
+  Plus,
+  AlertCircle
 } from "lucide-react";
 import { processBankStatement, type BankStatementOutput } from "@/ai/flows/bank-statement-import-flow";
-import { SYSTEM_CATEGORIES } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { useFynWealthStore } from "@/lib/store";
 
 export function BankStatementImport() {
+  const { currency } = useFynWealthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [reviewMode, setReviewMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -40,13 +40,12 @@ export function BankStatementImport() {
   const { user } = useUser();
 
   const handleResult = (result: BankStatementOutput) => {
-    // Filter for debits only as per requirements
-    const expensesOnly = result.transactions.filter(t => t.type === 'debit');
-    setTransactions(expensesOnly);
+    setTransactions(result.transactions);
+    setSummary(result.summary);
     setReviewMode(true);
     toast({ 
-      title: "Statement Parsed", 
-      description: `Found ${expensesOnly.length} expenses to review.` 
+      title: "Statement Analyzed", 
+      description: `Found ${result.summary.totalTransactions} expenses totaling ${currency.symbol}${result.summary.totalExpense.toLocaleString()}.` 
     });
   };
 
@@ -54,7 +53,6 @@ export function BankStatementImport() {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
 
-    // Validate file type
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const isCsv = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv') || file.type === 'text/plain';
     
@@ -62,7 +60,7 @@ export function BankStatementImport() {
       toast({ 
         variant: "destructive", 
         title: "Unsupported Format", 
-        description: "Please upload a PDF or CSV statement. Excel files should be exported to CSV first." 
+        description: "Please upload a PDF or CSV statement." 
       });
       return;
     }
@@ -74,36 +72,29 @@ export function BankStatementImport() {
       try {
         const content = reader.result as string;
         
-        // Ensure content is not empty
         if (!content || content.length < 50) {
           throw new Error("The selected file appears to be empty or invalid.");
         }
 
         const result = await processBankStatement({
           fileDataUri: isCsv ? undefined : content,
-          rawText: isCsv ? content : undefined,
-          categories: Object.keys(SYSTEM_CATEGORIES)
+          rawText: isCsv ? content : undefined
         });
 
         if (result && result.transactions && result.transactions.length > 0) {
           handleResult(result);
         } else {
-          throw new Error("No transactions were detected in this statement. Please ensure it contains expense records.");
+          throw new Error("No debit transactions detected. AI ignored credits and deposits.");
         }
       } catch (err: any) {
         console.error("Statement Parse Error:", err);
-        let message = err.message || "The AI could not read this statement format. Try a different export type.";
+        let message = err.message || "Could not read this statement. Try a CSV export.";
         
-        // Specific handling for rate limiting/quota errors
         if (err.message?.includes("429") || err.message?.toLowerCase().includes("quota")) {
-          message = "AI service is busy (Rate limit exceeded). Please wait 20-30 seconds and try uploading again.";
+          message = "AI service busy. Please wait 30s and try again.";
         }
 
-        toast({ 
-          variant: "destructive", 
-          title: "Import Failed", 
-          description: message 
-        });
+        toast({ variant: "destructive", title: "Import Failed", description: message });
       } finally {
         setLoading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -132,35 +123,42 @@ export function BankStatementImport() {
           description: t.description,
           note: t.description,
           status: 'paid',
+          confidence: t.confidence,
           createdAt: serverTimestamp()
         });
       });
 
       await Promise.all(promises);
       
-      // Update global user stats
       await updateDoc(doc(db, 'users', user.uid), {
         'stats.totalExpenses': increment(transactions.length)
       });
 
-      toast({ title: "Import Successful", description: `${transactions.length} expenses synced to your vault.` });
+      toast({ title: "Import Complete", description: "All debit records saved to vault." });
       setIsOpen(false);
-      setReviewMode(false);
-      setTransactions([]);
+      reset();
     } catch (err) {
-      toast({ variant: "destructive", title: "Sync Failed", description: "Could not save imported expenses." });
+      toast({ variant: "destructive", title: "Sync Failed", description: "Failed to save records." });
     } finally {
       setLoading(false);
     }
   };
 
   const removeTransaction = (index: number) => {
+    const removed = transactions[index];
     setTransactions(prev => prev.filter((_, i) => i !== index));
+    if (summary) {
+      setSummary({
+        totalTransactions: summary.totalTransactions - 1,
+        totalExpense: summary.totalExpense - removed.amount
+      });
+    }
   };
 
   const reset = () => {
     setReviewMode(false);
     setTransactions([]);
+    setSummary(null);
     setLoading(false);
   };
 
@@ -184,10 +182,10 @@ export function BankStatementImport() {
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Statement Import
+              Debit Processing
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Upload PDF or CSV statements to bulk-record transactions.
+              Extract debit transactions with mandatory smart categorization.
             </DialogDescription>
           </DialogHeader>
 
@@ -197,36 +195,36 @@ export function BankStatementImport() {
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "AI is Analyzing..." : "Select File"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "AI Data Engine Working..." : "Select Statement"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload your bank statement (PDF or CSV). We'll extract only the debits/expenses for you.
+                  Upload PDF or CSV. AI will filter ONLY debits and map them to standard categories.
                 </p>
               </div>
               
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                accept=".pdf,.csv,.txt" 
-                onChange={handleFileChange} 
-              />
-              
-              <Button 
-                onClick={() => fileInputRef.current?.click()} 
-                disabled={loading}
-                className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20 transition-all active:scale-95"
-              >
+              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.csv,.txt" onChange={handleFileChange} />
+              <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20 transition-all active:scale-95">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Parsing Statement" : "Choose Statement"}
+                {loading ? "Processing..." : "Choose File"}
               </Button>
             </div>
           ) : (
             <div className="flex flex-col h-[60vh]">
-              <div className="flex-1 overflow-hidden p-6">
-                <div className="flex items-center justify-between mb-4 px-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Detected Expenses ({transactions.length})</span>
-                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-none font-bold text-[9px] uppercase">Review & Import</Badge>
+              <div className="bg-muted/30 px-8 py-4 flex items-center justify-between border-b">
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Transactions</p>
+                    <p className="text-lg font-bold text-primary">{summary?.totalTransactions}</p>
+                  </div>
+                  <div className="w-px h-8 bg-muted-foreground/20" />
+                  <div className="text-center">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Debit</p>
+                    <p className="text-lg font-bold text-foreground">{currency.symbol}{summary?.totalExpense.toLocaleString()}</p>
+                  </div>
                 </div>
+                <Badge className="bg-emerald-50 text-emerald-700 border-none uppercase font-bold text-[9px]">Reviewing Debits</Badge>
+              </div>
+
+              <div className="flex-1 overflow-hidden p-6">
                 <ScrollArea className="h-full pr-4 border rounded-2xl bg-muted/5">
                   <div className="p-4 space-y-3">
                     {transactions.map((t, i) => (
@@ -240,38 +238,27 @@ export function BankStatementImport() {
                             <Badge variant="outline" className="text-[9px] h-5 px-2 font-bold uppercase border-primary/20 text-primary bg-primary/5">
                               {t.category}
                             </Badge>
+                            {t.confidence < 0.7 && <Badge variant="secondary" className="bg-rose-50 text-rose-600 text-[8px] h-4">Check Date/Amt</Badge>}
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="font-bold text-sm text-foreground whitespace-nowrap">
-                            ${Math.abs(t.amount).toLocaleString()}
+                            {currency.symbol}{Math.abs(t.amount).toLocaleString()}
                           </span>
-                          <button 
-                            onClick={() => removeTransaction(i)}
-                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                          >
+                          <button onClick={() => removeTransaction(i)} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
                     ))}
-                    {transactions.length === 0 && (
-                      <div className="py-20 text-center text-muted-foreground italic text-sm">
-                        No expenses found or all removed.
-                      </div>
-                    )}
                   </div>
                 </ScrollArea>
               </div>
               <DialogFooter className="p-6 bg-muted/20 border-t flex items-center gap-4">
                 <Button variant="ghost" onClick={reset} className="font-bold rounded-xl h-12 flex-1">Cancel</Button>
-                <Button 
-                  onClick={handleConfirmImport} 
-                  disabled={loading || transactions.length === 0}
-                  className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
-                >
+                <Button onClick={handleConfirmImport} disabled={loading || transactions.length === 0} className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20">
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                  Confirm Import
+                  Save All Debits
                 </Button>
               </DialogFooter>
             </div>

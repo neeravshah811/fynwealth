@@ -1,10 +1,10 @@
 'use server';
 /**
- * @fileOverview A Genkit flow to extract and categorize transactions from a bank statement.
- *
- * - processBankStatement - A function that handles the statement parsing process.
- * - BankStatementInput - The input type for the processBankStatement function.
- * - BankStatementOutput - The return type for the processBankStatement function.
+ * @fileOverview A specialized Genkit flow for processing bank statements into structured debit transactions.
+ * 
+ * - processBankStatement - Extracts cleaned debit transactions with mandatory category mapping.
+ * - BankStatementInput - Input containing file URI or raw text.
+ * - BankStatementOutput - Return type with summary and categorized transactions.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,28 +14,43 @@ const BankStatementInputSchema = z.object({
   fileDataUri: z
     .string()
     .optional()
-    .describe(
-      "A bank statement file (PDF or image), as a data URI."
-    ),
+    .describe("A bank statement file (PDF or image) as a data URI."),
   rawText: z
     .string()
     .optional()
-    .describe("The raw text content of a statement (e.g. from a CSV file)."),
-  categories: z.array(z.string()).describe("A list of valid expense categories to use for classification."),
+    .describe("The raw text content of a statement."),
 });
 export type BankStatementInput = z.infer<typeof BankStatementInputSchema>;
 
 const TransactionSchema = z.object({
   date: z.string().describe('The date of the transaction in YYYY-MM-DD format.'),
-  description: z.string().describe('The merchant name or transaction description.'),
-  amount: z.number().describe('The numerical amount of the transaction.'),
-  category: z.string().describe('The suggested category for the transaction.'),
-  type: z.enum(['debit', 'credit']).describe('Whether the transaction is a debit (expense) or credit (income/refund).'),
+  description: z.string().describe('The cleaned merchant name without transaction IDs or codes.'),
+  amount: z.number().describe('The absolute numerical value of the debit.'),
+  category: z.enum([
+    'Food & Dining',
+    'Groceries',
+    'Shopping',
+    'Travel',
+    'Bills & Utilities',
+    'Rent',
+    'Entertainment',
+    'Health & Fitness',
+    'Subscriptions',
+    'Transfers',
+    'EMI & Loans',
+    'Insurance',
+    'Investments',
+    'Miscellaneous'
+  ]).describe('One of the mandatory categories.'),
+  confidence: z.number().min(0).max(1).describe('The confidence level of the extraction and classification.'),
 });
 
 const BankStatementOutputSchema = z.object({
-  transactions: z.array(TransactionSchema).describe('A list of extracted transactions.'),
-  summary: z.string().describe('A brief summary of the extraction process.'),
+  summary: z.object({
+    totalTransactions: z.number(),
+    totalExpense: z.number()
+  }).describe('Aggregated totals for the processed debit transactions.'),
+  transactions: z.array(TransactionSchema).describe('List of structured debit transactions.'),
 });
 export type BankStatementOutput = z.infer<typeof BankStatementOutputSchema>;
 
@@ -47,20 +62,44 @@ const prompt = ai.definePrompt({
   name: 'processBankStatementPrompt',
   input: { schema: BankStatementInputSchema },
   output: { schema: BankStatementOutputSchema },
-  prompt: `You are an expert financial auditor. Your task is to extract transactions from the provided bank statement.
+  prompt: `You are a financial data processing engine for the FynWealth app.
+Your task is to process uploaded bank statement data and return structured expense transactions.
 
-Analyze the provided data and extract every transaction.
-1. Date: Ensure it is in YYYY-MM-DD format. If the year is missing, assume it is 2024 or 2025 based on context.
-2. Description: The merchant name or transaction details.
-3. Amount: The absolute numerical value.
-4. Type: Mark as 'debit' for payments/expenses and 'credit' for income/refunds.
-5. Category: Choose the best fit from this list: {{{categories}}}.
+STRICT RULES:
+1. ONLY process DEBIT transactions. Ignore all CREDIT entries (salary, refunds, interest, deposits).
+2. Extract and normalize each transaction into the requested format.
+3. Category mapping (MANDATORY): Map every transaction into EXACTLY ONE of these categories:
+   - Food & Dining
+   - Groceries
+   - Shopping
+   - Travel
+   - Bills & Utilities
+   - Rent
+   - Entertainment
+   - Health & Fitness
+   - Subscriptions
+   - Transfers
+   - EMI & Loans
+   - Insurance
+   - Investments
+   - Miscellaneous
 
-CRITICAL INSTRUCTIONS:
-- Focus primarily on capturing DEBITS (expenses).
-- Only include CREDITS if they appear to be REFUNDS for a previous expense. Ignore salary, transfers-in, or general income.
-- If the format is a CSV or table, parse the columns carefully to identify Date, Description, and Amount.
-- If multiple pages are present, process all of them.
+4. Smart classification rules:
+   - Swiggy, Zomato → Food & Dining
+   - Blinkit, BigBasket, Dmart → Groceries
+   - Amazon, Flipkart, Myntra → Shopping
+   - Uber, Ola, IRCTC, fuel → Travel
+   - Electricity, Gas, Mobile recharge → Bills & Utilities
+   - Netflix, Spotify, YouTube → Subscriptions
+   - Gym, Cult.fit → Health & Fitness
+   - Bank transfer to person → Transfers
+   - EMI/NACH → EMI & Loans
+   - Insurance premium → Insurance
+   - Mutual fund / stock → Investments
+
+5. Clean description: Remove transaction IDs, reference numbers, and IFSC codes. Keep only the meaningful merchant name.
+6. Remove duplicates if any.
+7. Return valid JSON only. DO NOT include explanations.
 
 Statement Data:
 {{#if fileDataUri}}{{media url=fileDataUri}}{{/if}}
@@ -77,7 +116,6 @@ const processBankStatementFlow = ai.defineFlow(
     outputSchema: BankStatementOutputSchema,
   },
   async (input) => {
-    // Rely on the global default model (Gemini 2.0 Flash) configured in the ai instance
     const { output } = await prompt(input);
     return output!;
   }
