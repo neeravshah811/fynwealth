@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -15,7 +16,6 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
-  // Determine if we are in dropdown mode to prevent duplication of month/year text
   const isDropdown = props.captionLayout === "dropdown" || props.captionLayout === "dropdown-buttons"
 
   return (
@@ -25,16 +25,16 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        month_caption: "flex justify-center pt-1 relative items-center h-12 w-full mb-4",
+        month_caption: "flex justify-center pt-1 relative items-center h-10 w-full mb-4",
         
-        // Hide the static caption label if dropdowns are enabled to prevent duplication
+        // CRITICAL FIX: Hide the caption_label row completely when dropdowns are active to prevent duplication
         caption_label: cn(
-          "text-sm font-bold text-primary flex items-center h-7",
-          isDropdown && "hidden"
+          "text-sm font-bold text-primary flex items-center",
+          isDropdown && "hidden invisible h-0 w-0 p-0 m-0"
         ),
         
-        // Ensure dropdowns are centered and aligned side-by-side horizontally
-        dropdowns: "flex items-center justify-center gap-2 z-20",
+        // CRITICAL FIX: Ensure dropdowns are aligned horizontally in a single row
+        dropdowns: "flex items-center justify-center gap-2 z-20 relative",
         
         nav: "flex items-center",
         button_previous: cn(

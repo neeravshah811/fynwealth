@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A specialized Genkit flow for processing bank statements into structured debit transactions.
@@ -66,7 +67,7 @@ const prompt = ai.definePrompt({
 Your task is to process uploaded bank statement data and return structured expense transactions.
 
 STRICT RULES:
-1. ONLY process DEBIT transactions. Ignore all CREDIT entries (salary, refunds, interest, deposits).
+1. ONLY process DEBIT transactions. Ignore all CREDIT entries (salary, refunds, interest, deposits, etc).
 2. Extract and normalize each transaction into the requested format.
 3. Category mapping (MANDATORY): Map every transaction into EXACTLY ONE of these categories:
    - Food & Dining
@@ -85,20 +86,20 @@ STRICT RULES:
    - Miscellaneous
 
 4. Smart classification rules:
-   - Swiggy, Zomato → Food & Dining
-   - Blinkit, BigBasket, Dmart → Groceries
-   - Amazon, Flipkart, Myntra → Shopping
-   - Uber, Ola, IRCTC, fuel → Travel
-   - Electricity, Gas, Mobile recharge → Bills & Utilities
-   - Netflix, Spotify, YouTube → Subscriptions
-   - Gym, Cult.fit → Health & Fitness
-   - Bank transfer to person → Transfers
-   - EMI/NACH → EMI & Loans
-   - Insurance premium → Insurance
-   - Mutual fund / stock → Investments
+   - Swiggy, Zomato, Starbucks, McDonald's → Food & Dining
+   - Blinkit, BigBasket, Dmart, Zepto, MilkBasket → Groceries
+   - Amazon, Flipkart, Myntra, Ajio, Nykaa → Shopping
+   - Uber, Ola, IRCTC, Petrol, Diesel, Indigo, Air India → Travel
+   - Electricity, Gas, Water, Mobile recharge, Broadband, WiFi → Bills & Utilities
+   - Netflix, Spotify, YouTube, Prime, Disney+ → Subscriptions
+   - Gym, Cult.fit, Pharmacy, Medical, Doctor → Health & Fitness
+   - Bank transfer to person, UPI to friend → Transfers
+   - EMI, NACH, Loan payment, Mortgage → EMI & Loans
+   - Insurance premium, LIC, ICICI Lombard → Insurance
+   - Mutual fund, Zerodha, Groww, Stocks, SIP → Investments
 
-5. Clean description: Remove transaction IDs, reference numbers, and IFSC codes. Keep only the meaningful merchant name.
-6. Remove duplicates if any.
+5. Clean description: Remove transaction IDs, reference numbers, and IFSC codes. Keep only the meaningful merchant name (e.g., "Amazon" instead of "AMZN*123456789-BLR").
+6. Remove exact duplicates if they occur on the same date with the same amount.
 7. Return valid JSON only. DO NOT include explanations.
 
 Statement Data:
