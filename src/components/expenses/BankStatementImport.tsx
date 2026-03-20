@@ -90,12 +90,17 @@ export function BankStatementImport() {
           setReviewMode(true);
           toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions for review.` });
         } else {
-          throw new Error("No debit transactions found. AI ignored all credits.");
+          toast({ 
+            variant: "destructive", 
+            title: "No Data Extracted", 
+            description: "The AI couldn't find any debit transactions. Please ensure the file contains spending records." 
+          });
         }
       } catch (err: any) {
-        let message = "Could not process statement. Please ensure it contains debit entries.";
+        console.error("Statement Error:", err);
+        let message = "Could not process statement. Please try a different format (PDF/CSV).";
         if (String(err).includes("429")) {
-          message = "AI service is busy. Please wait 10 seconds and try again.";
+          message = "AI service quota reached. Please wait 10-20 seconds and try again.";
         }
         toast({ variant: "destructive", title: "Import Failed", description: message });
       } finally {

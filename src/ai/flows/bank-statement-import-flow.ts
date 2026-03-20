@@ -78,18 +78,20 @@ const prompt = ai.definePrompt({
   input: { schema: BankStatementInputSchema },
   output: { schema: BankStatementOutputSchema },
   prompt: `You are the transaction processing engine for the FynWealth app.
-Your task is to process bank transactions and return structured debit entries for user review.
+Your task is to process bank transactions and return structured DEBIT entries for user review.
 
 STRICT PROCESSING RULES:
-1. ONLY include transactions where: DEBIT > 0.
-2. IGNORE: Credit transactions, salary entries, refunds, and interest credits.
+1. ONLY include transactions where DEBIT > 0. 
+   - Debits may be in columns labeled "Withdrawal", "Debit", "DR", "Out", or shown as negative values.
+   - If a transaction is a "Credit", "Deposit", "CR", or "In", IGNORE IT.
+2. IGNORE: Salary entries, refunds, interest credits, and deposits.
 3. Remove exact duplicates (same date + amount + description).
-4. Description Cleaning: Remove transaction IDs, numbers, and codes. Keep only the meaningful merchant name in a readable format.
+4. Description Cleaning: Remove transaction IDs, numbers, and codes (like UPI IDs or reference numbers). Keep only the meaningful merchant name in a readable format.
    Example: "UPI-SWIGGY-12345-BLR" → "Swiggy"
 
 CATEGORY RULES (MANDATORY):
-Assign ONLY one category from this list based on keywords:
-- Food and Groceries: swiggy, zomato, restaurant, cafe, blinkit, bigbasket, dmart, grocery
+Assign ONLY one category from this specific list:
+- Food and Groceries: swiggy, zomato, restaurant, cafe, blinkit, bigbasket, dmart, grocery, dining
 - Shopping: amazon, flipkart, myntra, clothes, fashion
 - Transportation: uber, ola, irctc, fuel, petrol, shell
 - Essentials: electricity, recharge, airtel, jio, water, gas
@@ -106,7 +108,6 @@ Assign ONLY one category from this list based on keywords:
 
 OUTPUT BEHAVIOR:
 - ALL transactions status = "pending".
-- DO NOT auto-approve.
 - Return valid JSON only. NO explanations.
 
 Statement Data:
