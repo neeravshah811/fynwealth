@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -81,8 +82,9 @@ export function BankStatementImport() {
       try {
         const content = reader.result as string;
         const result = await processBankStatement({
-          fileDataUri: file.type === 'application/pdf' ? content : undefined,
-          rawText: file.type !== 'application/pdf' ? content : undefined
+          userId: user.uid,
+          fileDataUri: content,
+          fileName: file.name
         });
 
         if (result && result.transactions && result.transactions.length > 0) {
@@ -98,8 +100,8 @@ export function BankStatementImport() {
         }
       } catch (err: any) {
         console.error("Statement Error:", err);
-        let message = "Could not process statement. Please try a different format (PDF/CSV).";
-        if (String(err).includes("429")) {
+        let message = err.message || "Could not process statement.";
+        if (String(err).includes("429") || String(err).includes("quota")) {
           message = "AI service quota reached. Please wait 10-20 seconds and try again.";
         }
         toast({ variant: "destructive", title: "Import Failed", description: message });
@@ -109,11 +111,8 @@ export function BankStatementImport() {
       }
     };
 
-    if (file.type === 'application/pdf') {
-      reader.readAsDataURL(file);
-    } else {
-      reader.readAsText(file);
-    }
+    // Always read as data URL for the Gemini backend compatibility
+    reader.readAsDataURL(file);
   };
 
   const updateStatus = (id: string, status: 'approved' | 'rejected' | 'pending') => {

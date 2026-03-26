@@ -111,6 +111,11 @@ Transactions:
 
 export async function processBankStatement(input: BankStatementInput): Promise<BankStatementOutput> {
   const { userId, fileDataUri } = input;
+  
+  if (!userId) {
+    throw new Error("Missing required User ID for statement processing.");
+  }
+
   const month = format(new Date(), 'yyyy-MM');
   const usageId = `${userId}_${month}`;
   const usageRef = doc(db, 'ai_usage', usageId);
@@ -171,6 +176,8 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
 
     // 6. Increment Usage
     await setDoc(usageRef, {
+      userId,
+      month,
       hybridStatementCount: increment(1),
       lastUpdated: new Date().toISOString()
     }, { merge: true });
@@ -193,6 +200,7 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
   } catch (err: any) {
     console.error("[processBankStatement] Error:", err.message);
     if (err.message.includes('limit reached')) throw err;
-    throw new Error('Failed to process statement. Please ensure it is a valid bank PDF/CSV.');
+    if (err.message.includes('No debit transactions')) throw err;
+    throw new Error(`Failed to process statement: ${err.message}`);
   }
 }
