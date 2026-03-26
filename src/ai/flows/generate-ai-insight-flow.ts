@@ -1,10 +1,6 @@
 'use server';
 /**
  * @fileOverview generateAIInsight - Genkit flow for financial insights with quota management.
- * 
- * - generateAIInsight: Main function to generate insights.
- * - AIInsightInput: Schema for userId and prompt.
- * - AIInsightOutput: Schema for the generated insight and updated usage count.
  */
 
 import { ai } from '@/ai/genkit';

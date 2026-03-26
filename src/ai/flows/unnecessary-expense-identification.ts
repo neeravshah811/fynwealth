@@ -1,10 +1,6 @@
 'use server';
 /**
  * @fileOverview An AI agent that analyzes spending patterns to identify recurring or potentially unnecessary expenses.
- *
- * - identifyUnnecessaryExpenses - A function that handles the expense analysis process.
- * - IdentifyUnnecessaryExpensesInput - The input type for the identifyUnnecessaryExpenses function.
- * - IdentifyUnnecessaryExpensesOutput - The return type for the identifyUnnecessaryExpenses function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -26,12 +22,12 @@ const IdentifiedExpenseSchema = z.object({
   description: z.string().describe('The description of the potentially unnecessary or recurring expense.'),
   amount: z.number().describe('The amount of the expense.'),
   category: z.string().describe('The category of the expense.'),
-  reason: z.string().describe('The reason why this expense is considered potentially unnecessary or recurring, or a pattern of recurrence.'),
+  reason: z.string().describe('The reason why this expense is considered potentially unnecessary or recurring.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
-  unnecessaryExpenses: z.array(IdentifiedExpenseSchema).describe('A list of expenses identified as potentially unnecessary or recurring.'),
-  summary: z.string().describe('A general summary of the identified patterns and suggestions for the user.'),
+  unnecessaryExpenses: z.array(IdentifiedExpenseSchema).describe('A list of identified expenses.'),
+  summary: z.string().describe('A general summary of suggestions.'),
 });
 export type IdentifyUnnecessaryExpensesOutput = z.infer<typeof IdentifyUnnecessaryExpensesOutputSchema>;
 
@@ -62,7 +58,13 @@ const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
     outputSchema: IdentifyUnnecessaryExpensesOutputSchema,
   },
   async (input) => {
-    const {output} = await unnecessaryExpenseIdentificationPrompt(input);
-    return output!;
+    try {
+      const {output} = await unnecessaryExpenseIdentificationPrompt(input);
+      if (!output) throw new Error("No output generated");
+      return output;
+    } catch (err: any) {
+      console.error("[unnecessaryExpenseIdentificationFlow] Error:", err.message);
+      throw new Error("Failed to identify unnecessary expenses. Please try again later.");
+    }
   }
 );

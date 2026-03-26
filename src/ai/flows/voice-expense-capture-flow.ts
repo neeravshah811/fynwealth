@@ -1,10 +1,6 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for capturing expense details from voice input.
- *
- * - voiceExpenseCapture - A function that handles the voice-to-expense capture process.
- * - VoiceExpenseCaptureInput - The input type for the voiceExpenseCapture function.
- * - VoiceExpenseCaptureOutput - The return type for the voiceExpenseCapture function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -76,47 +72,55 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
     outputSchema: VoiceExpenseCaptureOutputSchema,
   },
   async input => {
-    // Get current date for context
-    const today = new Date().toISOString().split('T')[0];
+    try {
+      // Get current date for context
+      const today = new Date().toISOString().split('T')[0];
 
-    // Perform direct extraction from audio
-    const result = await extractFromAudioPrompt({
-      audioDataUri: input.audioDataUri,
-      today,
-    });
+      // Perform direct extraction from audio
+      const result = await extractFromAudioPrompt({
+        audioDataUri: input.audioDataUri,
+        today,
+      });
 
-    let {amount, category, description, date} = result.output!;
+      if (!result.output) throw new Error("No output generated from AI");
 
-    // Post-processing and validation for extracted fields
-    if (!date || isNaN(new Date(date) as any)) {
-      date = today;
+      let {amount, category, description, date} = result.output;
+
+      // Post-processing and validation for extracted fields
+      if (!date || isNaN(new Date(date) as any)) {
+        date = today;
+      }
+
+      if (typeof amount !== 'number' || isNaN(amount)) {
+        amount = 0;
+      }
+
+      const validCategories: VoiceExpenseCaptureOutput['category'][] = [
+        'Food',
+        'Transport',
+        'Utilities',
+        'Rent',
+        'Subscriptions',
+        'Shopping',
+        'Entertainment',
+        'Healthcare',
+        'Education',
+        'Other',
+      ];
+      if (!validCategories.includes(category)) {
+        category = 'Other';
+      }
+
+      return {
+        amount,
+        category,
+        description,
+        date,
+      };
+    } catch (err: any) {
+      console.error("[voiceExpenseCaptureFlow] Error:", err.message);
+      if (err.message.includes('429')) throw new Error('AI Quota Exceeded. Please try again.');
+      throw new Error("Failed to process voice input. Please speak clearly and try again.");
     }
-
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0;
-    }
-
-    const validCategories: VoiceExpenseCaptureOutput['category'][] = [
-      'Food',
-      'Transport',
-      'Utilities',
-      'Rent',
-      'Subscriptions',
-      'Shopping',
-      'Entertainment',
-      'Healthcare',
-      'Education',
-      'Other',
-    ];
-    if (!validCategories.includes(category)) {
-      category = 'Other';
-    }
-
-    return {
-      amount,
-      category,
-      description,
-      date,
-    };
   }
 );

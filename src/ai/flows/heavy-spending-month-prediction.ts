@@ -43,10 +43,12 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
     try {
       const expensesJson = JSON.stringify(input.expenses);
       const {output} = await prompt({expensesJson});
-      return output!;
+      if (!output) throw new Error("No output generated");
+      return output;
     } catch (err: any) {
+      console.error("[predictHeavySpendingMonthsFlow] Error:", err.message);
       if (err.message.includes('429')) throw new Error('AI Quota Exceeded.');
-      throw err;
+      throw new Error("Failed to predict heavy spending. Please try again later.");
     }
   }
 );

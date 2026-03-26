@@ -34,11 +34,11 @@ const TransactionSchema = z.object({
     'Miscellaneous'
   ]),
   confidence: z.number(),
-  status: z.literal('pending'),
+  status: z.enum(['pending']),
   actions: z.object({
-    canEdit: z.boolean().default(true),
-    canApprove: z.boolean().default(true),
-    canReject: z.boolean().default(true)
+    canEdit: z.boolean(),
+    canApprove: z.boolean(),
+    canReject: z.boolean()
   })
 });
 
@@ -48,10 +48,10 @@ const BankStatementOutputSchema = z.object({
     totalExpense: z.number()
   }),
   review: z.object({
-    editable: z.boolean().default(true),
+    editable: z.boolean(),
     bulkActions: z.object({
-      approveAll: z.boolean().default(true),
-      rejectAll: z.boolean().default(true)
+      approveAll: z.boolean(),
+      rejectAll: z.boolean()
     }),
     instructions: z.string()
   }),
@@ -74,7 +74,7 @@ STRICT RULES:
 1. ONLY include DEBIT > 0. IGNORE Credits, Salary, Refunds, Interest.
 2. CATEGORIES (Mandatory): Assign one from the list: Food and Groceries, Shopping, Transportation, Essentials, Subscriptions, Health & Personal, Financial Commitments, Investments, Education / Kids, Life & Entertainment, Household & Family, Warranties, Personal, Miscellaneous.
 3. CLEAN Description: Remove transaction IDs and codes. Keep clean merchant names (e.g., "Swiggy" not "UPI-SWIGGY-1234").
-4. No duplicates. ALL status = "pending".
+4. No duplicates. ALL status = "pending". ALL actions (canEdit, canApprove, canReject) should be set to true.
 
 Statement Data:
 {{#if fileDataUri}}{{media url=fileDataUri}}{{/if}}
@@ -90,10 +90,13 @@ const processBankStatementFlow = ai.defineFlow(
   async (input) => {
     try {
       const { output } = await prompt(input);
-      return output!;
+      if (!output) throw new Error("No output generated from AI");
+      return output;
     } catch (err: any) {
+      console.error("[processBankStatementFlow] Error:", err.message);
       if (err.message.includes('429')) throw new Error('AI Quota Exceeded. Please try again in a few seconds.');
-      throw err;
+      if (err.message.includes('Invalid JSON payload')) throw new Error('AI Schema Mismatch. Please contact support.');
+      throw new Error('Failed to process statement. Please try again later.');
     }
   }
 );
