@@ -5,23 +5,16 @@ service cloud.firestore {
 
     /**
      * CORE PHILOSOPHY:
-     * This ruleset enforces a strict user-ownership model while providing secure 
-     * administrative oversight. Security is managed through structural segregation 
-     * and data denormalization.
+     * Enforce strict user-ownership while providing secure administrative oversight.
+     * All data access is blocked by default and permitted only via explicit rules.
      */
 
     // --- Global Helper Functions ---
 
-    /**
-     * @description Checks if a user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the user is the super-admin or an authorized administrator.
-     */
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@fynwealth.com' ||
@@ -29,36 +22,21 @@ service cloud.firestore {
       );
     }
 
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function belongsToUser() {
+      return isSignedIn() && (
+        (resource == null || resource.data.userId == request.auth.uid) &&
+        (request.resource == null || request.resource.data.userId == request.auth.uid)
+      );
     }
 
     // --- Collection Rules ---
 
     /**
-     * @description Global Categories and Subcategories. 
-     * Users can create their own entries marked with their UID.
-     */
-    match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow write: if isAdmin(); // Global admin fallback
-    }
-
-    match /subcategories/{subcategoryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow write: if isAdmin(); // Global admin fallback
-    }
-
-    /**
-     * @description User Profiles and all private sub-data (expenses, budgets, bills, folders, etc.)
-     * Uses recursive matching to ensure all nested paths are covered by owner-only logic.
+     * @description User Profiles and nested data (expenses, budgets, bills, folders, etc.)
      */
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
@@ -69,63 +47,74 @@ service cloud.firestore {
     }
 
     /**
-     * @description Monthly AI usage tracking.
+     * @description Transactions collection (if used at top-level)
+     */
+    match /transactions/{transactionId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if belongsToUser() || isAdmin();
+    }
+
+    /**
+     * @description AI Usage Tracking (Monthly Quotas)
      */
     match /ai_usage/{usageId} {
-      allow read, write: if isSignedIn() && (
-        (resource == null || resource.data.userId == request.auth.uid) &&
-        (request.resource == null || request.resource.data.userId == request.auth.uid)
-      );
+      allow read, write: if belongsToUser() || isAdmin();
     }
 
     /**
-     * @description AI analysis results for statements.
+     * @description Uploads and Statement Analysis Results
      */
+    match /uploads/{uploadId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if belongsToUser() || isAdmin();
+    }
+
     match /statement_results/{resultId} {
-      allow read, write: if isSignedIn() && (
-        (resource == null || resource.data.userId == request.auth.uid) &&
-        (request.resource == null || request.resource.data.userId == request.auth.uid)
-      );
+      allow read, write: if belongsToUser() || isAdmin();
     }
 
     /**
-     * @description System-defined categories. Globally readable.
+     * @description Global Categories and Subcategories
      */
-    match /system_categories/{categoryId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /subcategories/{subcategoryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
     /**
-     * @description Application-wide analytics and statistics.
+     * @description Administrative collections
      */
+    match /blacklist/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /analytics/{docId} {
       allow read, write: if isAdmin();
     }
 
-    /**
-     * @description Registry of authorized administrators.
-     */
-    match /admins/{adminId} {
-      allow get, list: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    /**
-     * @description User-submitted feature requests.
-     */
     match /featureRequests/{requestId} {
       allow create: if isSignedIn();
-      // Allow admins to manage (read, update, delete) feature requests
       allow get, list, update, delete: if isAdmin();
     }
 
     /**
-     * @description List of blacklisted UIDs who are banned from logging in.
+     * @description Default Fallback - Deny all access
      */
-    match /blacklist/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow write: if isAdmin();
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
