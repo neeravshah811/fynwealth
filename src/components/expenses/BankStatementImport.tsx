@@ -3,7 +3,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, setDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -20,19 +20,17 @@ import {
   FileUp, 
   Loader2, 
   CheckCircle2, 
-  Trash2, 
   FileText,
   Plus,
-  AlertCircle,
   X,
-  Edit2,
   ThumbsUp,
   RotateCcw
 } from "lucide-react";
-import { processBankStatement, type BankStatementOutput } from "@/ai/flows/bank-statement-import-flow";
+import { processBankStatement } from "@/ai/flows/bank-statement-import-flow";
 import { toast } from "@/hooks/use-toast";
 import { useFynWealthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const CATEGORIES = [
   'Education / Kids',
@@ -73,46 +71,81 @@ export function BankStatementImport() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?.uid) return;
+    if (!file || !user?.uid || !db) return;
 
     setLoading(true);
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-      try {
-        const content = reader.result as string;
-        const result = await processBankStatement({
-          userId: user.uid,
-          fileDataUri: content,
-          fileName: file.name
+
+    try {
+      // 1. Check Usage Quota (Client Side to respect Security Rules)
+      const month = format(new Date(), 'yyyy-MM');
+      const usageId = `${user.uid}_${month}`;
+      const usageRef = doc(db, 'ai_usage', usageId);
+      const usageDoc = await getDoc(usageRef);
+      
+      const hybridCount = usageDoc.exists() ? (usageDoc.data().hybridStatementCount || 0) : 0;
+      if (hybridCount >= 5) {
+        toast({ 
+          variant: "destructive", 
+          title: "Monthly Limit Reached", 
+          description: "You have reached the limit of 5 statement imports per month." 
         });
-
-        if (result && result.transactions && result.transactions.length > 0) {
-          setTransactions(result.transactions);
-          setReviewMode(true);
-          toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions for review.` });
-        } else {
-          toast({ 
-            variant: "destructive", 
-            title: "No Data Extracted", 
-            description: "The AI couldn't find any debit transactions. Please ensure the file contains spending records." 
-          });
-        }
-      } catch (err: any) {
-        console.error("Statement Error:", err);
-        let message = err.message || "Could not process statement.";
-        if (String(err).includes("429") || String(err).includes("quota")) {
-          message = "AI service quota reached. Please wait 10-20 seconds and try again.";
-        }
-        toast({ variant: "destructive", title: "Import Failed", description: message });
-      } finally {
         setLoading(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
       }
-    };
 
-    // Always read as data URL for the Gemini backend compatibility
-    reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const content = reader.result as string;
+          const result = await processBankStatement({
+            userId: user.uid,
+            fileDataUri: content,
+            fileName: file.name
+          });
+
+          if (result && result.transactions && result.transactions.length > 0) {
+            // 2. Track Usage Increment (Client Side)
+            await setDoc(usageRef, {
+              userId: user.uid,
+              month,
+              hybridStatementCount: increment(1),
+              lastUpdated: serverTimestamp()
+            }, { merge: true });
+
+            // 3. Store Intelligence Results (Client Side)
+            if (result.insights || result.anomalies) {
+              await addDoc(collection(db, 'statement_results'), {
+                userId: user.uid,
+                uploadId: `up_${Date.now()}`,
+                insights: result.insights || [],
+                anomalies: result.anomalies || [],
+                processedAt: serverTimestamp()
+              });
+            }
+
+            setTransactions(result.transactions);
+            setReviewMode(true);
+            toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions.` });
+          } else {
+            toast({ variant: "destructive", title: "No Data", description: "No debit transactions found." });
+          }
+        } catch (err: any) {
+          console.error("Import Error:", err);
+          let message = err.message || "Could not process statement.";
+          if (String(err).includes("429") || String(err).includes("quota")) {
+            message = "AI service quota reached. Please wait a moment and try again.";
+          }
+          toast({ variant: "destructive", title: "Import Failed", description: message });
+        } finally {
+          setLoading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Quota Check Error:", err);
+      toast({ variant: "destructive", title: "Error", description: "Could not verify your usage quota." });
+      setLoading(false);
+    }
   };
 
   const updateStatus = (id: string, status: 'approved' | 'rejected' | 'pending') => {
@@ -125,26 +158,25 @@ export function BankStatementImport() {
 
   const handleBulkApprove = () => {
     setTransactions(prev => prev.map(t => t.status === 'pending' ? { ...t, status: 'approved' } : t));
-    toast({ title: "Bulk Action", description: "All pending transactions marked as approved." });
   };
 
   const handleBulkReject = () => {
     setTransactions(prev => prev.map(t => ({ ...t, status: 'rejected' })));
-    toast({ title: "Bulk Action", description: "All transactions removed from review." });
   };
 
   const handleConfirmImport = async () => {
+    if (!user?.uid || !db) return;
     const approvedTxns = transactions.filter(t => t.status === 'approved');
     if (approvedTxns.length === 0) {
-      toast({ variant: "destructive", title: "Nothing to Save", description: "Please approve at least one transaction." });
+      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve some transactions first." });
       return;
     }
 
     setLoading(true);
     try {
       const promises = approvedTxns.map(t => {
-        return addDoc(collection(db, 'users', user!.uid, 'expenses'), {
-          userId: user!.uid,
+        return addDoc(collection(db, 'users', user.uid, 'expenses'), {
+          userId: user.uid,
           amount: t.amount,
           date: t.date,
           categoryName: t.category,
@@ -158,15 +190,15 @@ export function BankStatementImport() {
 
       await Promise.all(promises);
       
-      await updateDoc(doc(db, 'users', user!.uid), {
+      await updateDoc(doc(db, 'users', user.uid), {
         'stats.totalExpenses': increment(approvedTxns.length)
       });
 
-      toast({ title: "Sync Complete", description: `${approvedTxns.length} records saved to your vault.` });
+      toast({ title: "Vault Synced", description: `${approvedTxns.length} transactions recorded.` });
       setIsOpen(false);
       reset();
     } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to save records." });
+      toast({ variant: "destructive", title: "Save Error", description: "Could not save transactions." });
     } finally {
       setLoading(false);
     }
@@ -176,6 +208,7 @@ export function BankStatementImport() {
     setReviewMode(false);
     setTransactions([]);
     setLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -201,26 +234,26 @@ export function BankStatementImport() {
               Statement Audit
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Review and approve debit transactions before they enter your vault.
+              Deterministic parsing + AI intelligence layer. Review before saving.
             </DialogDescription>
           </DialogHeader>
 
           {!reviewMode ? (
             <div className="p-12 flex flex-col items-center justify-center text-center space-y-6">
-              <div className={`p-10 rounded-full transition-all duration-500 ${loading ? 'bg-primary/10 animate-pulse' : 'bg-muted/30'}`}>
+              <div className={cn("p-10 rounded-full transition-all duration-500", loading ? 'bg-primary/10 animate-pulse' : 'bg-muted/30')}>
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "AI is cleaning your data..." : "Select File"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "Analyzing Statement..." : "Select Statement File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload PDF, CSV or Excel. AI will ignore credits and normalize debit descriptions.
+                  Deterministic parsing ensures accuracy while AI categorizes and detects anomalies.
                 </p>
               </div>
               
               <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.csv,.xlsx,.txt" onChange={handleFileChange} />
               <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Processing..." : "Choose Statement"}
+                {loading ? "Verifying Quota..." : "Choose File"}
               </Button>
             </div>
           ) : (
@@ -228,17 +261,17 @@ export function BankStatementImport() {
               <div className="bg-muted/30 px-8 py-4 flex items-center justify-between border-b">
                 <div className="flex items-center gap-8">
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Expenses</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Transactions</p>
                     <p className="text-lg font-bold text-primary">{summary.totalTransactions}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Value</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Expense</p>
                     <p className="text-lg font-bold text-foreground">{currency.symbol}{summary.totalExpense.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button variant="outline" size="sm" onClick={handleBulkReject} className="h-8 text-[10px] font-bold uppercase border-destructive/20 text-destructive hover:bg-destructive/5 rounded-lg">
-                    Clear All
+                    Clear List
                   </Button>
                   <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg">
                     Approve All
@@ -251,8 +284,8 @@ export function BankStatementImport() {
                   <div className="p-4 space-y-3">
                     {transactions.filter(t => t.status !== 'rejected').map((t) => (
                       <div key={t.id} className={cn(
-                        "flex flex-col gap-4 p-4 rounded-xl border transition-all group",
-                        t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100" : "bg-card border-muted hover:ring-1 hover:ring-primary/20"
+                        "flex flex-col gap-4 p-4 rounded-xl border transition-all",
+                        t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100" : "bg-card border-muted"
                       )}>
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex flex-col min-w-0 flex-1">
@@ -272,7 +305,7 @@ export function BankStatementImport() {
                                 </SelectContent>
                               </Select>
                               {t.confidence < 0.8 && (
-                                <Badge variant="secondary" className="bg-amber-50 text-amber-600 text-[8px] h-4 uppercase font-bold border-amber-100">AI Unsure</Badge>
+                                <Badge variant="secondary" className="bg-amber-50 text-amber-600 text-[8px] h-4 uppercase font-bold border-amber-100">AI Review</Badge>
                               )}
                             </div>
                           </div>
@@ -301,7 +334,7 @@ export function BankStatementImport() {
                     {transactions.filter(t => t.status !== 'rejected').length === 0 && (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                         <RotateCcw className="w-8 h-8 opacity-20" />
-                        <p className="text-xs font-bold uppercase tracking-widest italic">Review cleared</p>
+                        <p className="text-xs font-bold uppercase tracking-widest italic">All cleared</p>
                       </div>
                     )}
                   </div>
@@ -316,7 +349,7 @@ export function BankStatementImport() {
                   className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
-                  Save Approved Debits
+                  Save to Vault
                 </Button>
               </DialogFooter>
             </div>

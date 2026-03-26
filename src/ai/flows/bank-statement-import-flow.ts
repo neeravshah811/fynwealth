@@ -3,19 +3,11 @@
 /**
  * @fileOverview Hybrid Bank Statement Processing Engine.
  * deterministic parsing (Python) + Gemini intelligence layer.
+ * Note: Firestore mutations are handled by the calling client component to respect security rules.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getFirestore, doc, getDoc, setDoc, increment, collection, addDoc } from 'firebase/firestore';
-import { initializeApp, getApps } from 'firebase/app';
-import { firebaseConfig } from '@/firebase/config';
-import { format } from 'date-fns';
-
-if (!getApps().length) {
-  initializeApp(firebaseConfig);
-}
-const db = getFirestore();
 
 const BankStatementInputSchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -63,8 +55,6 @@ export type BankStatementOutput = z.infer<typeof BankStatementOutputSchema>;
  * In production, this calls a Python microservice using pdfplumber/pandas.
  */
 async function callPythonParser(fileDataUri: string) {
-  // Placeholder: In a real scenario, you'd fetch() your Python Cloud Run endpoint here.
-  // For now, we simulate structured output from a deterministic parser.
   console.log("[PythonParser] Deterministically extracting data from file...");
   
   // Simulation of parser output
@@ -116,19 +106,8 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
     throw new Error("Missing required User ID for statement processing.");
   }
 
-  const month = format(new Date(), 'yyyy-MM');
-  const usageId = `${userId}_${month}`;
-  const usageRef = doc(db, 'ai_usage', usageId);
-
   try {
-    // 1. Check Hybrid AI Usage (Limit 5 per month)
-    const usageDoc = await getDoc(usageRef);
-    const hybridCount = usageDoc.exists() ? (usageDoc.data().hybridStatementCount || 0) : 0;
-    if (hybridCount >= 5) {
-      throw new Error('Statement processing limit reached (5 per month)');
-    }
-
-    // 2. Deterministic Parsing (Python simulation)
+    // 1. Deterministic Parsing (Python simulation)
     const parsedData = await callPythonParser(fileDataUri);
     const debitsOnly = parsedData.filter(t => t.type === "debit");
 
@@ -136,18 +115,16 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
       throw new Error("No debit transactions found in statement.");
     }
 
-    // 3. Gemini Intelligence Layer (Single Batch Call)
-    // We only send debits to save tokens and focus on expenses.
+    // 2. Gemini Intelligence Layer (Single Batch Call)
     let aiResponse;
     try {
       const { output } = await intelligencePrompt({ transactions: debitsOnly });
       aiResponse = output;
     } catch (aiErr) {
       console.warn("[HybridFlow] Gemini Intelligence failed, using fallback.", aiErr);
-      // Fallback: No insights/anomalies, basic categorization
     }
 
-    // 4. Map results back to structured schema
+    // 3. Map results back to structured schema
     const finalTransactions: any[] = debitsOnly.map((t, idx) => {
       const aiData = aiResponse?.categorized.find(c => c.index === idx);
       return {
@@ -161,26 +138,6 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
         actions: { canEdit: true, canApprove: true, canReject: true }
       };
     });
-
-    // 5. Store Insights/Anomalies in Firestore
-    const uploadId = `up_${Date.now()}`;
-    if (aiResponse) {
-      await addDoc(collection(db, 'statement_results'), {
-        userId,
-        uploadId,
-        insights: aiResponse.insights,
-        anomalies: aiResponse.anomalies,
-        processedAt: new Date().toISOString()
-      });
-    }
-
-    // 6. Increment Usage
-    await setDoc(usageRef, {
-      userId,
-      month,
-      hybridStatementCount: increment(1),
-      lastUpdated: new Date().toISOString()
-    }, { merge: true });
 
     return {
       summary: {
@@ -198,9 +155,7 @@ export async function processBankStatement(input: BankStatementInput): Promise<B
     };
 
   } catch (err: any) {
-    console.error("[processBankStatement] Error:", err.message);
-    if (err.message.includes('limit reached')) throw err;
-    if (err.message.includes('No debit transactions')) throw err;
-    throw new Error(`Failed to process statement: ${err.message}`);
+    console.error("[processBankStatement] Server Error:", err.message);
+    throw err;
   }
 }

@@ -69,6 +69,26 @@ service cloud.firestore {
     }
 
     /**
+     * @description Monthly AI usage tracking.
+     */
+    match /ai_usage/{usageId} {
+      allow read, write: if isSignedIn() && (
+        (resource == null || resource.data.userId == request.auth.uid) &&
+        (request.resource == null || request.resource.data.userId == request.auth.uid)
+      );
+    }
+
+    /**
+     * @description AI analysis results for statements.
+     */
+    match /statement_results/{resultId} {
+      allow read, write: if isSignedIn() && (
+        (resource == null || resource.data.userId == request.auth.uid) &&
+        (request.resource == null || request.resource.data.userId == request.auth.uid)
+      );
+    }
+
+    /**
      * @description System-defined categories. Globally readable.
      */
     match /system_categories/{categoryId} {
