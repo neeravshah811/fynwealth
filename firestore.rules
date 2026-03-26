@@ -17,8 +17,10 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'admin@fynwealth.com' ||
-        request.auth.token.email.matches('.*@fynwealth.com')
+        request.auth.token.email != null && (
+          request.auth.token.email == 'admin@fynwealth.com' ||
+          request.auth.token.email.matches('.*@fynwealth.com')
+        )
       );
     }
 
@@ -26,7 +28,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function belongsToUser() {
+    function ownsDocument() {
       return isSignedIn() && (
         (resource == null || resource.data.userId == request.auth.uid) &&
         (request.resource == null || request.resource.data.userId == request.auth.uid)
@@ -47,30 +49,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Transactions collection (if used at top-level)
-     */
-    match /transactions/{transactionId} {
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if belongsToUser() || isAdmin();
-    }
-
-    /**
      * @description AI Usage Tracking (Monthly Quotas)
      */
     match /ai_usage/{usageId} {
-      allow read, write: if belongsToUser() || isAdmin();
+      allow read, write: if ownsDocument() || isAdmin();
     }
 
     /**
-     * @description Uploads and Statement Analysis Results
+     * @description Statement Analysis Results
      */
-    match /uploads/{uploadId} {
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if belongsToUser() || isAdmin();
-    }
-
     match /statement_results/{resultId} {
-      allow read, write: if belongsToUser() || isAdmin();
+      allow read, write: if ownsDocument() || isAdmin();
     }
 
     /**
@@ -91,23 +80,39 @@ service cloud.firestore {
     /**
      * @description Administrative collections
      */
-    match /blacklist/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow write: if isAdmin();
-    }
-
     match /admins/{adminId} {
+      // Standard users read this to check their own role in AuthGuard
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
     match /analytics/{docId} {
-      allow read, write: if isAdmin();
+      // Standard users need read/write to increment totalUsers in appStats during signup
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (docId == 'appStats' && isSignedIn());
     }
 
     match /featureRequests/{requestId} {
       allow create: if isSignedIn();
       allow get, list, update, delete: if isAdmin();
+    }
+
+    match /blacklist/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    /**
+     * @description Optional top-level collections
+     */
+    match /transactions/{transactionId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if ownsDocument() || isAdmin();
+    }
+
+    match /uploads/{uploadId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if ownsDocument() || isAdmin();
     }
 
     /**
