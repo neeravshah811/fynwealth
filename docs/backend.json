@@ -127,9 +127,23 @@
         "userId": { "type": "string" },
         "month": { "type": "string", "description": "Format: YYYY-MM" },
         "count": { "type": "number" },
+        "hybridStatementCount": { "type": "number", "description": "Limit of 5 hybrid processing calls." },
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "month", "count"]
+    },
+    "StatementResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StatementResult",
+      "type": "object",
+      "description": "Stored intelligence from bank statement processing.",
+      "properties": {
+        "userId": { "type": "string" },
+        "uploadId": { "type": "string" },
+        "insights": { "type": "array", "items": { "type": "string" } },
+        "anomalies": { "type": "array", "items": { "type": "string" } },
+        "processedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -168,6 +182,10 @@
       {
         "path": "/ai_usage/{usageId}",
         "definition": { "entityName": "AIUsage", "description": "Monthly AI usage tracking." }
+      },
+      {
+        "path": "/statement_results/{resultId}",
+        "definition": { "entityName": "StatementResult", "description": "AI analysis results for statements." }
       }
     ]
   }
