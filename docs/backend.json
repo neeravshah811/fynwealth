@@ -117,6 +117,19 @@
         "reason": { "type": "string" }
       },
       "required": ["uid", "email", "deletedAt"]
+    },
+    "AIUsage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AIUsage",
+      "type": "object",
+      "description": "Tracks monthly AI usage per user for quota management.",
+      "properties": {
+        "userId": { "type": "string" },
+        "month": { "type": "string", "description": "Format: YYYY-MM" },
+        "count": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "month", "count"]
     }
   },
   "auth": {
@@ -151,6 +164,10 @@
       {
         "path": "/blacklist/{uid}",
         "definition": { "entityName": "BlacklistedUser", "description": "Global list of banned credentials." }
+      },
+      {
+        "path": "/ai_usage/{usageId}",
+        "definition": { "entityName": "AIUsage", "description": "Monthly AI usage tracking." }
       }
     ]
   }
