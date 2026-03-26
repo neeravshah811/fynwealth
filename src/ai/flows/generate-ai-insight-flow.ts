@@ -1,13 +1,10 @@
-
 'use server';
 /**
- * @fileOverview A specialized Genkit flow for generating financial insights with usage tracking.
+ * @fileOverview generateAIInsight - Genkit flow for financial insights with quota management.
  * 
- * - generateAIInsight - Main function to generate insights.
- * - generateAIInsightFlow - The Genkit flow definition.
- * 
- * This implementation acts as a server-side "callable" function within the Next.js environment.
- * It enforces a monthly quota of 20 requests per user and uses Gemini 2.0 Flash.
+ * - generateAIInsight: Main function to generate insights.
+ * - AIInsightInput: Schema for userId and prompt.
+ * - AIInsightOutput: Schema for the generated insight and updated usage count.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,7 +14,7 @@ import { getFirestore, doc, getDoc, setDoc, increment } from 'firebase/firestore
 import { firebaseConfig } from '@/firebase/config';
 import { format } from 'date-fns';
 
-// Initialize Firebase Client SDK for server-side use in this flow
+// Initialize Firebase for server-side use in this flow
 if (!getApps().length) {
   initializeApp(firebaseConfig);
 }
@@ -36,8 +33,8 @@ const AIInsightOutputSchema = z.object({
 export type AIInsightOutput = z.infer<typeof AIInsightOutputSchema>;
 
 /**
- * generateAIInsight - Main server action acting as an HTTPS callable.
- * Checks usage limits and generates a concise financial insight using Gemini.
+ * generateAIInsight - Server action acting as an HTTPS callable.
+ * Enforces a monthly quota of 20 requests per user and uses Gemini 2.0 Flash.
  */
 export async function generateAIInsight(input: AIInsightInput): Promise<AIInsightOutput> {
   return generateAIInsightFlow(input);
@@ -52,7 +49,7 @@ const generateAIInsightFlow = ai.defineFlow(
   async (input) => {
     const { userId, prompt: userPrompt } = input;
     
-    // Usage tracking logic: Key by userId and current month (YYYY-MM)
+    // Usage tracking: Key by userId and current month (YYYY-MM)
     const month = format(new Date(), 'yyyy-MM');
     const usageId = `${userId}_${month}`;
     const usageRef = doc(db, 'ai_usage', usageId);
@@ -68,7 +65,6 @@ const generateAIInsightFlow = ai.defineFlow(
       }
 
       // 3. Call Gemini API via Genkit using gemini-2.0-flash
-      // Optimized for low cost with concise prompt and token limits
       const response = await ai.generate({
         model: 'googleai/gemini-2.0-flash',
         prompt: `You are a concise financial advisor for FynWealth. 
@@ -100,8 +96,7 @@ const generateAIInsightFlow = ai.defineFlow(
 
     } catch (error: any) {
       console.error("[generateAIInsight] Error:", error.message);
-      // Log specific AI usage limit error
-      if (error.message === 'AI usage limit reached') {
+      if (error.message === 'AI usage limit reached' || error.message.includes('429')) {
         throw error;
       }
       throw new Error("Failed to generate AI insight. Please try again later.");
