@@ -1,8 +1,9 @@
+
 "use client";
 
-import { useFynWealthStore, SYSTEM_CATEGORIES } from "@/lib/store";
+import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, updateDoc, query, orderBy, where, addDoc, serverTimestamp, setDoc, getDocs, increment } from "firebase/firestore";
+import { collection, doc, query, orderBy, where, serverTimestamp, getDocs, increment } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +17,9 @@ import {
   Filter, 
   Download, 
   Upload, 
-  Calendar as CalendarIcon, 
   Tag, 
   Repeat, 
   Paperclip, 
-  FileText, 
   X 
 } from "lucide-react";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -48,6 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { addDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 export default function ExpensesPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -153,7 +153,7 @@ export default function ExpensesPage() {
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!db || !user?.uid) return;
     const docRef = doc(db, 'users', user.uid, 'expenses', id);
-    updateDoc(docRef, { status: currentStatus === 'paid' ? 'unpaid' : 'paid' });
+    updateDocumentNonBlocking(docRef, { status: currentStatus === 'paid' ? 'unpaid' : 'paid' });
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -166,7 +166,7 @@ export default function ExpensesPage() {
       const subcategoryObj = editSubcategories.find(s => s.id === editingExpense.subcategoryId);
 
       const docRef = doc(db, 'users', user.uid, 'expenses', editingExpense.id);
-      await updateDoc(docRef, {
+      updateDocumentNonBlocking(docRef, {
         ...editingExpense,
         amount: Math.abs(parseFloat(editingExpense.amount)),
         categoryName: categoryObj?.name || editingExpense.categoryName || "Unknown",
@@ -203,11 +203,11 @@ export default function ExpensesPage() {
     if (!db || !user?.uid) return;
     
     // Update user stats
-    updateDoc(doc(db, 'users', user.uid), {
+    updateDocumentNonBlocking(doc(db, 'users', user.uid), {
       'stats.totalExpenses': increment(-1)
-    }).catch(() => {});
+    });
 
-    deleteDoc(doc(db, 'users', user.uid, 'expenses', id));
+    deleteDocumentNonBlocking(doc(db, 'users', user.uid, 'expenses', id));
     toast({ title: "Deleted", description: "Record removed." });
   };
 
@@ -285,9 +285,9 @@ export default function ExpensesPage() {
             const [date, desc, cat, sub, amt, status, budgetLimit] = parts.map(p => p.trim().replace(/^"|"$/g, ''));
             
             const parsedAmount = Math.abs(parseFloat(amt));
-            if (isNaN(parsedAmount)) throw new Error("Invalid amount");
+            if (isNaN(parsedAmount)) continue;
 
-            addDoc(collection(db, 'users', user.uid, 'expenses'), {
+            addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
               userId: user.uid,
               date: date || format(new Date(), 'yyyy-MM-dd'),
               note: desc || "",
@@ -308,7 +308,7 @@ export default function ExpensesPage() {
               
               if (categoryMatch) {
                 const budgetRef = doc(db, 'users', user.uid, 'budgets', categoryMatch.id);
-                setDoc(budgetRef, {
+                setDocumentNonBlocking(budgetRef, {
                   categoryId: categoryMatch.id,
                   categoryName: categoryMatch.name,
                   limit: Math.abs(parseFloat(budgetLimit)),
@@ -326,9 +326,9 @@ export default function ExpensesPage() {
       }
 
       if (successCount > 0) {
-        updateDoc(doc(db, 'users', user.uid), {
+        updateDocumentNonBlocking(doc(db, 'users', user.uid), {
           'stats.totalExpenses': increment(successCount)
-        }).catch(() => {});
+        });
       }
 
       toast({ 

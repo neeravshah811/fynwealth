@@ -5,8 +5,8 @@ service cloud.firestore {
 
     /**
      * CORE PHILOSOPHY:
-     * Enforce strict user-ownership while providing secure administrative oversight.
-     * All data access is blocked by default and permitted only via explicit rules.
+     * Enforce strict user-ownership.
+     * Access is denied by default.
      */
 
     // --- Global Helper Functions ---
@@ -28,6 +28,10 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    /**
+     * Checks if the user owns the document based on a userId field.
+     * Works for both existing resources and incoming requests.
+     */
     function ownsDocument() {
       return isSignedIn() && (
         (resource == null || resource.data.userId == request.auth.uid) &&
@@ -37,9 +41,6 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    /**
-     * @description User Profiles and nested data (expenses, budgets, bills, folders, etc.)
-     */
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
 
@@ -48,23 +49,16 @@ service cloud.firestore {
       }
     }
 
-    /**
-     * @description AI Usage Tracking (Monthly Quotas)
-     */
     match /ai_usage/{usageId} {
-      allow read, write: if ownsDocument() || isAdmin();
+      // Allow read/write if the document ID matches the pattern {uid}_{month}
+      // or if the document contains the correct userId field.
+      allow read, write: if isSignedIn() && (isAdmin() || ownsDocument() || usageId.startsWith(request.auth.uid));
     }
 
-    /**
-     * @description Statement Analysis Results
-     */
     match /statement_results/{resultId} {
       allow read, write: if ownsDocument() || isAdmin();
     }
 
-    /**
-     * @description Global Categories and Subcategories
-     */
     match /categories/{categoryId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
@@ -77,18 +71,14 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
-    /**
-     * @description Administrative collections
-     */
     match /admins/{adminId} {
-      // Standard users read this to check their own role in AuthGuard
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
     match /analytics/{docId} {
-      // Standard users need read/write to increment totalUsers in appStats during signup
       allow read: if isSignedIn();
+      // Allow standard users to increment stats (e.g. during signup)
       allow write: if isAdmin() || (docId == 'appStats' && isSignedIn());
     }
 
@@ -102,9 +92,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    /**
-     * @description Optional top-level collections
-     */
     match /transactions/{transactionId} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read, update, delete: if ownsDocument() || isAdmin();
@@ -115,9 +102,6 @@ service cloud.firestore {
       allow read, update, delete: if ownsDocument() || isAdmin();
     }
 
-    /**
-     * @description Default Fallback - Deny all access
-     */
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -3,7 +3,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, setDoc } from "firebase/firestore";
+import { collection, serverTimestamp, doc, increment, getDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ import { toast } from "@/hooks/use-toast";
 import { useFynWealthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { addDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const CATEGORIES = [
   'Education / Kids',
@@ -76,7 +77,7 @@ export function BankStatementImport() {
     setLoading(true);
 
     try {
-      // 1. Check Usage Quota (Client Side to respect Security Rules)
+      // 1. Check Usage Quota
       const month = format(new Date(), 'yyyy-MM');
       const usageId = `${user.uid}_${month}`;
       const usageRef = doc(db, 'ai_usage', usageId);
@@ -104,17 +105,17 @@ export function BankStatementImport() {
           });
 
           if (result && result.transactions && result.transactions.length > 0) {
-            // 2. Track Usage Increment (Client Side)
-            await setDoc(usageRef, {
+            // 2. Track Usage Increment
+            setDocumentNonBlocking(usageRef, {
               userId: user.uid,
               month,
               hybridStatementCount: increment(1),
               lastUpdated: serverTimestamp()
             }, { merge: true });
 
-            // 3. Store Intelligence Results (Client Side)
+            // 3. Store Intelligence Results
             if (result.insights || result.anomalies) {
-              await addDoc(collection(db, 'statement_results'), {
+              addDocumentNonBlocking(collection(db, 'statement_results'), {
                 userId: user.uid,
                 uploadId: `up_${Date.now()}`,
                 insights: result.insights || [],
@@ -174,8 +175,9 @@ export function BankStatementImport() {
 
     setLoading(true);
     try {
-      const promises = approvedTxns.map(t => {
-        return addDoc(collection(db, 'users', user.uid, 'expenses'), {
+      // Record expenses using centralized non-blocking helper
+      approvedTxns.forEach(t => {
+        addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
           userId: user.uid,
           amount: t.amount,
           date: t.date,
@@ -187,10 +189,9 @@ export function BankStatementImport() {
           createdAt: serverTimestamp()
         });
       });
-
-      await Promise.all(promises);
       
-      await updateDoc(doc(db, 'users', user.uid), {
+      // Update global count
+      updateDocumentNonBlocking(doc(db, 'users', user.uid), {
         'stats.totalExpenses': increment(approvedTxns.length)
       });
 

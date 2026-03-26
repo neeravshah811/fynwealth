@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,7 +14,7 @@ import {
   sendPasswordResetEmail,
   signOut
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { Loader2, Mail, Lock, User, ArrowRight, Chrome, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -58,12 +60,13 @@ export default function LoginPage() {
         userData.createdAt = serverTimestamp();
         userData.stats = { totalExpenses: 0, totalReminders: 0 };
         
-        // Update global stats
+        // Update global stats using centralized helper
         const statsRef = doc(db, 'analytics', 'appStats');
-        setDoc(statsRef, { totalUsers: increment(1) }, { merge: true }).catch(() => {});
+        setDocumentNonBlocking(statsRef, { totalUsers: increment(1) }, { merge: true });
       }
 
-      await setDoc(userRef, userData, { merge: true });
+      // Save user profile using centralized helper
+      setDocumentNonBlocking(userRef, userData, { merge: true });
     } catch (error: any) {
       if (error.message === 'BAN_ACTIVE') throw error;
       console.error("Failed to sync user profile", error);
