@@ -23,7 +23,8 @@ import {
   Plus,
   X,
   ThumbsUp,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from "lucide-react";
 import { processBankStatementManual } from "@/ai/flows/bank-statement-import-flow";
 import { toast } from "@/hooks/use-toast";
@@ -81,32 +82,91 @@ export function BankStatementImport() {
 
           if (extension === 'csv' || extension === 'txt') {
             const text = data as string;
-            const rows = text.split('\n');
-            parsed = rows.map(row => {
-              const cols = row.split(',');
-              if (cols.length < 3) return null;
-              // Attempt to guess mapping: Date, Description, Amount
-              const amount = parseFloat(cols[cols.length - 1]?.replace(/[^0-9.-]/g, ''));
+            const rows = text.split('\n').map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+            
+            // Try to find headers
+            let headerIdx = -1;
+            let dateIdx = 0, descIdx = 1, debitIdx = -1, amountIdx = -1;
+
+            for(let i = 0; i < Math.min(rows.length, 10); i++) {
+              const row = rows[i].map(c => c.toLowerCase());
+              if (row.some(c => c.includes('date') || c.includes('description') || c.includes('debit') || c.includes('withdrawal'))) {
+                headerIdx = i;
+                dateIdx = row.findIndex(c => c.includes('date'));
+                descIdx = row.findIndex(c => c.includes('desc') || c.includes('particulars'));
+                debitIdx = row.findIndex(c => c.includes('debit') || c.includes('withdrawal') || c.includes('paid out'));
+                amountIdx = row.findIndex(c => c === 'amount');
+                break;
+              }
+            }
+
+            const dataRows = rows.slice(headerIdx + 1);
+            parsed = dataRows.map(row => {
+              if (row.length < 2) return null;
+              
+              // If we found a specific debit column, use it. 
+              // Otherwise use the general amount column and check for negative values.
+              let amountStr = "";
+              if (debitIdx !== -1) amountStr = row[debitIdx];
+              else if (amountIdx !== -1) amountStr = row[amountIdx];
+              else amountStr = row[row.length - 1]; // Fallback to last column
+
+              const rawAmount = parseFloat(amountStr?.replace(/[^0-9.-]/g, ''));
+              if (isNaN(rawAmount) || rawAmount === 0) return null;
+
+              // Determine if it's a debit. 
+              // If it's in a dedicated "Debit" column, it's a debit regardless of sign.
+              // If it's in a general "Amount" column, it's a debit if it's negative.
+              const isDebit = (debitIdx !== -1 && Math.abs(rawAmount) > 0) || rawAmount < 0;
+
               return {
-                date: cols[0]?.trim() || new Date().toISOString().split('T')[0],
-                description: cols[1]?.trim() || "Transaction",
-                amount: amount || 0,
-                type: amount < 0 ? 'debit' : 'credit'
+                date: row[dateIdx] || new Date().toISOString().split('T')[0],
+                description: row[descIdx] || "Transaction",
+                amount: Math.abs(rawAmount),
+                type: isDebit ? 'debit' : 'credit'
               };
             }).filter(Boolean);
+
           } else if (extension === 'xlsx' || extension === 'xls') {
             const workbook = XLSX.read(data, { type: 'binary' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            parsed = (json as any[]).map(row => {
+            const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            // Similar header detection for Excel
+            let headerIdx = -1;
+            let dateIdx = 0, descIdx = 1, debitIdx = -1, amountIdx = -1;
+
+            for(let i = 0; i < Math.min(json.length, 10); i++) {
+              const row = json[i].map(c => String(c || "").toLowerCase());
+              if (row.some(c => c.includes('date') || c.includes('description') || c.includes('debit') || c.includes('withdrawal'))) {
+                headerIdx = i;
+                dateIdx = row.findIndex(c => c.includes('date'));
+                descIdx = row.findIndex(c => c.includes('desc') || c.includes('particulars'));
+                debitIdx = row.findIndex(c => c.includes('debit') || c.includes('withdrawal') || c.includes('paid out'));
+                amountIdx = row.findIndex(c => c === 'amount');
+                break;
+              }
+            }
+
+            const dataRows = json.slice(headerIdx + 1);
+            parsed = dataRows.map(row => {
               if (!row || row.length < 2) return null;
-              const amount = typeof row[row.length - 1] === 'number' ? row[row.length - 1] : parseFloat(String(row[row.length-1]).replace(/[^0-9.-]/g, ''));
+              
+              let amountVal = 0;
+              if (debitIdx !== -1) amountVal = typeof row[debitIdx] === 'number' ? row[debitIdx] : parseFloat(String(row[debitIdx] || "").replace(/[^0-9.-]/g, ''));
+              else if (amountIdx !== -1) amountVal = typeof row[amountIdx] === 'number' ? row[amountIdx] : parseFloat(String(row[amountIdx] || "").replace(/[^0-9.-]/g, ''));
+              else amountVal = typeof row[row.length - 1] === 'number' ? row[row.length - 1] : parseFloat(String(row[row.length-1] || "").replace(/[^0-9.-]/g, ''));
+
+              if (isNaN(amountVal) || amountVal === 0) return null;
+
+              const isDebit = (debitIdx !== -1 && Math.abs(amountVal) > 0) || amountVal < 0;
+
               return {
-                date: String(row[0] || new Date().toISOString().split('T')[0]),
-                description: String(row[1] || "Transaction"),
-                amount: amount || 0,
-                type: amount < 0 ? 'debit' : 'credit'
+                date: String(row[dateIdx] || new Date().toISOString().split('T')[0]),
+                description: String(row[descIdx] || "Transaction"),
+                amount: Math.abs(amountVal),
+                type: isDebit ? 'debit' : 'credit'
               };
             }).filter(Boolean);
           }
@@ -132,10 +192,12 @@ export function BankStatementImport() {
     setLoading(true);
 
     try {
-      // 1. Manual Deterministic Parsing
       const parsedData = await parseFileManual(file);
       
-      // 2. Process via Manual Deterministic Engine
+      if (!parsedData || parsedData.length === 0) {
+        throw new Error("No readable transactions found in file.");
+      }
+
       const result = await processBankStatementManual({
         userId: user.uid,
         transactions: parsedData
@@ -146,11 +208,15 @@ export function BankStatementImport() {
         setReviewMode(true);
         toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions.` });
       } else {
-        toast({ variant: "destructive", title: "No Data", description: "No debit transactions found." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "This file does not appear to contain any debit transactions." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
-      toast({ variant: "destructive", title: "Import Failed", description: "Could not parse statement manually. Ensure columns match Date, Description, Amount." });
+      toast({ 
+        variant: "destructive", 
+        title: "Import Failed", 
+        description: err.message || "Ensure your file contains Date, Description, and Debit/Amount columns." 
+      });
     } finally {
       setLoading(false);
     }
@@ -240,7 +306,7 @@ export function BankStatementImport() {
               Manual Statement Audit
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Purely manual deterministic parsing. No AI used.
+              Deterministic parsing. Only debits (expenses) are extracted.
             </DialogDescription>
           </DialogHeader>
 
@@ -252,7 +318,7 @@ export function BankStatementImport() {
               <div className="space-y-2">
                 <h3 className="font-bold text-lg">{loading ? "Parsing Statement..." : "Select Statement File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Deterministic logic ensures your data stays private and accurate.
+                  Upload CSV, Excel, or Text statements. We'll automatically find your expenses.
                 </p>
               </div>
               

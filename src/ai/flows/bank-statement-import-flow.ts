@@ -111,7 +111,8 @@ export async function processBankStatementManual(input: BankStatementInput): Pro
   const debitsOnly = transactions.filter(t => t.type === "debit");
 
   if (debitsOnly.length === 0) {
-    throw new Error("No debit transactions found in statement.");
+    // If absolutely no debits found, provide more context in the error
+    throw new Error("No debit transactions found in statement. Please ensure your file contains expenses.");
   }
 
   const finalTransactions = debitsOnly.map((t, idx) => {
