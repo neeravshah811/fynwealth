@@ -83,6 +83,7 @@ export function BankStatementImport() {
    */
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
+    // Common date formats like DD/MM/YYYY, MM-DD-YYYY, etc.
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
@@ -123,13 +124,15 @@ export function BankStatementImport() {
    */
   const extractTransactionsFromRows = (rows: any[][]): any[] => {
     const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
+    const creditKeys = ['credit', 'deposit', 'cr', 'amount in', 'income', 'interest'];
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value', 'balance'];
 
     let headerIdx = -1;
-    let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
+    let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1;
 
+    // 1. Find Header
     for(let i = 0; i < Math.min(rows.length, 100); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
@@ -140,7 +143,8 @@ export function BankStatementImport() {
         dateIdx = row.findIndex(c => dateKeys.some(k => k === c || c.includes(k)));
         descIdx = row.findIndex(c => descKeys.some(k => k === c || c.includes(k)));
         debitIdx = row.findIndex(c => debitKeys.some(k => k === c || c.includes(k)));
-        amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
+        creditIdx = row.findIndex(c => creditKeys.some(k => k === c || c.includes(k)));
+        amountIdx = row.findIndex(c => amtKeys.some(k => k === c || c.includes(k)));
         break;
       }
     }
@@ -153,44 +157,81 @@ export function BankStatementImport() {
       if (row.length < 2) continue;
 
       let foundDate = "";
-      let foundDesc = "Transaction";
+      let foundDesc = "";
       let foundAmount = 0;
       let foundType: 'debit' | 'credit' = 'debit';
 
       if (headerIdx !== -1) {
         const dateVal = row[dateIdx] || "";
-        const descVal = descIdx !== -1 ? row[descIdx] : "Transaction";
+        const descVal = descIdx !== -1 ? row[descIdx] : "";
         
+        // If desc is empty, look for the longest string in the row
+        if (!descVal || descVal.length < 3) {
+          const longStrings = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(parseFloat(String(c).replace(/[^0-9.-]/g, ''))));
+          foundDesc = longStrings.length > 0 ? longStrings.sort((a,b) => b.length - a.length)[0] : "Transaction";
+        } else {
+          foundDesc = descVal;
+        }
+
         let amtValStr = "";
+        let isDebitCol = false;
+        let isCreditCol = false;
+
         if (debitIdx !== -1 && row[debitIdx]) {
           amtValStr = String(row[debitIdx]);
-          foundType = 'debit';
+          isDebitCol = true;
+        } else if (creditIdx !== -1 && row[creditIdx]) {
+          // If there's a value in the credit column, we should usually ignore it
+          isCreditCol = true;
         } else if (amountIdx !== -1) {
           amtValStr = String(row[amountIdx]);
         }
 
         const rawAmount = parseFloat(amtValStr.replace(/[^0-9.-]/g, ''));
+        
         if (isDateLike(dateVal) && !isNaN(rawAmount) && rawAmount !== 0) {
           foundDate = dateVal;
-          foundDesc = descVal;
           foundAmount = Math.abs(rawAmount);
-          foundType = (debitIdx !== -1) ? 'debit' : (rawAmount < 0 ? 'debit' : 'credit');
-          results.push({ date: foundDate, description: foundDesc, amount: foundAmount, type: foundType });
+          
+          if (isDebitCol) {
+            foundType = 'debit';
+          } else if (isCreditCol) {
+            foundType = 'credit';
+          } else {
+            // Heuristic for single amount column
+            foundType = (rawAmount < 0) ? 'debit' : 'debit'; // Note: some banks show debits as positive in a "withdrawal" col
+          }
+
+          if (foundType === 'debit') {
+            results.push({ date: foundDate, description: foundDesc, amount: foundAmount, type: foundType });
+          }
         }
       } else {
+        // Brute Force logic for rows without identified header
         const dateCol = row.find(c => isDateLike(String(c)));
         const numCols = row.map(c => {
-          const n = parseFloat(String(c || "").replace(/[^0-9.-]/g, ''));
+          const clean = String(c || "").replace(/[^0-9.-]/g, '');
+          const n = parseFloat(clean);
           return isNaN(n) ? 0 : n;
         }).filter(n => n !== 0);
 
         if (dateCol && numCols.length > 0) {
+          // We assume first non-zero number is amount. If multiple, we might need better logic
           const amount = numCols[0];
+          
+          // Improved description find: the longest string that isn't a date or amount
+          const descriptionCandidate = row
+            .map(c => String(c).trim())
+            .filter(c => c.length > 3 && !isDateLike(c) && isNaN(parseFloat(c.replace(/[^0-9.-]/g, ''))))
+            .sort((a, b) => b.length - a.length)[0];
+
+          // If amount is positive, we assume it's a debit from a "Withdrawal" col unless it's huge or looks like salary
+          // This is a guess, but better than ignoring. We'll filter based on results.push logic.
           results.push({
             date: String(dateCol),
-            description: row.find(c => String(c).length > 5 && !isDateLike(String(c))) || "Transaction",
+            description: descriptionCandidate || "Transaction",
             amount: Math.abs(amount),
-            type: amount < 0 ? 'debit' : 'debit'
+            type: (amount < 0 || row.some(c => String(c).toLowerCase().includes('dr'))) ? 'debit' : 'debit'
           });
         }
       }
@@ -219,9 +260,11 @@ export function BankStatementImport() {
         parsedData = extractTransactionsFromRows(json as any[][]);
       } else {
         const text = await file.text();
-        const rows = text.split(/\r?\n/).map(line => 
-          line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''))
-        );
+        // Robust CSV splitting handling quotes and long narrations with commas
+        const rows = text.split(/\r?\n/).map(line => {
+          const matches = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
+          return matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : [];
+        });
         parsedData = extractTransactionsFromRows(rows);
       }
       
@@ -239,7 +282,7 @@ export function BankStatementImport() {
         setReviewMode(true);
         toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
       } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions (withdrawals) were found." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions were found." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
@@ -348,7 +391,7 @@ export function BankStatementImport() {
               <div className="space-y-2">
                 <h3 className="font-bold text-lg">{loading ? "Scanning Document..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload your statement. We'll find withdrawals and categorise them automatically using manual rules.
+                  Upload your statement. We'll automatically identify expenses and ignore deposits.
                 </p>
               </div>
               
@@ -393,7 +436,7 @@ export function BankStatementImport() {
                           <div className="flex flex-col min-w-0 flex-1">
                             <div className="flex items-center gap-3 mb-1.5">
                               <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap bg-muted/50 px-2 py-0.5 rounded uppercase">{t.date}</span>
-                              <h4 className="font-bold text-sm truncate pr-4 text-foreground">{t.description}</h4>
+                              <h4 className="font-bold text-sm truncate pr-4 text-foreground" title={t.description}>{t.description}</h4>
                             </div>
                             <div className="flex items-center gap-3">
                               <Select value={t.category} onValueChange={(v) => updateCategory(t.id, v)}>
@@ -444,7 +487,7 @@ export function BankStatementImport() {
                 <Button variant="ghost" onClick={reset} className="font-bold rounded-xl h-12 flex-1">Cancel</Button>
                 <Button 
                   onClick={handleConfirmImport} 
-                  disabled={loading || summary.totalTransactions === 0} 
+                  disabled={loading || approvedTxns.length === 0} 
                   className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
