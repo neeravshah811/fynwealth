@@ -75,6 +75,12 @@ export function BankStatementImport() {
       const reader = new FileReader();
       const extension = file.name.split('.').pop()?.toLowerCase();
 
+      const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
+      const creditKeys = ['credit', 'deposit', 'cr', 'received', 'amount in', 'deposited'];
+      const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description'];
+      const dateKeys = ['date', 'dt', 'time', 'transaction date'];
+      const amtKeys = ['amount', 'amt', 'value'];
+
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
@@ -82,42 +88,54 @@ export function BankStatementImport() {
 
           if (extension === 'csv' || extension === 'txt') {
             const text = data as string;
-            const rows = text.split('\n').map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
-            
-            // Try to find headers
-            let headerIdx = -1;
-            let dateIdx = 0, descIdx = 1, debitIdx = -1, amountIdx = -1;
+            // Try common delimiters
+            let delimiter = ',';
+            if (text.includes(';') && !text.includes(',')) delimiter = ';';
+            if (text.includes('\t') && !text.includes(',')) delimiter = '\t';
 
-            for(let i = 0; i < Math.min(rows.length, 10); i++) {
-              const row = rows[i].map(c => c.toLowerCase());
-              if (row.some(c => c.includes('date') || c.includes('description') || c.includes('debit') || c.includes('withdrawal'))) {
+            const rows = text.split('\n').map(r => r.split(delimiter).map(c => c.trim().replace(/^"|"$/g, '')));
+            
+            // Try to find headers in the first 50 rows
+            let headerIdx = -1;
+            let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
+
+            for(let i = 0; i < Math.min(rows.length, 50); i++) {
+              const row = rows[i].map(c => String(c || "").toLowerCase());
+              const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
+              const hasDesc = row.some(c => descKeys.some(k => c.includes(k)));
+              const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
+
+              if (hasDate && (hasDesc || hasAmt)) {
                 headerIdx = i;
-                dateIdx = row.findIndex(c => c.includes('date'));
-                descIdx = row.findIndex(c => c.includes('desc') || c.includes('particulars'));
-                debitIdx = row.findIndex(c => c.includes('debit') || c.includes('withdrawal') || c.includes('paid out'));
-                amountIdx = row.findIndex(c => c === 'amount');
+                dateIdx = row.findIndex(c => dateKeys.some(k => c.includes(k)));
+                descIdx = row.findIndex(c => descKeys.some(k => c.includes(k)));
+                debitIdx = row.findIndex(c => debitKeys.some(k => c.includes(k)));
+                amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
                 break;
               }
+            }
+
+            if (headerIdx === -1) {
+              // Fallback if no headers found
+              dateIdx = 0; descIdx = 1; amountIdx = rows[0].length - 1;
+              headerIdx = -1;
             }
 
             const dataRows = rows.slice(headerIdx + 1);
             parsed = dataRows.map(row => {
               if (row.length < 2) return null;
               
-              // If we found a specific debit column, use it. 
-              // Otherwise use the general amount column and check for negative values.
               let amountStr = "";
-              if (debitIdx !== -1) amountStr = row[debitIdx];
+              if (debitIdx !== -1 && row[debitIdx]) amountStr = row[debitIdx];
               else if (amountIdx !== -1) amountStr = row[amountIdx];
-              else amountStr = row[row.length - 1]; // Fallback to last column
+              else amountStr = row[row.length - 1];
 
               const rawAmount = parseFloat(amountStr?.replace(/[^0-9.-]/g, ''));
               if (isNaN(rawAmount) || rawAmount === 0) return null;
 
-              // Determine if it's a debit. 
-              // If it's in a dedicated "Debit" column, it's a debit regardless of sign.
-              // If it's in a general "Amount" column, it's a debit if it's negative.
-              const isDebit = (debitIdx !== -1 && Math.abs(rawAmount) > 0) || rawAmount < 0;
+              // If we have a specific debit column, anything in it is a debit
+              // Otherwise, we rely on the sign in the general amount column
+              const isDebit = (debitIdx !== -1 && row[debitIdx] && Math.abs(rawAmount) > 0) || rawAmount < 0;
 
               return {
                 date: row[dateIdx] || new Date().toISOString().split('T')[0],
@@ -133,18 +151,21 @@ export function BankStatementImport() {
             const worksheet = workbook.Sheets[firstSheetName];
             const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             
-            // Similar header detection for Excel
             let headerIdx = -1;
-            let dateIdx = 0, descIdx = 1, debitIdx = -1, amountIdx = -1;
+            let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
 
-            for(let i = 0; i < Math.min(json.length, 10); i++) {
+            for(let i = 0; i < Math.min(json.length, 50); i++) {
               const row = json[i].map(c => String(c || "").toLowerCase());
-              if (row.some(c => c.includes('date') || c.includes('description') || c.includes('debit') || c.includes('withdrawal'))) {
+              const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
+              const hasDesc = row.some(c => descKeys.some(k => c.includes(k)));
+              const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
+
+              if (hasDate && (hasDesc || hasAmt)) {
                 headerIdx = i;
-                dateIdx = row.findIndex(c => c.includes('date'));
-                descIdx = row.findIndex(c => c.includes('desc') || c.includes('particulars'));
-                debitIdx = row.findIndex(c => c.includes('debit') || c.includes('withdrawal') || c.includes('paid out'));
-                amountIdx = row.findIndex(c => c === 'amount');
+                dateIdx = row.findIndex(c => dateKeys.some(k => c.includes(k)));
+                descIdx = row.findIndex(c => descKeys.some(k => c.includes(k)));
+                debitIdx = row.findIndex(c => debitKeys.some(k => c.includes(k)));
+                amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
                 break;
               }
             }
@@ -154,13 +175,15 @@ export function BankStatementImport() {
               if (!row || row.length < 2) return null;
               
               let amountVal = 0;
-              if (debitIdx !== -1) amountVal = typeof row[debitIdx] === 'number' ? row[debitIdx] : parseFloat(String(row[debitIdx] || "").replace(/[^0-9.-]/g, ''));
-              else if (amountIdx !== -1) amountVal = typeof row[amountIdx] === 'number' ? row[amountIdx] : parseFloat(String(row[amountIdx] || "").replace(/[^0-9.-]/g, ''));
-              else amountVal = typeof row[row.length - 1] === 'number' ? row[row.length - 1] : parseFloat(String(row[row.length-1] || "").replace(/[^0-9.-]/g, ''));
+              if (debitIdx !== -1 && row[debitIdx]) {
+                amountVal = typeof row[debitIdx] === 'number' ? row[debitIdx] : parseFloat(String(row[debitIdx] || "").replace(/[^0-9.-]/g, ''));
+              } else if (amountIdx !== -1) {
+                amountVal = typeof row[amountIdx] === 'number' ? row[amountIdx] : parseFloat(String(row[amountIdx] || "").replace(/[^0-9.-]/g, ''));
+              }
 
               if (isNaN(amountVal) || amountVal === 0) return null;
 
-              const isDebit = (debitIdx !== -1 && Math.abs(amountVal) > 0) || amountVal < 0;
+              const isDebit = (debitIdx !== -1 && row[debitIdx] && Math.abs(amountVal) > 0) || amountVal < 0;
 
               return {
                 date: String(row[dateIdx] || new Date().toISOString().split('T')[0]),
@@ -195,7 +218,7 @@ export function BankStatementImport() {
       const parsedData = await parseFileManual(file);
       
       if (!parsedData || parsedData.length === 0) {
-        throw new Error("No readable transactions found in file.");
+        throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
       }
 
       const result = await processBankStatementManual({
@@ -206,16 +229,16 @@ export function BankStatementImport() {
       if (result && result.transactions && result.transactions.length > 0) {
         setTransactions(result.transactions);
         setReviewMode(true);
-        toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions.` });
+        toast({ title: "Analysis Complete", description: `Extracted ${result.transactions.length} expenses.` });
       } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "This file does not appear to contain any debit transactions." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "No debit transactions identified in this file." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
       toast({ 
         variant: "destructive", 
         title: "Import Failed", 
-        description: err.message || "Ensure your file contains Date, Description, and Debit/Amount columns." 
+        description: err.message || "Failed to parse file. Ensure it is a valid bank statement." 
       });
     } finally {
       setLoading(false);
@@ -242,7 +265,7 @@ export function BankStatementImport() {
     if (!user?.uid || !db) return;
     const approvedTxns = transactions.filter(t => t.status === 'approved');
     if (approvedTxns.length === 0) {
-      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve some transactions first." });
+      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve at least one transaction." });
       return;
     }
 
@@ -306,7 +329,7 @@ export function BankStatementImport() {
               Manual Statement Audit
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Deterministic parsing. Only debits (expenses) are extracted.
+              Supports Withdrawal, Debit, and general Amount columns.
             </DialogDescription>
           </DialogHeader>
 
@@ -316,9 +339,9 @@ export function BankStatementImport() {
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "Parsing Statement..." : "Select Statement File"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "Scanning File..." : "Select Bank Statement"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload CSV, Excel, or Text statements. We'll automatically find your expenses.
+                  Upload CSV, Excel, or Text statements. We'll find withdrawals automatically.
                 </p>
               </div>
               
@@ -333,17 +356,17 @@ export function BankStatementImport() {
               <div className="bg-muted/30 px-8 py-4 flex items-center justify-between border-b">
                 <div className="flex items-center gap-8">
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Transactions</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Extracted</p>
                     <p className="text-lg font-bold text-primary">{summary.totalTransactions}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Expense</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Value</p>
                     <p className="text-lg font-bold text-foreground">{currency.symbol}{summary.totalExpense.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button variant="outline" size="sm" onClick={handleBulkReject} className="h-8 text-[10px] font-bold uppercase border-destructive/20 text-destructive hover:bg-destructive/5 rounded-lg">
-                    Clear List
+                    Reject All
                   </Button>
                   <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg">
                     Approve All
@@ -403,7 +426,7 @@ export function BankStatementImport() {
                     {transactions.filter(t => t.status !== 'rejected').length === 0 && (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                         <RotateCcw className="w-8 h-8 opacity-20" />
-                        <p className="text-xs font-bold uppercase tracking-widest italic">All cleared</p>
+                        <p className="text-xs font-bold uppercase tracking-widest italic">Review list empty</p>
                       </div>
                     )}
                   </div>
@@ -418,7 +441,7 @@ export function BankStatementImport() {
                   className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
-                  Save to Vault
+                  Record {approvedTxns.length} Expenses
                 </Button>
               </DialogFooter>
             </div>
