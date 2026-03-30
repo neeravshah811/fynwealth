@@ -80,8 +80,145 @@ export function BankStatementImport() {
 
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
+    // Match common bank date formats: 01/01/2024, 01-Jan-2024, 2024-01-01
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
+  };
+
+  const cleanAmount = (val: any): number => {
+    if (val === null || val === undefined) return 0;
+    let s = String(val).trim().toUpperCase();
+    
+    // Handle accounting parentheses
+    if (s.startsWith('(') && s.endsWith(')')) {
+      s = '-' + s.slice(1, -1);
+    }
+    
+    // Remove everything except digits, comma, dot, and minus
+    s = s.replace(/[^0-9.,-]/g, '');
+    if (!s) return 0;
+
+    // Detect format: If comma is the decimal (European)
+    // Heuristic: If comma appears once and is followed by 2 digits, and no dot exists, or comma is last
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    
+    if (lastComma > lastDot) {
+      // Comma is the decimal separator (e.g. 1.234,56)
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Dot is the decimal separator (e.g. 1,234.56)
+      s = s.replace(/,/g, '');
+    }
+    
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const extractTransactionsFromRows = (rows: any[][]): any[] => {
+    const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'spent', 'expense'];
+    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary'];
+    const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
+    const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
+    const amtKeys = ['amount', 'amt', 'value'];
+    const balanceKeys = ['balance', 'bal', 'closing balance', 'available'];
+
+    let headerIdx = -1;
+    let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
+
+    // 1. Identify Table Header
+    for(let i = 0; i < Math.min(rows.length, 50); i++) {
+      const row = rows[i].map(c => String(c || "").toLowerCase());
+      const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
+      const hasAmt = row.some(c => amtKeys.some(k => c === k || c.includes(k)));
+
+      if (hasDate && hasAmt) {
+        headerIdx = i;
+        dateIdx = row.findIndex(c => dateKeys.some(k => c === k || c.includes(k)));
+        descIdx = row.findIndex(c => descKeys.some(k => c === k || c.includes(k)));
+        debitIdx = row.findIndex(c => debitKeys.some(k => c === k || c.includes(k)));
+        creditIdx = row.findIndex(c => creditKeys.some(k => c === k || c.includes(k)));
+        amountIdx = row.findIndex(c => amtKeys.some(k => c === k || c.includes(k)));
+        balanceIdx = row.findIndex(c => balanceKeys.some(k => c === k || c.includes(k)));
+        break;
+      }
+    }
+
+    const results: any[] = [];
+    const startIdx = 0; // We scan from row 0 to capture prefix entries
+
+    for (let i = startIdx; i < rows.length; i++) {
+      if (i === headerIdx) continue;
+      
+      const row = rows[i];
+      if (row.length < 1) continue;
+
+      let foundDate = "";
+      let foundDesc = "";
+      let foundAmount = 0;
+      let isDebit = false;
+
+      // 2. Logic for statements WITH identified headers
+      if (headerIdx !== -1 && i > headerIdx) {
+        const dateVal = row[dateIdx] || "";
+        
+        // Multi-line description support: If row has no date, append text to previous transaction
+        if (!isDateLike(dateVal) && results.length > 0) {
+          const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
+          if (extraText) {
+            results[results.length - 1].description += ' ' + extraText;
+          }
+          continue;
+        }
+
+        if (isDateLike(dateVal)) {
+          foundDate = String(dateVal);
+          
+          // Identify description: use descIdx or pick longest string
+          if (descIdx !== -1 && row[descIdx]) {
+            foundDesc = String(row[descIdx]);
+          } else {
+            foundDesc = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
+          }
+
+          // Check Debit vs Credit column
+          if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
+            foundAmount = cleanAmount(row[debitIdx]);
+            isDebit = true;
+          } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
+            isDebit = false; // It's a credit
+          } else if (amountIdx !== -1) {
+            const rawAmt = cleanAmount(row[amountIdx]);
+            // If only one amount column, negative usually means debit, but some banks use positive for debit in dedicated columns
+            foundAmount = rawAmt;
+            isDebit = rawAmt < 0; 
+          }
+        }
+      } 
+      // 3. Brute Force logic for prefix rows or missing headers
+      else {
+        const dateCol = row.find(c => isDateLike(String(c)));
+        const amountCandidates = row.map(c => cleanAmount(c)).filter(n => n !== 0);
+        
+        if (dateCol && amountCandidates.length > 0) {
+          foundDate = String(dateCol);
+          foundAmount = amountCandidates[0];
+          foundDesc = row.filter(c => String(c).trim().length > 3 && !isDateLike(String(c)) && cleanAmount(c) === 0).join(' ') || "Entry";
+          isDebit = true; // Heuristic default
+        }
+      }
+
+      if (foundDate && Math.abs(foundAmount) > 0 && isDebit) {
+        results.push({
+          date: foundDate,
+          description: foundDesc.trim(),
+          amount: Math.abs(foundAmount),
+          type: 'debit'
+        });
+      }
+    }
+
+    return results;
   };
 
   const parsePdfManual = async (file: File): Promise<any[]> => {
@@ -97,6 +234,7 @@ export function BankStatementImport() {
       const rows: Record<number, any[]> = {};
       
       items.forEach(item => {
+        // Round Y to group items on roughly same line
         const y = Math.round(item.transform[5]);
         if (!rows[y]) rows[y] = [];
         rows[y].push(item);
@@ -110,141 +248,6 @@ export function BankStatementImport() {
     }
 
     return extractTransactionsFromRows(allTextRows);
-  };
-
-  const extractTransactionsFromRows = (rows: any[][]): any[] => {
-    const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
-    const creditKeys = ['credit', 'deposit', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary'];
-    const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
-    const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
-    const amtKeys = ['amount', 'amt', 'value', 'balance'];
-    const typeKeys = ['type', 'mode', 'dr/cr', 'd/c', 'trans type'];
-
-    let headerIdx = -1;
-    let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, typeIdx = -1;
-
-    // 1. Find Header
-    for(let i = 0; i < Math.min(rows.length, 100); i++) {
-      const row = rows[i].map(c => String(c || "").toLowerCase());
-      const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
-      const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
-
-      if (hasDate && hasAmt) {
-        headerIdx = i;
-        dateIdx = row.findIndex(c => dateKeys.some(k => k === c || c.includes(k)));
-        descIdx = row.findIndex(c => descKeys.some(k => k === c || c.includes(k)));
-        debitIdx = row.findIndex(c => debitKeys.some(k => k === c || c.includes(k)));
-        creditIdx = row.findIndex(c => creditKeys.some(k => k === c || c.includes(k)));
-        amountIdx = row.findIndex(c => amtKeys.some(k => k === c || c.includes(k)));
-        typeIdx = row.findIndex(c => typeKeys.some(k => k === c || c.includes(k)));
-        break;
-      }
-    }
-
-    const results: any[] = [];
-    const startIdx = headerIdx !== -1 ? headerIdx + 1 : 0;
-
-    for (let i = startIdx; i < rows.length; i++) {
-      const row = rows[i];
-      if (row.length < 1) continue;
-
-      let foundDate = "";
-      let foundDesc = "";
-      let foundAmount = 0;
-      let foundType: 'debit' | 'credit' = 'debit';
-
-      if (headerIdx !== -1) {
-        const dateVal = row[dateIdx] || "";
-        const descVal = descIdx !== -1 ? row[descIdx] : "";
-        
-        // 1.1 Handle multi-line descriptions
-        if (!isDateLike(dateVal) && results.length > 0 && row.length > 0) {
-          const extraText = row.filter(c => String(c).length > 3).join(' ');
-          if (extraText) {
-            results[results.length - 1].description += ' ' + extraText;
-          }
-          continue;
-        }
-
-        if (!descVal || descVal.length < 3) {
-          const longStrings = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(parseFloat(String(c).replace(/[^0-9.-]/g, ''))));
-          foundDesc = longStrings.length > 0 ? longStrings.sort((a,b) => b.length - a.length)[0] : "Transaction";
-        } else {
-          foundDesc = descVal;
-        }
-
-        let amtValStr = "";
-        let isDebitCol = false;
-        let isCreditCol = false;
-
-        if (debitIdx !== -1 && row[debitIdx] && row[debitIdx] !== "0.00" && row[debitIdx] !== "0") {
-          amtValStr = String(row[debitIdx]);
-          isDebitCol = true;
-        } else if (creditIdx !== -1 && row[creditIdx] && row[creditIdx] !== "0.00" && row[creditIdx] !== "0") {
-          isCreditCol = true;
-        } else if (amountIdx !== -1) {
-          amtValStr = String(row[amountIdx]);
-        }
-
-        // Secondary Type Check (e.g. Dr/Cr column)
-        if (typeIdx !== -1 && row[typeIdx]) {
-          const t = String(row[typeIdx]).toLowerCase();
-          if (t.includes('cr') || t.includes('credit')) isCreditCol = true;
-          if (t.includes('dr') || t.includes('debit')) isDebitCol = true;
-        }
-
-        const rawAmount = parseFloat(amtValStr.replace(/[^0-9.-]/g, ''));
-        
-        if (isDateLike(dateVal) && !isNaN(rawAmount) && rawAmount !== 0) {
-          foundDate = dateVal;
-          foundAmount = Math.abs(rawAmount);
-          
-          if (isDebitCol) foundType = 'debit';
-          else if (isCreditCol) foundType = 'credit';
-          else foundType = (rawAmount < 0) ? 'debit' : 'credit';
-
-          // Final safety check: ignore known income patterns
-          const lowDesc = foundDesc.toLowerCase();
-          if (lowDesc.includes('salary') || lowDesc.includes('interest credit') || lowDesc.includes('refund')) {
-            foundType = 'credit';
-          }
-
-          if (foundType === 'debit') {
-            results.push({ date: foundDate, description: foundDesc, amount: foundAmount, type: foundType });
-          }
-        }
-      } else {
-        // Brute Force logic for rows without identified header
-        const dateCol = row.find(c => isDateLike(String(c)));
-        const numCols = row.map(c => {
-          const clean = String(c || "").replace(/[^0-9.-]/g, '');
-          const n = parseFloat(clean);
-          return isNaN(n) ? 0 : n;
-        }).filter(n => n !== 0);
-
-        if (dateCol && numCols.length > 0) {
-          const amount = numCols[0];
-          const descriptionCandidate = row
-            .map(c => String(c).trim())
-            .filter(c => c.length > 3 && !isDateLike(c) && isNaN(parseFloat(c.replace(/[^0-9.-]/g, ''))))
-            .sort((a, b) => b.length - a.length)[0];
-
-          const lowDesc = (descriptionCandidate || "").toLowerCase();
-          const looksLikeIncome = lowDesc.includes('salary') || lowDesc.includes('interest credit') || lowDesc.includes('refund') || row.some(c => String(c).toLowerCase().includes('cr'));
-
-          if (!looksLikeIncome) {
-            results.push({
-              date: String(dateCol),
-              description: descriptionCandidate || "Transaction",
-              amount: Math.abs(amount),
-              type: 'debit'
-            });
-          }
-        }
-      }
-    }
-
-    return results;
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,7 +291,7 @@ export function BankStatementImport() {
         setReviewMode(true);
         toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
       } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions were found." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions were identified." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
@@ -311,7 +314,7 @@ export function BankStatementImport() {
   };
 
   const handleBulkApprove = () => {
-    setTransactions(prev => prev.map(t => t.status === 'pending' ? { ...t, status: 'approved' } : t));
+    setTransactions(prev => prev.map(t => (t.status === 'pending' || t.status === 'rejected') ? { ...t, status: 'approved' } : t));
   };
 
   const handleBulkReject = () => {
@@ -378,14 +381,14 @@ export function BankStatementImport() {
         if (!open) reset();
         setIsOpen(open);
       }}>
-        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
+        <DialogContent className="sm:max-w-[750px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Statement Import
+              Statement Audit
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Supports PDF, Excel, and CSV files.
+              Deterministic parsing for PDF, Excel, and CSV statements.
             </DialogDescription>
           </DialogHeader>
 
@@ -397,34 +400,34 @@ export function BankStatementImport() {
               <div className="space-y-2">
                 <h3 className="font-bold text-lg">{loading ? "Scanning Document..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload your statement. We'll automatically identify expenses and ignore deposits.
+                  Upload your bank export. We'll identify debit entries from every page and filter out credits.
                 </p>
               </div>
               
               <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls,.txt,.pdf" onChange={handleFileChange} />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20">
+              <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Processing..." : "Choose Statement"}
+                {loading ? "Processing..." : "Select Statement"}
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col h-[65vh]">
+            <div className="flex flex-col h-[70vh]">
               <div className="bg-muted/30 px-8 py-4 flex items-center justify-between border-b">
                 <div className="flex items-center gap-8">
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Found</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Entries</p>
                     <p className="text-lg font-bold text-primary">{summary.totalTransactions}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Total Value</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Volume</p>
                     <p className="text-lg font-bold text-foreground">{currency.symbol}{summary.totalExpense.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={handleBulkReject} className="h-8 text-[10px] font-bold uppercase border-destructive/20 text-destructive hover:bg-destructive/5 rounded-lg">
+                  <Button variant="outline" size="sm" onClick={handleBulkReject} className="h-8 text-[10px] font-bold uppercase border-destructive/20 text-destructive hover:bg-destructive/5">
                     Reject All
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg">
+                  <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50">
                     Approve All
                   </Button>
                 </div>
@@ -436,42 +439,51 @@ export function BankStatementImport() {
                     {transactions.filter(t => t.status !== 'rejected').map((t) => (
                       <div key={t.id} className={cn(
                         "flex flex-col gap-4 p-4 rounded-xl border transition-all",
-                        t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100" : "bg-card border-muted"
+                        t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100 shadow-sm" : "bg-card border-muted"
                       )}>
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-3 mb-1.5">
-                              <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap bg-muted/50 px-2 py-0.5 rounded uppercase">{t.date}</span>
-                              <h4 className="font-bold text-sm truncate pr-4 text-foreground" title={t.description}>{t.description}</h4>
-                            </div>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col min-w-0 flex-1 space-y-3">
                             <div className="flex items-center gap-3">
-                              <Select value={t.category} onValueChange={(v) => updateCategory(t.id, v)}>
-                                <SelectTrigger className="h-7 w-44 text-[10px] font-bold uppercase bg-background border-muted rounded-lg px-2">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl max-h-[300px]">
-                                  {CATEGORIES.map(cat => (
-                                    <SelectItem key={cat} value={cat} className="text-[10px] font-bold uppercase">{cat}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap bg-muted/50 px-2 py-0.5 rounded uppercase">{t.date}</span>
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0.5 px-2 h-auto border-none font-bold uppercase">
+                                {t.category}
+                              </Badge>
                             </div>
+                            
+                            {/* Full text narration - No truncate */}
+                            <p className="font-bold text-sm text-foreground leading-relaxed">
+                              {t.description}
+                            </p>
+
+                            <Select value={t.category} onValueChange={(v) => updateCategory(t.id, v)}>
+                              <SelectTrigger className="h-8 w-48 text-[10px] font-bold uppercase bg-background border-muted rounded-lg px-2">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl max-h-[300px]">
+                                {CATEGORIES.map(cat => (
+                                  <SelectItem key={cat} value={cat} className="text-[10px] font-bold uppercase">{cat}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <div className="flex flex-col items-end gap-2 shrink-0">
-                            <span className="font-bold text-sm text-foreground">
+
+                          <div className="flex flex-col items-end gap-4 shrink-0">
+                            <span className="font-bold text-base text-foreground">
                               {currency.symbol}{t.amount.toLocaleString()}
                             </span>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2">
                               {t.status === 'approved' ? (
-                                <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'pending')} className="h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-100">
-                                  <CheckCircle2 className="w-4 h-4" />
+                                <Button size="sm" variant="ghost" onClick={() => updateStatus(t.id, 'pending')} className="h-9 px-3 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 font-bold text-[10px] uppercase">
+                                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                                  Approved
                                 </Button>
                               ) : (
-                                <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'approved')} className="h-8 w-8 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50">
-                                  <ThumbsUp className="w-4 h-4" />
+                                <Button size="sm" variant="outline" onClick={() => updateStatus(t.id, 'approved')} className="h-9 px-3 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 font-bold text-[10px] uppercase">
+                                  <ThumbsUp className="w-4 h-4 mr-2" />
+                                  Approve
                                 </Button>
                               )}
-                              <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'rejected')} className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5">
+                              <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'rejected')} className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5">
                                 <X className="w-4 h-4" />
                               </Button>
                             </div>
@@ -480,9 +492,9 @@ export function BankStatementImport() {
                       </div>
                     ))}
                     {transactions.filter(t => t.status !== 'rejected').length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-                        <RotateCcw className="w-8 h-8 opacity-20" />
-                        <p className="text-xs font-bold uppercase tracking-widest italic">No transactions reviewed</p>
+                      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+                        <RotateCcw className="w-10 h-10 opacity-20" />
+                        <p className="text-xs font-bold uppercase tracking-widest italic">All entries reviewed</p>
                       </div>
                     )}
                   </div>
@@ -494,10 +506,10 @@ export function BankStatementImport() {
                 <Button 
                   onClick={handleConfirmImport} 
                   disabled={loading || approvedTxns.length === 0} 
-                  className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
+                  className="font-bold rounded-xl h-12 flex-[2] shadow-lg"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
-                  Save {approvedTxns.length} Expenses
+                  Save {approvedTxns.length} Approved Expenses
                 </Button>
               </DialogFooter>
             </div>

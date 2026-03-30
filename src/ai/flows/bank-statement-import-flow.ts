@@ -24,7 +24,7 @@ const TransactionSchema = z.object({
   amount: z.number(),
   category: z.string(),
   confidence: z.number(),
-  status: z.enum(['pending']),
+  status: z.enum(['pending', 'approved', 'rejected']),
   actions: z.object({
     canEdit: z.boolean(),
     canApprove: z.boolean(),
@@ -87,15 +87,14 @@ function getCategory(description: string): string {
  * Clean Description (Deterministic)
  */
 function cleanDescription(description: string): string {
-  // Remove common transaction IDs, reference numbers, etc.
+  // We keep more of the original text now to satisfy "Full Text" requirement
+  // but we still strip excessive whitespace and redundant transaction codes
   return description
-    .replace(/\d{5,}/g, '') // Remove long numbers
     .replace(/UPI\//gi, '')
     .replace(/IMPS\//gi, '')
     .replace(/NEFT\//gi, '')
     .replace(/RTGS\//gi, '')
     .replace(/TRANSFER\//gi, '')
-    .replace(/-BLR|-MUM|-DEL|-HYD|-CHE/gi, '') // Common city codes
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -111,7 +110,6 @@ export async function processBankStatementManual(input: BankStatementInput): Pro
   const debitsOnly = transactions.filter(t => t.type === "debit");
 
   if (debitsOnly.length === 0) {
-    // If absolutely no debits found, provide more context in the error
     throw new Error("No debit transactions found in statement. Please ensure your file contains expenses.");
   }
 
@@ -123,7 +121,7 @@ export async function processBankStatementManual(input: BankStatementInput): Pro
       description: cleanedDesc || t.description,
       amount: Math.abs(t.amount),
       category: getCategory(cleanedDesc || t.description),
-      confidence: 1.0, // Manual code is 100% deterministic
+      confidence: 1.0, 
       status: "pending" as const,
       actions: { canEdit: true, canApprove: true, canReject: true }
     };
