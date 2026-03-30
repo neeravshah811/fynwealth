@@ -78,19 +78,12 @@ export function BankStatementImport() {
 
   const approvedTxns = useMemo(() => transactions.filter(t => t.status === 'approved'), [transactions]);
 
-  /**
-   * Identifies if a string looks like a date
-   */
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
-    // Common date formats like DD/MM/YYYY, MM-DD-YYYY, etc.
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
 
-  /**
-   * Parses PDF statements manually
-   */
   const parsePdfManual = async (file: File): Promise<any[]> => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
@@ -119,18 +112,16 @@ export function BankStatementImport() {
     return extractTransactionsFromRows(allTextRows);
   };
 
-  /**
-   * Generic transaction extractor from a grid of strings
-   */
   const extractTransactionsFromRows = (rows: any[][]): any[] => {
     const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
-    const creditKeys = ['credit', 'deposit', 'cr', 'amount in', 'income', 'interest'];
+    const creditKeys = ['credit', 'deposit', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary'];
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value', 'balance'];
+    const typeKeys = ['type', 'mode', 'dr/cr', 'd/c', 'trans type'];
 
     let headerIdx = -1;
-    let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1;
+    let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, typeIdx = -1;
 
     // 1. Find Header
     for(let i = 0; i < Math.min(rows.length, 100); i++) {
@@ -145,6 +136,7 @@ export function BankStatementImport() {
         debitIdx = row.findIndex(c => debitKeys.some(k => k === c || c.includes(k)));
         creditIdx = row.findIndex(c => creditKeys.some(k => k === c || c.includes(k)));
         amountIdx = row.findIndex(c => amtKeys.some(k => k === c || c.includes(k)));
+        typeIdx = row.findIndex(c => typeKeys.some(k => k === c || c.includes(k)));
         break;
       }
     }
@@ -154,7 +146,7 @@ export function BankStatementImport() {
 
     for (let i = startIdx; i < rows.length; i++) {
       const row = rows[i];
-      if (row.length < 2) continue;
+      if (row.length < 1) continue;
 
       let foundDate = "";
       let foundDesc = "";
@@ -165,7 +157,15 @@ export function BankStatementImport() {
         const dateVal = row[dateIdx] || "";
         const descVal = descIdx !== -1 ? row[descIdx] : "";
         
-        // If desc is empty, look for the longest string in the row
+        // 1.1 Handle multi-line descriptions
+        if (!isDateLike(dateVal) && results.length > 0 && row.length > 0) {
+          const extraText = row.filter(c => String(c).length > 3).join(' ');
+          if (extraText) {
+            results[results.length - 1].description += ' ' + extraText;
+          }
+          continue;
+        }
+
         if (!descVal || descVal.length < 3) {
           const longStrings = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(parseFloat(String(c).replace(/[^0-9.-]/g, ''))));
           foundDesc = longStrings.length > 0 ? longStrings.sort((a,b) => b.length - a.length)[0] : "Transaction";
@@ -177,14 +177,20 @@ export function BankStatementImport() {
         let isDebitCol = false;
         let isCreditCol = false;
 
-        if (debitIdx !== -1 && row[debitIdx]) {
+        if (debitIdx !== -1 && row[debitIdx] && row[debitIdx] !== "0.00" && row[debitIdx] !== "0") {
           amtValStr = String(row[debitIdx]);
           isDebitCol = true;
-        } else if (creditIdx !== -1 && row[creditIdx]) {
-          // If there's a value in the credit column, we should usually ignore it
+        } else if (creditIdx !== -1 && row[creditIdx] && row[creditIdx] !== "0.00" && row[creditIdx] !== "0") {
           isCreditCol = true;
         } else if (amountIdx !== -1) {
           amtValStr = String(row[amountIdx]);
+        }
+
+        // Secondary Type Check (e.g. Dr/Cr column)
+        if (typeIdx !== -1 && row[typeIdx]) {
+          const t = String(row[typeIdx]).toLowerCase();
+          if (t.includes('cr') || t.includes('credit')) isCreditCol = true;
+          if (t.includes('dr') || t.includes('debit')) isDebitCol = true;
         }
 
         const rawAmount = parseFloat(amtValStr.replace(/[^0-9.-]/g, ''));
@@ -193,13 +199,14 @@ export function BankStatementImport() {
           foundDate = dateVal;
           foundAmount = Math.abs(rawAmount);
           
-          if (isDebitCol) {
-            foundType = 'debit';
-          } else if (isCreditCol) {
+          if (isDebitCol) foundType = 'debit';
+          else if (isCreditCol) foundType = 'credit';
+          else foundType = (rawAmount < 0) ? 'debit' : 'credit';
+
+          // Final safety check: ignore known income patterns
+          const lowDesc = foundDesc.toLowerCase();
+          if (lowDesc.includes('salary') || lowDesc.includes('interest credit') || lowDesc.includes('refund')) {
             foundType = 'credit';
-          } else {
-            // Heuristic for single amount column
-            foundType = (rawAmount < 0) ? 'debit' : 'debit'; // Note: some banks show debits as positive in a "withdrawal" col
           }
 
           if (foundType === 'debit') {
@@ -216,23 +223,23 @@ export function BankStatementImport() {
         }).filter(n => n !== 0);
 
         if (dateCol && numCols.length > 0) {
-          // We assume first non-zero number is amount. If multiple, we might need better logic
           const amount = numCols[0];
-          
-          // Improved description find: the longest string that isn't a date or amount
           const descriptionCandidate = row
             .map(c => String(c).trim())
             .filter(c => c.length > 3 && !isDateLike(c) && isNaN(parseFloat(c.replace(/[^0-9.-]/g, ''))))
             .sort((a, b) => b.length - a.length)[0];
 
-          // If amount is positive, we assume it's a debit from a "Withdrawal" col unless it's huge or looks like salary
-          // This is a guess, but better than ignoring. We'll filter based on results.push logic.
-          results.push({
-            date: String(dateCol),
-            description: descriptionCandidate || "Transaction",
-            amount: Math.abs(amount),
-            type: (amount < 0 || row.some(c => String(c).toLowerCase().includes('dr'))) ? 'debit' : 'debit'
-          });
+          const lowDesc = (descriptionCandidate || "").toLowerCase();
+          const looksLikeIncome = lowDesc.includes('salary') || lowDesc.includes('interest credit') || lowDesc.includes('refund') || row.some(c => String(c).toLowerCase().includes('cr'));
+
+          if (!looksLikeIncome) {
+            results.push({
+              date: String(dateCol),
+              description: descriptionCandidate || "Transaction",
+              amount: Math.abs(amount),
+              type: 'debit'
+            });
+          }
         }
       }
     }
@@ -260,7 +267,6 @@ export function BankStatementImport() {
         parsedData = extractTransactionsFromRows(json as any[][]);
       } else {
         const text = await file.text();
-        // Robust CSV splitting handling quotes and long narrations with commas
         const rows = text.split(/\r?\n/).map(line => {
           const matches = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
           return matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : [];
@@ -289,7 +295,7 @@ export function BankStatementImport() {
       toast({ 
         variant: "destructive", 
         title: "Import Failed", 
-        description: err.message || "Failed to parse statement. Please ensure it's a valid PDF, CSV or Excel file." 
+        description: err.message || "Failed to parse statement." 
       });
     } finally {
       setLoading(false);
@@ -379,7 +385,7 @@ export function BankStatementImport() {
               Statement Import
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Supports PDF, Excel, and CSV files from most major banks.
+              Supports PDF, Excel, and CSV files.
             </DialogDescription>
           </DialogHeader>
 
@@ -476,7 +482,7 @@ export function BankStatementImport() {
                     {transactions.filter(t => t.status !== 'rejected').length === 0 && (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                         <RotateCcw className="w-8 h-8 opacity-20" />
-                        <p className="text-xs font-bold uppercase tracking-widest italic">No transactions to review</p>
+                        <p className="text-xs font-bold uppercase tracking-widest italic">No transactions reviewed</p>
                       </div>
                     )}
                   </div>
