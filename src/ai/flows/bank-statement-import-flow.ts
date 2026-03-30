@@ -1,18 +1,19 @@
-
 'use server';
 /**
- * @fileOverview Hybrid Bank Statement Processing Engine.
- * deterministic parsing (Python) + Gemini intelligence layer.
- * Note: Firestore mutations are handled by the calling client component to respect security rules.
+ * @fileOverview Manual Bank Statement Processing Engine.
+ * Deterministic parsing and categorization without AI.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const BankStatementInputSchema = z.object({
   userId: z.string().min(1, "User ID is required"),
-  fileDataUri: z.string().describe("File as a data URI."),
-  fileName: z.string().optional(),
+  transactions: z.array(z.object({
+    date: z.string(),
+    description: z.string(),
+    amount: z.number(),
+    type: z.enum(['debit', 'credit']),
+  })),
 });
 export type BankStatementInput = z.infer<typeof BankStatementInputSchema>;
 
@@ -45,117 +46,98 @@ const BankStatementOutputSchema = z.object({
     instructions: z.string()
   }),
   transactions: z.array(TransactionSchema),
-  insights: z.array(z.string()).optional(),
-  anomalies: z.array(z.string()).optional()
 });
 export type BankStatementOutput = z.infer<typeof BankStatementOutputSchema>;
 
 /**
- * Deterministic Parser Caller
- * In production, this calls a Python microservice using pdfplumber/pandas.
+ * Manual Categorization Logic (Deterministic)
  */
-async function callPythonParser(fileDataUri: string) {
-  console.log("[PythonParser] Deterministically extracting data from file...");
+function getCategory(description: string): string {
+  const d = description.toLowerCase();
   
-  // Simulation of parser output
-  return [
-    { date: "2026-03-01", description: "SWIGGY-1234", amount: 450.00, type: "debit", balance: 10000 },
-    { date: "2026-03-02", description: "AMAZON-RETAIL", amount: 1200.00, type: "debit", balance: 8800 },
-    { date: "2026-03-03", description: "HDFC-EMI", amount: 5000.00, type: "debit", balance: 3800 },
-    { date: "2026-03-04", description: "SALARY-CREDIT", amount: 50000.00, type: "credit", balance: 53800 },
-  ];
+  if (d.includes('swiggy') || d.includes('zomato') || d.includes('restaurant') || d.includes('cafe') || d.includes('eat') || d.includes('food')) return 'Food and Groceries';
+  if (d.includes('blinkit') || d.includes('bigbasket') || d.includes('dmart') || d.includes('grocery') || d.includes('reliance fresh') || d.includes('spencer')) return 'Food and Groceries';
+  
+  if (d.includes('amazon') || d.includes('flipkart') || d.includes('myntra') || d.includes('nykaa') || d.includes('shopping') || d.includes('ajio')) return 'Shopping';
+  
+  if (d.includes('uber') || d.includes('ola') || d.includes('irctc') || d.includes('fuel') || d.includes('petrol') || d.includes('taxi') || d.includes('travel') || d.includes('metro') || d.includes('indigo') || d.includes('airindia')) return 'Transportation';
+  
+  if (d.includes('electricity') || d.includes('recharge') || d.includes('airtel') || d.includes('jio') || d.includes('vodafone') || d.includes('water') || d.includes('gas') || d.includes('utility') || d.includes('bill')) return 'Essentials';
+  
+  if (d.includes('netflix') || d.includes('spotify') || d.includes('youtube') || d.includes('apple') || d.includes('prime') || d.includes('disney') || d.includes('hotstar')) return 'Subscriptions';
+  
+  if (d.includes('pharmacy') || d.includes('apollo') || d.includes('1mg') || d.includes('gym') || d.includes('cult.fit') || d.includes('doctor') || d.includes('hospital') || d.includes('medicine') || d.includes('health')) return 'Health & Personal';
+  
+  if (d.includes('emi') || d.includes('nach') || d.includes('loan') || d.includes('lic') || d.includes('insurance') || d.includes('policy') || d.includes('premium')) return 'Financial Commitments';
+  
+  if (d.includes('sip') || d.includes('mutual fund') || d.includes('zerodha') || d.includes('groww') || d.includes('stocks') || d.includes('equity') || d.includes('upstox') || d.includes('angelone')) return 'Investments';
+  
+  if (d.includes('school') || d.includes('tuition') || d.includes('fees') || d.includes('udemy') || d.includes('coursera') || d.includes('education')) return 'Education / Kids';
+  
+  if (d.includes('movies') || d.includes('pvr') || d.includes('inox') || d.includes('bookmyshow') || d.includes('events') || d.includes('travel') || d.includes('trip') || d.includes('holiday') || d.includes('gift')) return 'Life & Entertainment';
+  
+  if (d.includes('repair') || d.includes('maid') || d.includes('laundry') || d.includes('pet') || d.includes('urban company') || d.includes('cleaning')) return 'Household & Family';
+  
+  if (d.includes('apple store') || d.includes('croma') || d.includes('vijay sales') || d.includes('hardware')) return 'Warranties';
+
+  return 'Miscellaneous';
 }
 
 /**
- * intelligencePrompt - Gemini Intelligence Layer
+ * Clean Description (Deterministic)
  */
-const intelligencePrompt = ai.definePrompt({
-  name: 'statementIntelligencePrompt',
-  input: { schema: z.object({ transactions: z.array(z.any()) }) },
-  output: { 
-    schema: z.object({
-      categorized: z.array(z.object({
-        index: z.number(),
-        category: z.string(),
-        cleanDescription: z.string(),
-        confidence: z.number()
-      })),
-      insights: z.array(z.string()),
-      anomalies: z.array(z.string())
-    })
-  },
-  prompt: `You are the financial intelligence layer for FynWealth.
-Analyze the following DEBIT transactions parsed from a bank statement.
+function cleanDescription(description: string): string {
+  // Remove common transaction IDs, reference numbers, etc.
+  return description
+    .replace(/\d{5,}/g, '') // Remove long numbers
+    .replace(/UPI\//gi, '')
+    .replace(/IMPS\//gi, '')
+    .replace(/NEFT\//gi, '')
+    .replace(/RTGS\//gi, '')
+    .replace(/TRANSFER\//gi, '')
+    .replace(/-BLR|-MUM|-DEL|-HYD|-CHE/gi, '') // Common city codes
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-TASKS:
-1. CATEGORIZE: Assign one: Food and Groceries, Shopping, Transportation, Essentials, Subscriptions, Health & Personal, Financial Commitments, Investments, Education / Kids, Life & Entertainment, Household & Family, Warranties, Personal, Miscellaneous.
-2. CLEAN: Remove transaction IDs and codes.
-3. INSIGHTS: Provide top categories or patterns (max 3).
-4. ANOMALIES: Detect unusual spikes or non-recurring large transactions.
-
-Transactions:
-{{#each transactions}}
-- Index: {{@index}}, Date: {{{date}}}, Desc: {{{description}}}, Amt: {{{amount}}}
-{{/each}}`
-});
-
-export async function processBankStatement(input: BankStatementInput): Promise<BankStatementOutput> {
-  const { userId, fileDataUri } = input;
+export async function processBankStatementManual(input: BankStatementInput): Promise<BankStatementOutput> {
+  const { userId, transactions } = input;
   
   if (!userId) {
     throw new Error("Missing required User ID for statement processing.");
   }
 
-  try {
-    // 1. Deterministic Parsing (Python simulation)
-    const parsedData = await callPythonParser(fileDataUri);
-    const debitsOnly = parsedData.filter(t => t.type === "debit");
+  // Filter ONLY debits
+  const debitsOnly = transactions.filter(t => t.type === "debit");
 
-    if (debitsOnly.length === 0) {
-      throw new Error("No debit transactions found in statement.");
-    }
-
-    // 2. Gemini Intelligence Layer (Single Batch Call)
-    let aiResponse;
-    try {
-      const { output } = await intelligencePrompt({ transactions: debitsOnly });
-      aiResponse = output;
-    } catch (aiErr) {
-      console.warn("[HybridFlow] Gemini Intelligence failed, using fallback.", aiErr);
-    }
-
-    // 3. Map results back to structured schema
-    const finalTransactions: any[] = debitsOnly.map((t, idx) => {
-      const aiData = aiResponse?.categorized.find(c => c.index === idx);
-      return {
-        id: `txn_${idx}_${Date.now()}`,
-        date: t.date,
-        description: aiData?.cleanDescription || t.description,
-        amount: t.amount,
-        category: aiData?.category || "Miscellaneous",
-        confidence: aiData?.confidence || 0.5,
-        status: "pending",
-        actions: { canEdit: true, canApprove: true, canReject: true }
-      };
-    });
-
-    return {
-      summary: {
-        totalTransactions: finalTransactions.length,
-        totalExpense: finalTransactions.reduce((s, t) => s + t.amount, 0)
-      },
-      review: {
-        editable: true,
-        bulkActions: { approveAll: true, rejectAll: true },
-        instructions: "Deterministically parsed. AI categorization applied."
-      },
-      transactions: finalTransactions,
-      insights: aiResponse?.insights,
-      anomalies: aiResponse?.anomalies
-    };
-
-  } catch (err: any) {
-    console.error("[processBankStatement] Server Error:", err.message);
-    throw err;
+  if (debitsOnly.length === 0) {
+    throw new Error("No debit transactions found in statement.");
   }
+
+  const finalTransactions = debitsOnly.map((t, idx) => {
+    const cleanedDesc = cleanDescription(t.description);
+    return {
+      id: `txn_${idx}_${Date.now()}`,
+      date: t.date,
+      description: cleanedDesc || t.description,
+      amount: Math.abs(t.amount),
+      category: getCategory(cleanedDesc || t.description),
+      confidence: 1.0, // Manual code is 100% deterministic
+      status: "pending" as const,
+      actions: { canEdit: true, canApprove: true, canReject: true }
+    };
+  });
+
+  return {
+    summary: {
+      totalTransactions: finalTransactions.length,
+      totalExpense: finalTransactions.reduce((s, t) => s + t.amount, 0)
+    },
+    review: {
+      editable: true,
+      bulkActions: { approveAll: true, rejectAll: true },
+      instructions: "Manual rule-based parsing applied. Review and save."
+    },
+    transactions: finalTransactions,
+  };
 }

@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
 import { useFirestore, useUser } from "@/firebase";
-import { collection, serverTimestamp, doc, increment, getDoc } from "firebase/firestore";
+import { collection, serverTimestamp, doc, increment } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -26,12 +25,12 @@ import {
   ThumbsUp,
   RotateCcw
 } from "lucide-react";
-import { processBankStatement } from "@/ai/flows/bank-statement-import-flow";
+import { processBankStatementManual } from "@/ai/flows/bank-statement-import-flow";
 import { toast } from "@/hooks/use-toast";
 import { useFynWealthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { addDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import * as XLSX from 'xlsx';
 
 const CATEGORIES = [
   'Education / Kids',
@@ -70,6 +69,62 @@ export function BankStatementImport() {
     };
   }, [transactions]);
 
+  const parseFileManual = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      const extension = file.name.split('.').pop()?.toLowerCase();
+
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          let parsed: any[] = [];
+
+          if (extension === 'csv' || extension === 'txt') {
+            const text = data as string;
+            const rows = text.split('\n');
+            parsed = rows.map(row => {
+              const cols = row.split(',');
+              if (cols.length < 3) return null;
+              // Attempt to guess mapping: Date, Description, Amount
+              const amount = parseFloat(cols[cols.length - 1]?.replace(/[^0-9.-]/g, ''));
+              return {
+                date: cols[0]?.trim() || new Date().toISOString().split('T')[0],
+                description: cols[1]?.trim() || "Transaction",
+                amount: amount || 0,
+                type: amount < 0 ? 'debit' : 'credit'
+              };
+            }).filter(Boolean);
+          } else if (extension === 'xlsx' || extension === 'xls') {
+            const workbook = XLSX.read(data, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            parsed = (json as any[]).map(row => {
+              if (!row || row.length < 2) return null;
+              const amount = typeof row[row.length - 1] === 'number' ? row[row.length - 1] : parseFloat(String(row[row.length-1]).replace(/[^0-9.-]/g, ''));
+              return {
+                date: String(row[0] || new Date().toISOString().split('T')[0]),
+                description: String(row[1] || "Transaction"),
+                amount: amount || 0,
+                type: amount < 0 ? 'debit' : 'credit'
+              };
+            }).filter(Boolean);
+          }
+
+          resolve(parsed);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      if (extension === 'xlsx' || extension === 'xls') {
+        reader.readAsBinaryString(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid || !db) return;
@@ -77,74 +132,26 @@ export function BankStatementImport() {
     setLoading(true);
 
     try {
-      // 1. Check Usage Quota
-      const month = format(new Date(), 'yyyy-MM');
-      const usageId = `${user.uid}_${month}`;
-      const usageRef = doc(db, 'ai_usage', usageId);
-      const usageDoc = await getDoc(usageRef);
+      // 1. Manual Deterministic Parsing
+      const parsedData = await parseFileManual(file);
       
-      const hybridCount = usageDoc.exists() ? (usageDoc.data().hybridStatementCount || 0) : 0;
-      if (hybridCount >= 5) {
-        toast({ 
-          variant: "destructive", 
-          title: "Monthly Limit Reached", 
-          description: "You have reached the limit of 5 statement imports per month." 
-        });
-        setLoading(false);
-        return;
+      // 2. Process via Manual Deterministic Engine
+      const result = await processBankStatementManual({
+        userId: user.uid,
+        transactions: parsedData
+      });
+
+      if (result && result.transactions && result.transactions.length > 0) {
+        setTransactions(result.transactions);
+        setReviewMode(true);
+        toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions.` });
+      } else {
+        toast({ variant: "destructive", title: "No Data", description: "No debit transactions found." });
       }
-
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        try {
-          const content = reader.result as string;
-          const result = await processBankStatement({
-            userId: user.uid,
-            fileDataUri: content,
-            fileName: file.name
-          });
-
-          if (result && result.transactions && result.transactions.length > 0) {
-            // 2. Track Usage Increment
-            setDocumentNonBlocking(usageRef, {
-              userId: user.uid,
-              month,
-              hybridStatementCount: increment(1),
-              lastUpdated: serverTimestamp()
-            }, { merge: true });
-
-            // 3. Store Intelligence Results
-            if (result.insights || result.anomalies) {
-              addDocumentNonBlocking(collection(db, 'statement_results'), {
-                userId: user.uid,
-                uploadId: `up_${Date.now()}`,
-                insights: result.insights || [],
-                anomalies: result.anomalies || [],
-                processedAt: serverTimestamp()
-              });
-            }
-
-            setTransactions(result.transactions);
-            setReviewMode(true);
-            toast({ title: "Analysis Complete", description: `Found ${result.transactions.length} debit transactions.` });
-          } else {
-            toast({ variant: "destructive", title: "No Data", description: "No debit transactions found." });
-          }
-        } catch (err: any) {
-          console.error("Import Error:", err);
-          let message = err.message || "Could not process statement.";
-          if (String(err).includes("429") || String(err).includes("quota")) {
-            message = "AI service quota reached. Please wait a moment and try again.";
-          }
-          toast({ variant: "destructive", title: "Import Failed", description: message });
-        } finally {
-          setLoading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error("Quota Check Error:", err);
-      toast({ variant: "destructive", title: "Error", description: "Could not verify your usage quota." });
+    } catch (err: any) {
+      console.error("Import Error:", err);
+      toast({ variant: "destructive", title: "Import Failed", description: "Could not parse statement manually. Ensure columns match Date, Description, Amount." });
+    } finally {
       setLoading(false);
     }
   };
@@ -175,7 +182,6 @@ export function BankStatementImport() {
 
     setLoading(true);
     try {
-      // Record expenses using centralized non-blocking helper
       approvedTxns.forEach(t => {
         addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
           userId: user.uid,
@@ -190,7 +196,6 @@ export function BankStatementImport() {
         });
       });
       
-      // Update global count
       updateDocumentNonBlocking(doc(db, 'users', user.uid), {
         'stats.totalExpenses': increment(approvedTxns.length)
       });
@@ -232,10 +237,10 @@ export function BankStatementImport() {
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Statement Audit
+              Manual Statement Audit
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Deterministic parsing + AI intelligence layer. Review before saving.
+              Purely manual deterministic parsing. No AI used.
             </DialogDescription>
           </DialogHeader>
 
@@ -245,16 +250,16 @@ export function BankStatementImport() {
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "Analyzing Statement..." : "Select Statement File"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "Parsing Statement..." : "Select Statement File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Deterministic parsing ensures accuracy while AI categorizes and detects anomalies.
+                  Deterministic logic ensures your data stays private and accurate.
                 </p>
               </div>
               
-              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.csv,.xlsx,.txt" onChange={handleFileChange} />
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls,.txt" onChange={handleFileChange} />
               <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Verifying Quota..." : "Choose File"}
+                {loading ? "Processing..." : "Choose File"}
               </Button>
             </div>
           ) : (
@@ -305,9 +310,6 @@ export function BankStatementImport() {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              {t.confidence < 0.8 && (
-                                <Badge variant="secondary" className="bg-amber-50 text-amber-600 text-[8px] h-4 uppercase font-bold border-amber-100">AI Review</Badge>
-                              )}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2 shrink-0">
