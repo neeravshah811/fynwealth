@@ -76,12 +76,13 @@ export function BankStatementImport() {
     };
   }, [transactions]);
 
+  const approvedTxns = useMemo(() => transactions.filter(t => t.status === 'approved'), [transactions]);
+
   /**
    * Identifies if a string looks like a date
    */
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
-    // Check common formats: DD/MM/YYYY, YYYY-MM-DD, DD-MMM-YYYY
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
@@ -98,7 +99,6 @@ export function BankStatementImport() {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       
-      // Group items by Y coordinate to form rows
       const items = textContent.items as any[];
       const rows: Record<number, any[]> = {};
       
@@ -108,7 +108,6 @@ export function BankStatementImport() {
         rows[y].push(item);
       });
 
-      // Sort rows by Y (top to bottom) and items within row by X (left to right)
       const sortedY = Object.keys(rows).map(Number).sort((a, b) => b - a);
       sortedY.forEach(y => {
         const sortedRowItems = rows[y].sort((a, b) => a.transform[4] - b.transform[4]);
@@ -131,7 +130,6 @@ export function BankStatementImport() {
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
 
-    // 1. Try to find a header row
     for(let i = 0; i < Math.min(rows.length, 100); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
@@ -142,12 +140,11 @@ export function BankStatementImport() {
         dateIdx = row.findIndex(c => dateKeys.some(k => k === c || c.includes(k)));
         descIdx = row.findIndex(c => descKeys.some(k => k === c || c.includes(k)));
         debitIdx = row.findIndex(c => debitKeys.some(k => k === c || c.includes(k)));
-        amountIdx = row.findIndex(c => amtKeys.some(k => k === c || c.includes(k)));
+        amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
         break;
       }
     }
 
-    // 2. If no headers, use heuristic "Brute Force" search
     const results: any[] = [];
     const startIdx = headerIdx !== -1 ? headerIdx + 1 : 0;
 
@@ -161,7 +158,6 @@ export function BankStatementImport() {
       let foundType: 'debit' | 'credit' = 'debit';
 
       if (headerIdx !== -1) {
-        // Use detected columns
         const dateVal = row[dateIdx] || "";
         const descVal = descIdx !== -1 ? row[descIdx] : "Transaction";
         
@@ -182,7 +178,6 @@ export function BankStatementImport() {
           results.push({ date: foundDate, description: foundDesc, amount: foundAmount, type: foundType });
         }
       } else {
-        // Heuristic: row has something date-like and something number-like
         const dateCol = row.find(c => isDateLike(String(c)));
         const numCols = row.map(c => {
           const n = parseFloat(String(c || "").replace(/[^0-9.-]/g, ''));
@@ -190,13 +185,12 @@ export function BankStatementImport() {
         }).filter(n => n !== 0);
 
         if (dateCol && numCols.length > 0) {
-          // Assume the largest non-zero number is the amount (usually true for simple rows)
           const amount = numCols[0];
           results.push({
             date: String(dateCol),
             description: row.find(c => String(c).length > 5 && !isDateLike(String(c))) || "Transaction",
             amount: Math.abs(amount),
-            type: amount < 0 ? 'debit' : 'debit' // Default to debit for unidentified rows
+            type: amount < 0 ? 'debit' : 'debit'
           });
         }
       }
@@ -277,7 +271,6 @@ export function BankStatementImport() {
 
   const handleConfirmImport = async () => {
     if (!user?.uid || !db) return;
-    const approvedTxns = transactions.filter(t => t.status === 'approved');
     if (approvedTxns.length === 0) {
       toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve at least one transaction to continue." });
       return;
