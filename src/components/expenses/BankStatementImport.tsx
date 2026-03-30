@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useFirestore, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc, increment } from "firebase/firestore";
 import {
@@ -32,6 +32,12 @@ import { useFynWealthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import * as XLSX from 'xlsx';
+import * as pdfjs from 'pdfjs-dist';
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+}
 
 const CATEGORIES = [
   'Education / Kids',
@@ -70,142 +76,133 @@ export function BankStatementImport() {
     };
   }, [transactions]);
 
-  const parseFileManual = async (file: File): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      const extension = file.name.split('.').pop()?.toLowerCase();
+  /**
+   * Identifies if a string looks like a date
+   */
+  const isDateLike = (str: string): boolean => {
+    const s = String(str).trim();
+    // Check common formats: DD/MM/YYYY, YYYY-MM-DD, DD-MMM-YYYY
+    const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
+    return dateRegex.test(s);
+  };
 
-      const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
-      const creditKeys = ['credit', 'deposit', 'cr', 'received', 'amount in', 'deposited'];
-      const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description'];
-      const dateKeys = ['date', 'dt', 'time', 'transaction date'];
-      const amtKeys = ['amount', 'amt', 'value'];
+  /**
+   * Parses PDF statements manually
+   */
+  const parsePdfManual = async (file: File): Promise<any[]> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    let allTextRows: string[][] = [];
 
-      reader.onload = (e) => {
-        try {
-          const data = e.target?.result;
-          let parsed: any[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      
+      // Group items by Y coordinate to form rows
+      const items = textContent.items as any[];
+      const rows: Record<number, any[]> = {};
+      
+      items.forEach(item => {
+        const y = Math.round(item.transform[5]);
+        if (!rows[y]) rows[y] = [];
+        rows[y].push(item);
+      });
 
-          if (extension === 'csv' || extension === 'txt') {
-            const text = data as string;
-            // Try common delimiters
-            let delimiter = ',';
-            if (text.includes(';') && !text.includes(',')) delimiter = ';';
-            if (text.includes('\t') && !text.includes(',')) delimiter = '\t';
+      // Sort rows by Y (top to bottom) and items within row by X (left to right)
+      const sortedY = Object.keys(rows).map(Number).sort((a, b) => b - a);
+      sortedY.forEach(y => {
+        const sortedRowItems = rows[y].sort((a, b) => a.transform[4] - b.transform[4]);
+        allTextRows.push(sortedRowItems.map(item => item.str.trim()));
+      });
+    }
 
-            const rows = text.split('\n').map(r => r.split(delimiter).map(c => c.trim().replace(/^"|"$/g, '')));
-            
-            // Try to find headers in the first 50 rows
-            let headerIdx = -1;
-            let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
+    return extractTransactionsFromRows(allTextRows);
+  };
 
-            for(let i = 0; i < Math.min(rows.length, 50); i++) {
-              const row = rows[i].map(c => String(c || "").toLowerCase());
-              const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
-              const hasDesc = row.some(c => descKeys.some(k => c.includes(k)));
-              const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
+  /**
+   * Generic transaction extractor from a grid of strings
+   */
+  const extractTransactionsFromRows = (rows: any[][]): any[] => {
+    const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'withdraw', 'spent'];
+    const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
+    const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
+    const amtKeys = ['amount', 'amt', 'value', 'balance'];
 
-              if (hasDate && (hasDesc || hasAmt)) {
-                headerIdx = i;
-                dateIdx = row.findIndex(c => dateKeys.some(k => c.includes(k)));
-                descIdx = row.findIndex(c => descKeys.some(k => c.includes(k)));
-                debitIdx = row.findIndex(c => debitKeys.some(k => c.includes(k)));
-                amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
-                break;
-              }
-            }
+    let headerIdx = -1;
+    let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
 
-            if (headerIdx === -1) {
-              // Fallback if no headers found
-              dateIdx = 0; descIdx = 1; amountIdx = rows[0].length - 1;
-              headerIdx = -1;
-            }
+    // 1. Try to find a header row
+    for(let i = 0; i < Math.min(rows.length, 100); i++) {
+      const row = rows[i].map(c => String(c || "").toLowerCase());
+      const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
+      const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
 
-            const dataRows = rows.slice(headerIdx + 1);
-            parsed = dataRows.map(row => {
-              if (row.length < 2) return null;
-              
-              let amountStr = "";
-              if (debitIdx !== -1 && row[debitIdx]) amountStr = row[debitIdx];
-              else if (amountIdx !== -1) amountStr = row[amountIdx];
-              else amountStr = row[row.length - 1];
-
-              const rawAmount = parseFloat(amountStr?.replace(/[^0-9.-]/g, ''));
-              if (isNaN(rawAmount) || rawAmount === 0) return null;
-
-              // If we have a specific debit column, anything in it is a debit
-              // Otherwise, we rely on the sign in the general amount column
-              const isDebit = (debitIdx !== -1 && row[debitIdx] && Math.abs(rawAmount) > 0) || rawAmount < 0;
-
-              return {
-                date: row[dateIdx] || new Date().toISOString().split('T')[0],
-                description: row[descIdx] || "Transaction",
-                amount: Math.abs(rawAmount),
-                type: isDebit ? 'debit' : 'credit'
-              };
-            }).filter(Boolean);
-
-          } else if (extension === 'xlsx' || extension === 'xls') {
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            let headerIdx = -1;
-            let dateIdx = -1, descIdx = -1, debitIdx = -1, amountIdx = -1;
-
-            for(let i = 0; i < Math.min(json.length, 50); i++) {
-              const row = json[i].map(c => String(c || "").toLowerCase());
-              const hasDate = row.some(c => dateKeys.some(k => c.includes(k)));
-              const hasDesc = row.some(c => descKeys.some(k => c.includes(k)));
-              const hasAmt = row.some(c => amtKeys.some(k => c.includes(k)) || debitKeys.some(k => c.includes(k)));
-
-              if (hasDate && (hasDesc || hasAmt)) {
-                headerIdx = i;
-                dateIdx = row.findIndex(c => dateKeys.some(k => c.includes(k)));
-                descIdx = row.findIndex(c => descKeys.some(k => c.includes(k)));
-                debitIdx = row.findIndex(c => debitKeys.some(k => c.includes(k)));
-                amountIdx = row.findIndex(c => amtKeys.some(k => c.includes(k)));
-                break;
-              }
-            }
-
-            const dataRows = json.slice(headerIdx + 1);
-            parsed = dataRows.map(row => {
-              if (!row || row.length < 2) return null;
-              
-              let amountVal = 0;
-              if (debitIdx !== -1 && row[debitIdx]) {
-                amountVal = typeof row[debitIdx] === 'number' ? row[debitIdx] : parseFloat(String(row[debitIdx] || "").replace(/[^0-9.-]/g, ''));
-              } else if (amountIdx !== -1) {
-                amountVal = typeof row[amountIdx] === 'number' ? row[amountIdx] : parseFloat(String(row[amountIdx] || "").replace(/[^0-9.-]/g, ''));
-              }
-
-              if (isNaN(amountVal) || amountVal === 0) return null;
-
-              const isDebit = (debitIdx !== -1 && row[debitIdx] && Math.abs(amountVal) > 0) || amountVal < 0;
-
-              return {
-                date: String(row[dateIdx] || new Date().toISOString().split('T')[0]),
-                description: String(row[descIdx] || "Transaction"),
-                amount: Math.abs(amountVal),
-                type: isDebit ? 'debit' : 'credit'
-              };
-            }).filter(Boolean);
-          }
-
-          resolve(parsed);
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      if (extension === 'xlsx' || extension === 'xls') {
-        reader.readAsBinaryString(file);
-      } else {
-        reader.readAsText(file);
+      if (hasDate && hasAmt) {
+        headerIdx = i;
+        dateIdx = row.findIndex(c => dateKeys.some(k => k === c || c.includes(k)));
+        descIdx = row.findIndex(c => descKeys.some(k => k === c || c.includes(k)));
+        debitIdx = row.findIndex(c => debitKeys.some(k => k === c || c.includes(k)));
+        amountIdx = row.findIndex(c => amtKeys.some(k => k === c || c.includes(k)));
+        break;
       }
-    });
+    }
+
+    // 2. If no headers, use heuristic "Brute Force" search
+    const results: any[] = [];
+    const startIdx = headerIdx !== -1 ? headerIdx + 1 : 0;
+
+    for (let i = startIdx; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length < 2) continue;
+
+      let foundDate = "";
+      let foundDesc = "Transaction";
+      let foundAmount = 0;
+      let foundType: 'debit' | 'credit' = 'debit';
+
+      if (headerIdx !== -1) {
+        // Use detected columns
+        const dateVal = row[dateIdx] || "";
+        const descVal = descIdx !== -1 ? row[descIdx] : "Transaction";
+        
+        let amtValStr = "";
+        if (debitIdx !== -1 && row[debitIdx]) {
+          amtValStr = String(row[debitIdx]);
+          foundType = 'debit';
+        } else if (amountIdx !== -1) {
+          amtValStr = String(row[amountIdx]);
+        }
+
+        const rawAmount = parseFloat(amtValStr.replace(/[^0-9.-]/g, ''));
+        if (isDateLike(dateVal) && !isNaN(rawAmount) && rawAmount !== 0) {
+          foundDate = dateVal;
+          foundDesc = descVal;
+          foundAmount = Math.abs(rawAmount);
+          foundType = (debitIdx !== -1) ? 'debit' : (rawAmount < 0 ? 'debit' : 'credit');
+          results.push({ date: foundDate, description: foundDesc, amount: foundAmount, type: foundType });
+        }
+      } else {
+        // Heuristic: row has something date-like and something number-like
+        const dateCol = row.find(c => isDateLike(String(c)));
+        const numCols = row.map(c => {
+          const n = parseFloat(String(c || "").replace(/[^0-9.-]/g, ''));
+          return isNaN(n) ? 0 : n;
+        }).filter(n => n !== 0);
+
+        if (dateCol && numCols.length > 0) {
+          // Assume the largest non-zero number is the amount (usually true for simple rows)
+          const amount = numCols[0];
+          results.push({
+            date: String(dateCol),
+            description: row.find(c => String(c).length > 5 && !isDateLike(String(c))) || "Transaction",
+            amount: Math.abs(amount),
+            type: amount < 0 ? 'debit' : 'debit' // Default to debit for unidentified rows
+          });
+        }
+      }
+    }
+
+    return results;
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,10 +212,27 @@ export function BankStatementImport() {
     setLoading(true);
 
     try {
-      const parsedData = await parseFileManual(file);
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      let parsedData: any[] = [];
+
+      if (extension === 'pdf') {
+        parsedData = await parsePdfManual(file);
+      } else if (extension === 'xlsx' || extension === 'xls') {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+        parsedData = extractTransactionsFromRows(json as any[][]);
+      } else {
+        const text = await file.text();
+        const rows = text.split(/\r?\n/).map(line => 
+          line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''))
+        );
+        parsedData = extractTransactionsFromRows(rows);
+      }
       
       if (!parsedData || parsedData.length === 0) {
-        throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
+        throw new Error("No readable transactions found. Ensure file contains Date and Amount columns.");
       }
 
       const result = await processBankStatementManual({
@@ -229,16 +243,16 @@ export function BankStatementImport() {
       if (result && result.transactions && result.transactions.length > 0) {
         setTransactions(result.transactions);
         setReviewMode(true);
-        toast({ title: "Analysis Complete", description: `Extracted ${result.transactions.length} expenses.` });
+        toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
       } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "No debit transactions identified in this file." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions (withdrawals) were found." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
       toast({ 
         variant: "destructive", 
         title: "Import Failed", 
-        description: err.message || "Failed to parse file. Ensure it is a valid bank statement." 
+        description: err.message || "Failed to parse statement. Please ensure it's a valid PDF, CSV or Excel file." 
       });
     } finally {
       setLoading(false);
@@ -265,7 +279,7 @@ export function BankStatementImport() {
     if (!user?.uid || !db) return;
     const approvedTxns = transactions.filter(t => t.status === 'approved');
     if (approvedTxns.length === 0) {
-      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve at least one transaction." });
+      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve at least one transaction to continue." });
       return;
     }
 
@@ -289,11 +303,11 @@ export function BankStatementImport() {
         'stats.totalExpenses': increment(approvedTxns.length)
       });
 
-      toast({ title: "Vault Synced", description: `${approvedTxns.length} transactions recorded.` });
+      toast({ title: "Vault Synced", description: `Successfully recorded ${approvedTxns.length} expenses.` });
       setIsOpen(false);
       reset();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Error", description: "Could not save transactions." });
+      toast({ variant: "destructive", title: "Save Error", description: "Could not write to cloud storage." });
     } finally {
       setLoading(false);
     }
@@ -326,10 +340,10 @@ export function BankStatementImport() {
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Manual Statement Audit
+              Statement Import
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Supports Withdrawal, Debit, and general Amount columns.
+              Supports PDF, Excel, and CSV files from most major banks.
             </DialogDescription>
           </DialogHeader>
 
@@ -339,16 +353,16 @@ export function BankStatementImport() {
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
               </div>
               <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "Scanning File..." : "Select Bank Statement"}</h3>
+                <h3 className="font-bold text-lg">{loading ? "Scanning Document..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload CSV, Excel, or Text statements. We'll find withdrawals automatically.
+                  Upload your statement. We'll find withdrawals and categorise them automatically using manual rules.
                 </p>
               </div>
               
-              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls,.txt" onChange={handleFileChange} />
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls,.txt,.pdf" onChange={handleFileChange} />
               <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg shadow-primary/20">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Processing..." : "Choose File"}
+                {loading ? "Processing..." : "Choose Statement"}
               </Button>
             </div>
           ) : (
@@ -356,7 +370,7 @@ export function BankStatementImport() {
               <div className="bg-muted/30 px-8 py-4 flex items-center justify-between border-b">
                 <div className="flex items-center gap-8">
                   <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Extracted</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Found</p>
                     <p className="text-lg font-bold text-primary">{summary.totalTransactions}</p>
                   </div>
                   <div className="text-center">
@@ -426,7 +440,7 @@ export function BankStatementImport() {
                     {transactions.filter(t => t.status !== 'rejected').length === 0 && (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
                         <RotateCcw className="w-8 h-8 opacity-20" />
-                        <p className="text-xs font-bold uppercase tracking-widest italic">Review list empty</p>
+                        <p className="text-xs font-bold uppercase tracking-widest italic">No transactions to review</p>
                       </div>
                     )}
                   </div>
@@ -441,7 +455,7 @@ export function BankStatementImport() {
                   className="font-bold rounded-xl h-12 flex-[2] shadow-lg shadow-primary/20"
                 >
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
-                  Record {approvedTxns.length} Expenses
+                  Save {approvedTxns.length} Expenses
                 </Button>
               </DialogFooter>
             </div>
