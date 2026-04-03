@@ -1,6 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for capturing expense details from voice input.
+ * Optimized for low-latency transcription and extraction.
  */
 
 import {ai} from '@/ai/genkit';
@@ -17,12 +18,12 @@ export type VoiceExpenseCaptureInput = z.infer<typeof VoiceExpenseCaptureInputSc
 
 const VoiceExpenseCaptureOutputSchema = z.object({
   amount: z.number().describe('The numerical amount of the expense.'),
-  category: z.string().describe('Suggested category name based on common financial terms.'),
-  description: z.string().describe('A brief description of the expense.'),
+  category: z.string().describe('Suggested category name.'),
+  description: z.string().describe('A brief description.'),
   date: z
     .string()
     .describe(
-      "The date the expense occurred, in YYYY-MM-DD format. If no date is specified, use today's date."
+      "The date in YYYY-MM-DD format. Default to today if missing."
     ),
 });
 export type VoiceExpenseCaptureOutput = z.infer<typeof VoiceExpenseCaptureOutputSchema>;
@@ -33,7 +34,6 @@ export async function voiceExpenseCapture(
   return voiceExpenseCaptureFlow(input);
 }
 
-// Single combined prompt to extract structured details directly from audio
 const extractFromAudioPrompt = ai.definePrompt({
   name: 'extractFromAudioPrompt',
   input: {
@@ -43,11 +43,9 @@ const extractFromAudioPrompt = ai.definePrompt({
     }),
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
-  prompt: `You are an AI financial assistant called FynWealth. Listen to the provided audio and extract the following details: amount, category, description, and date.
-      
-If the category is unclear, suggest a broad logical category like 'Food', 'Transport', 'Utilities', 'Shopping', or 'Miscellaneous'.
-The date should be in YYYY-MM-DD format. If no date is mentioned, use today's date: {{today}}.
-The amount should be a numerical value. If no amount is clear, return 0.
+  prompt: `Listen and extract: amount (number), category, description, date (YYYY-MM-DD). 
+Use today's date if not mentioned: {{today}}. 
+Use 0 for unknown amount.
 
 Audio: {{media url=audioDataUri}}`,
 });
@@ -60,10 +58,7 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
   },
   async input => {
     try {
-      // Get current date for context
       const today = new Date().toISOString().split('T')[0];
-
-      // Perform direct extraction from audio
       const result = await extractFromAudioPrompt({
         audioDataUri: input.audioDataUri,
         today,
@@ -73,7 +68,6 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
 
       let {amount, category, description, date} = result.output;
 
-      // Post-processing and validation for extracted fields
       if (!date || isNaN(new Date(date) as any)) {
         date = today;
       }
@@ -91,7 +85,7 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("[voiceExpenseCaptureFlow] Error:", err.message);
       if (err.message.includes('429')) throw new Error('AI Quota Exceeded. Please try again.');
-      throw new Error("Failed to process voice input. Please speak clearly and try again.");
+      throw new Error("Failed to process voice input. Please speak clearly.");
     }
   }
 );

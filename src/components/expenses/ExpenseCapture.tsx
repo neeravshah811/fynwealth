@@ -41,6 +41,7 @@ import { BankStatementImport } from "./BankStatementImport";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { cn } from "@/lib/utils";
 
 export function ExpenseCapture() {
   const { currency } = useFynWealthStore();
@@ -48,6 +49,7 @@ export function ExpenseCapture() {
   const db = useFirestore();
   
   const [loading, setLoading] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [activeTab, setActiveTab] = useState("manual");
@@ -105,13 +107,6 @@ export function ExpenseCapture() {
   const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-
-  const [warrantyData, setWarrantyData] = useState({
-    productName: "",
-    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
-    expiryDate: format(new Date(new Date().getFullYear() + 1, new Date().getMonth(), new Date().getDate()), 'yyyy-MM-dd'),
-    contact: ""
-  });
 
   async function loadSubcategories(categoryId: string, isReview: boolean = false) {
     if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
@@ -178,8 +173,6 @@ export function ExpenseCapture() {
     }
   };
 
-  const isWarrantyCategory = categories.find(c => c.id === selectedCategory)?.name === "Warranties";
-
   const resetForm = () => {
     setAmount("");
     setNote("");
@@ -191,12 +184,7 @@ export function ExpenseCapture() {
     setFrequency('Monthly');
     setAttachmentData(null);
     setAttachmentName(null);
-    setWarrantyData({
-      productName: "",
-      purchaseDate: format(new Date(), 'yyyy-MM-dd'),
-      expiryDate: format(new Date(new Date().getFullYear() + 1, new Date().getMonth(), new Date().getDate()), 'yyyy-MM-dd'),
-      contact: ""
-    });
+    setProcessingMessage("");
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -234,29 +222,6 @@ export function ExpenseCapture() {
         status: status,
         createdAt: serverTimestamp()
       };
-
-      if (isWarrantyCategory) {
-        payload.productName = warrantyData.productName;
-        payload.purchaseDate = warrantyData.purchaseDate;
-        payload.warrantyExpiryDate = warrantyData.expiryDate;
-        payload.serviceCentreContact = warrantyData.contact;
-
-        addDocumentNonBlocking(collection(db, 'users', user.uid, 'bills'), {
-          name: `Warranty Expiry: ${warrantyData.productName}`,
-          amount: 0,
-          dueDate: warrantyData.expiryDate,
-          dueTime: '09:00',
-          frequency: 'One-time',
-          categoryId: selectedCategory,
-          categoryName: 'Warranties',
-          userId: user.uid,
-          status: 'pending',
-          notified: false,
-          createdAt: serverTimestamp(),
-          note: `Warranty reminder for ${warrantyData.productName}. Contact: ${warrantyData.contact}`
-        });
-        updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalReminders': increment(1) });
-      }
 
       addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), payload);
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(1) });
@@ -312,12 +277,6 @@ export function ExpenseCapture() {
     }
   };
 
-  const removeAttachment = () => {
-    setAttachmentData(null);
-    setAttachmentName(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -342,11 +301,13 @@ export function ExpenseCapture() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      // Immediately show processing message
+      setLoading(true);
+      setProcessingMessage("Analyzing your audio...");
     }
   };
 
   const processVoice = async (audioBlob: Blob) => {
-    setLoading(true);
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -372,8 +333,9 @@ export function ExpenseCapture() {
       reader.readAsDataURL(audioBlob);
     } catch (err) {
       toast({ variant: "destructive", title: "AI Transcribe Failed", description: "Failed to process audio. Try speaking again." });
-    } finally {
       setLoading(false);
+    } finally {
+      setProcessingMessage("");
     }
   };
 
@@ -381,11 +343,14 @@ export function ExpenseCapture() {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
     
+    // Immediately show processing message
+    setLoading(true);
+    setProcessingMessage("Extracting receipt data...");
+
     const previewReader = new FileReader();
     previewReader.onloadend = () => { setAttachmentData(previewReader.result as string); setAttachmentName(file.name); };
     previewReader.readAsDataURL(file);
 
-    setLoading(true);
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -410,13 +375,23 @@ export function ExpenseCapture() {
       reader.readAsDataURL(file);
     } catch (err) {
       toast({ variant: "destructive", title: "Scan Error", description: "AI failed to analyze receipt." });
-    } finally {
       setLoading(false);
+    } finally {
+      setProcessingMessage("");
     }
   };
 
   return (
-    <Card className="shadow-lg border-none bg-card ring-1 ring-black/5">
+    <Card className="shadow-lg border-none bg-card ring-1 ring-black/5 relative">
+      {loading && processingMessage && (
+        <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm rounded-[20px] flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
+          <div className="p-4 rounded-full bg-primary/10">
+            <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          </div>
+          <p className="text-sm font-bold text-primary animate-pulse uppercase tracking-widest">{processingMessage}</p>
+        </div>
+      )}
+
       <CardHeader className="bg-primary/5 rounded-t-[20px] flex flex-row items-center justify-between space-y-0 pb-4">
         <div className="flex items-center gap-3">
           <CardTitle className="text-xl font-headline text-primary font-bold">Record Spend</CardTitle>
@@ -536,7 +511,10 @@ export function ExpenseCapture() {
       </CardContent>
 
       {/* AI Review & Edit Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+      <Dialog open={isReviewDialogOpen} onOpenChange={(open) => {
+        if (!open) setProcessingMessage("");
+        setIsReviewDialogOpen(open);
+      }}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
@@ -583,7 +561,7 @@ export function ExpenseCapture() {
           <DialogFooter className="p-6 bg-muted/20 border-t flex gap-3">
             <Button variant="ghost" onClick={() => setIsReviewDialogOpen(false)} className="flex-1 font-bold rounded-xl h-12">Discard</Button>
             <Button onClick={handleReviewApproval} disabled={loading || !aiReviewData.categoryId} className="flex-[2] font-bold rounded-xl h-12 shadow-lg">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
               Approve & Save
             </Button>
           </DialogFooter>

@@ -1,6 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow to extract expense details from a scanned bill or invoice.
+ * Optimized for maximum extraction speed.
  */
 
 import { ai } from '@/ai/genkit';
@@ -16,11 +17,11 @@ const ScanBillExpenseCaptureInputSchema = z.object({
 export type ScanBillExpenseCaptureInput = z.infer<typeof ScanBillExpenseCaptureInputSchema>;
 
 const ScanBillExpenseCaptureOutputSchema = z.object({
-  merchantName: z.string().describe('The name of the merchant. Use an empty string if not found.'),
+  merchantName: z.string().describe('The name of the merchant. Use empty string if not found.'),
   totalAmount: z.number().describe('The total amount. Use 0 if not found.'),
   transactionDate: z.string().describe('The date in YYYY-MM-DD format. Use today\'s date if not found.'),
-  currency: z.string().describe('The currency symbol. Use an empty string if not found.'),
-  categorySuggestion: z.string().describe('A suggested category. Use an empty string if not found.'),
+  currency: z.string().describe('The currency symbol. Use empty string if not found.'),
+  categorySuggestion: z.string().describe('A suggested category. Use empty string if not found.'),
 });
 export type ScanBillExpenseCaptureOutput = z.infer<typeof ScanBillExpenseCaptureOutputSchema>;
 
@@ -32,9 +33,8 @@ const prompt = ai.definePrompt({
   name: 'scanBillExpensePrompt',
   input: { schema: ScanBillExpenseCaptureInputSchema },
   output: { schema: ScanBillExpenseCaptureOutputSchema },
-  prompt: `You are an AI assistant specialized in extracting financial information from invoices and bills.
-Extract the following details from the provided image of a bill or invoice. Ensure the transaction date is in YYYY-MM-DD format. 
-If a specific piece of information is not found on the bill, return an empty string for text fields or 0 for numerical fields.
+  prompt: `Extract: merchantName, totalAmount (number), transactionDate (YYYY-MM-DD), currency, categorySuggestion.
+Return 0/empty if not found.
 
 Bill Image: {{media url=billImage}}`,
 });
