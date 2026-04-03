@@ -2,6 +2,11 @@
 /**
  * @fileOverview Predicts upcoming spending based on strict historical averaging.
  * Optimized for accuracy using pre-aggregated monthly totals.
+ * 
+ * Logic:
+ * 1. Current Month Expected: Average of total spending from all previous months.
+ * 2. Next Month Expected: Average of total spending including the current month.
+ * 3. Comparison: % change between Current Month Expected vs Last Month Actual.
  */
 
 import {ai} from '@/ai/genkit';

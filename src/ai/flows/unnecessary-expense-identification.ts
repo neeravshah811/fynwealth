@@ -64,11 +64,23 @@ const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
   async (input) => {
     try {
       const {output} = await unnecessaryExpenseIdentificationPrompt(input);
-      if (!output) throw new Error("No output generated");
+      if (!output) {
+        return {
+          highSpendCategories: input.categories.map(c => ({
+            ...c,
+            savingTip: "Review your transaction history to identify potential savings."
+          }))
+        };
+      }
       return output;
     } catch (err: any) {
       console.error("[unnecessaryExpenseIdentificationFlow] Error:", err.message);
-      throw new Error("Failed to generate saving tips. Please try again later.");
+      return {
+        highSpendCategories: input.categories.map(c => ({
+          ...c,
+          savingTip: "Audit this category for recurring or non-essential items."
+        }))
+      };
     }
   }
 );
