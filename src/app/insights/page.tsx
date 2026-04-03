@@ -174,7 +174,7 @@ export default function InsightsPage() {
               
               <div className="h-px bg-muted/50 my-4" />
               
-              {insights.predictions?.futureSpikes.map((p: any, i: number) => (
+              {insights.predictions?.futureSpikes?.map((p: any, i: number) => (
                 <div key={i} className="flex gap-5 p-5 rounded-[20px] bg-muted/20 border border-muted/50 transition-all hover:bg-muted/30 group">
                   <div className="flex flex-col items-center justify-center bg-background rounded-2xl p-3 min-w-[72px] h-20 shadow-sm ring-1 ring-primary/5 transition-all group-hover:ring-primary/20 group-hover:shadow-md">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{p.year}</span>
@@ -204,7 +204,7 @@ export default function InsightsPage() {
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="space-y-5">
-              {insights.unnecessary?.highSpendCategories.map((cat: any, i: number) => (
+              {insights.unnecessary?.highSpendCategories?.map((cat: any, i: number) => (
                 <div key={i} className="p-5 rounded-[20px] border border-accent/10 bg-accent/5 space-y-3 transition-all hover:shadow-md hover:bg-accent/[0.08]">
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-bold text-sm flex items-center gap-3 text-foreground truncate">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
@@ -34,7 +35,6 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/no
 import * as XLSX from 'xlsx';
 import * as pdfjs from 'pdfjs-dist';
 
-// Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
@@ -99,7 +99,11 @@ export function BankStatementImport() {
     const lastDot = s.lastIndexOf('.');
     
     if (lastComma > lastDot) {
-      s = s.replace(/\./g, '').replace(',', '.');
+      if (s.length - lastComma === 3) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
     } else {
       s = s.replace(/,/g, '');
     }
@@ -110,16 +114,18 @@ export function BankStatementImport() {
 
   const extractTransactionsFromRows = (rows: any[][]): any[] => {
     const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'spent', 'expense'];
-    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary', 'cashback'];
+    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary', 'cashback', 'credit limit'];
+    const balanceKeys = ['balance', 'bal', 'closing balance', 'available'];
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value'];
-    const balanceKeys = ['balance', 'bal', 'closing balance', 'available'];
+
+    const negativeKeywords = ['salary', 'interest credit', 'refund', 'cashback', 'reversal', 'income', 'deposit', 'received'];
 
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
 
-    for(let i = 0; i < Math.min(rows.length, 100); i++) {
+    for(let i = 0; i < Math.min(rows.length, 50); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
       const hasAmt = row.some(c => amtKeys.some(k => c === k || c.includes(k)));
@@ -139,8 +145,6 @@ export function BankStatementImport() {
     const results: any[] = [];
 
     for (let i = 0; i < rows.length; i++) {
-      if (i === headerIdx) continue;
-      
       const row = rows[i];
       if (row.length < 1) continue;
 
@@ -149,54 +153,48 @@ export function BankStatementImport() {
       let foundAmount = 0;
       let isDebit = false;
 
-      if (headerIdx !== -1 && i > headerIdx) {
-        const dateVal = row[dateIdx] || "";
-        
-        if (!isDateLike(dateVal) && results.length > 0) {
+      const dateColIdx = row.findIndex(c => isDateLike(String(c)));
+      if (dateColIdx === -1) {
+        if (results.length > 0 && row.some(c => String(c).length > 10)) {
           const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
-          if (extraText) {
-            results[results.length - 1].description += ' ' + extraText;
-          }
-          continue;
+          results[results.length - 1].description += ' ' + extraText;
+        }
+        continue;
+      }
+
+      foundDate = String(row[dateColIdx]);
+
+      if (headerIdx !== -1 && i > headerIdx) {
+        if (descIdx !== -1 && row[descIdx]) {
+          foundDesc = String(row[descIdx]);
+        } else {
+          foundDesc = row.filter((c, idx) => idx !== dateColIdx && idx !== balanceIdx && String(c).length > 5 && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
         }
 
-        if (isDateLike(dateVal)) {
-          foundDate = String(dateVal);
-          
-          if (descIdx !== -1 && row[descIdx]) {
-            foundDesc = String(row[descIdx]);
-          } else {
-            foundDesc = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
-          }
-
-          if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
-            foundAmount = cleanAmount(row[debitIdx]);
-            isDebit = true;
-          } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
-            isDebit = false; 
-          } else if (amountIdx !== -1) {
-            const rawAmt = cleanAmount(row[amountIdx]);
-            foundAmount = Math.abs(rawAmt);
-            isDebit = rawAmt < 0; 
-          }
+        if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
+          foundAmount = cleanAmount(row[debitIdx]);
+          isDebit = true;
+        } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
+          isDebit = false;
+        } else if (amountIdx !== -1) {
+          const rawAmt = cleanAmount(row[amountIdx]);
+          foundAmount = Math.abs(rawAmt);
+          isDebit = rawAmt < 0 || (!row[creditIdx] && rawAmt !== 0);
         }
-      } 
-      else {
-        const dateCol = row.find(c => isDateLike(String(c)));
-        const amountCandidates = row.map(c => cleanAmount(c)).filter(n => n !== 0);
-        
-        if (dateCol && amountCandidates.length > 0) {
-          foundDate = String(dateCol);
-          foundAmount = Math.abs(amountCandidates[0]);
-          foundDesc = row.filter(c => String(c).trim().length > 3 && !isDateLike(String(c)) && cleanAmount(c) === 0).join(' ') || "Entry";
-          
-          const rowText = row.join(' ').toLowerCase();
-          const isIncome = creditKeys.some(k => rowText.includes(k));
-          isDebit = !isIncome;
+      } else {
+        const amountCandidates = row.map((c, idx) => ({ val: cleanAmount(c), idx })).filter(o => o.val !== 0 && o.idx !== dateColIdx && o.idx !== balanceIdx);
+        if (amountCandidates.length > 0) {
+          const bestAmount = amountCandidates[0];
+          foundAmount = Math.abs(bestAmount.val);
+          foundDesc = row.filter((c, idx) => idx !== dateColIdx && idx !== bestAmount.idx && String(c).trim().length > 3).join(' ') || "Entry";
+          isDebit = bestAmount.val < 0 || row.join(' ').toLowerCase().includes('dr');
         }
       }
 
-      if (foundDate && foundAmount > 0 && isDebit) {
+      const lowerDesc = foundDesc.toLowerCase();
+      const hasIncomeKeyword = negativeKeywords.some(k => lowerDesc.includes(k));
+
+      if (foundDate && foundAmount > 0 && isDebit && !hasIncomeKeyword) {
         results.push({
           date: foundDate,
           description: foundDesc.trim(),
@@ -265,7 +263,7 @@ export function BankStatementImport() {
       }
       
       if (!parsedData || parsedData.length === 0) {
-        throw new Error("No readable transactions found. Ensure file contains Date and Amount columns.");
+        throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
       }
 
       const result = await processBankStatementManual({

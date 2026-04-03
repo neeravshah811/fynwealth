@@ -69,7 +69,6 @@ export default function LoginPage() {
     }
   };
 
-  // Handle Google Redirect Result (Reliability for Mobile)
   useEffect(() => {
     if (!auth) return;
 
@@ -153,14 +152,11 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Reliability Hack: Detect if device is mobile
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     if (isMobile) {
-      // Best for Mobile: Avoids popup blockers and sandbox issues
       signInWithRedirect(auth, provider);
     } else {
-      // Best for Desktop: Fast and seamless
       signInWithPopup(auth, provider)
         .then(async (result) => {
           const user = result.user;
