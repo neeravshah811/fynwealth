@@ -47,6 +47,10 @@ export default function InsightsPage() {
   const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
   const expenses = expensesData || [];
 
+  /**
+   * Robust numeric parser aligned with dashboard
+   * Removes symbols, commas, and supports accounting parentheses
+   */
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -66,7 +70,7 @@ export default function InsightsPage() {
     
     return expenses
       .filter(e => e.date >= startStr && e.date <= endStr && (e.status === 'paid' || !e.status))
-      .reduce((sum, e) => sum + Math.abs(toNum(e.amount)), 0);
+      .reduce((sum, e) => sum + toNum(e.amount), 0);
   }, [expenses, viewMonth, viewYear]);
 
   const discoveries = useMemo(() => {
@@ -79,25 +83,26 @@ export default function InsightsPage() {
     const lastStartStr = format(startOfMonth(lastMonthDate), 'yyyy-MM-dd');
     const lastEndStr = format(endOfMonth(lastMonthDate), 'yyyy-MM-dd');
 
-    const sortDesc = (arr: any[]) => [...arr]
-      .filter(e => toNum(e.amount) > 0)
-      .sort((a, b) => toNum(b.amount) - toNum(a.amount));
-
-    const sortAsc = (arr: any[]) => [...arr]
-      .filter(e => toNum(e.amount) > 0)
-      .sort((a, b) => toNum(a.amount) - toNum(b.amount));
+    // Filter only positive expenses for discovery lists to avoid EMI/Refund confusion
+    const filterAndSort = (arr: any[], direction: 'asc' | 'desc') => [...arr]
+      .filter(e => toNum(e.amount) > 0 && (e.status === 'paid' || !e.status))
+      .sort((a, b) => {
+        const valA = toNum(a.amount);
+        const valB = toNum(b.amount);
+        return direction === 'desc' ? valB - valA : valA - valB;
+      });
 
     const currentTxns = expenses.filter(e => e.date >= currentStartStr && e.date <= currentEndStr);
     const lastTxns = expenses.filter(e => e.date >= lastStartStr && e.date <= lastEndStr);
 
     return {
       current: {
-        highest: sortDesc(currentTxns).slice(0, 3),
-        lowest: sortAsc(currentTxns).slice(0, 3)
+        highest: filterAndSort(currentTxns, 'desc').slice(0, 3),
+        lowest: filterAndSort(currentTxns, 'asc').slice(0, 3)
       },
       last: {
-        highest: sortDesc(lastTxns).slice(0, 3),
-        lowest: sortAsc(lastTxns).slice(0, 3)
+        highest: filterAndSort(lastTxns, 'desc').slice(0, 3),
+        lowest: filterAndSort(lastTxns, 'asc').slice(0, 3)
       }
     };
   }, [expenses, viewMonth, viewYear]);
@@ -112,7 +117,7 @@ export default function InsightsPage() {
     const categoryTotals: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
       const cat = e.categoryName || e.category || "General";
-      categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(toNum(e.amount));
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + toNum(e.amount);
     });
 
     return Object.entries(categoryTotals)
@@ -126,7 +131,7 @@ export default function InsightsPage() {
   }, []);
 
   const loadInsights = useCallback(async (isManual = false) => {
-    if (expenses.length === 0 || fetchingRef.current) return;
+    if (fetchingRef.current) return;
 
     setLoading(true);
     setError(null);
@@ -140,7 +145,7 @@ export default function InsightsPage() {
         if (e.status === 'paid' || !e.status) {
           const monthKey = e.date.substring(0, 7);
           if (monthKey <= targetMonthKey) {
-            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + toNum(e.amount);
           }
         }
       });
@@ -195,7 +200,7 @@ export default function InsightsPage() {
     </div>
   );
 
-  const formatAmount = (amount: number) => Math.abs(toNum(amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (amount: number) => Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hasData = !!(insights.predictions || insights.unnecessary);
 
@@ -254,7 +259,7 @@ export default function InsightsPage() {
             <CardContent className="p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Expected</p>
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Spent</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
                     {currency.symbol}{formatAmount(currentMonthTotal)}
                   </p>
@@ -276,7 +281,7 @@ export default function InsightsPage() {
                   <p className="text-sm text-foreground leading-relaxed font-bold italic flex-1">
                     {insights.predictions?.historicalComparison || "Analyzing your historical spending patterns..."}
                   </p>
-                  {insights.predictions?.percentageChange !== undefined && (
+                  {insights.predictions?.percentageChange !== undefined && insights.predictions.percentageChange !== 0 && (
                     <div className={cn(
                       "px-4 py-2 rounded-xl text-xs font-bold border shrink-0 flex items-center gap-2",
                       insights.predictions.trendDirection === 'down' 
@@ -284,7 +289,7 @@ export default function InsightsPage() {
                         : "bg-amber-50 text-amber-700 border-amber-100"
                     )}>
                       {insights.predictions.trendDirection === 'down' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      {Math.abs(insights.predictions.percentageChange)}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Last Month
+                      {Math.abs(insights.predictions.percentageChange)}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Previous Data
                     </div>
                   )}
                 </div>
@@ -313,7 +318,7 @@ export default function InsightsPage() {
                         <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground">No records found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No recorded expenses found.</div>
                     )}
                   </div>
                   <div className="space-y-3">
@@ -324,7 +329,7 @@ export default function InsightsPage() {
                         <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground">No records found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No recorded expenses found.</div>
                     )}
                   </div>
                 </div>
@@ -397,7 +402,7 @@ export default function InsightsPage() {
                 })}
                 {accurateTopCategories.length === 0 && (
                   <div className="text-center py-20 text-muted-foreground font-medium italic text-sm">
-                    No high spending identified.
+                    No high spending identified for this period.
                   </div>
                 )}
               </div>

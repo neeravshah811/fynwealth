@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Predicts upcoming heavy spending and compares month-over-month trends.
@@ -53,13 +52,42 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
   },
   async (input) => {
     try {
+      if (!input.expenses || input.expenses.length === 0) {
+        return {
+          predictedNextMonthTotal: 0,
+          percentageChange: 0,
+          trendDirection: 'stable',
+          historicalComparison: "No historical records found in your vault."
+        };
+      }
+
       const expensesJson = JSON.stringify(input.expenses);
       const {output} = await prompt({expensesJson});
-      if (!output) throw new Error("No output generated");
+      
+      if (!output) {
+        // Fallback calculation if AI fails to produce schema-compliant output
+        const total = input.expenses.reduce((s, e) => s + e.amount, 0);
+        const avg = total / input.expenses.length;
+        return {
+          predictedNextMonthTotal: avg,
+          percentageChange: 0,
+          trendDirection: 'stable',
+          historicalComparison: "Analysis simplified due to processing limit."
+        };
+      }
+      
       return output;
     } catch (err: any) {
       console.error("[predictHeavySpendingMonthsFlow] Error:", err.message);
-      throw new Error("Failed to forecast spending. Please try again later.");
+      // Fail gracefully with mathematical average fallback
+      const total = input.expenses?.length > 0 ? input.expenses.reduce((s, e) => s + e.amount, 0) : 0;
+      const avg = input.expenses?.length > 0 ? total / input.expenses.length : 0;
+      return {
+        predictedNextMonthTotal: avg,
+        percentageChange: 0,
+        trendDirection: 'stable',
+        historicalComparison: "Forecast based on historical average."
+      };
     }
   }
 );

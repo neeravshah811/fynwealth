@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -40,18 +39,33 @@ export function OverviewCards() {
   const { data: budgets, isLoading: budgetsLoading } = useCollection(budgetsQuery);
   const { data: expenses, isLoading: expensesLoading } = useCollection(expensesQuery);
 
+  /**
+   * Unified number parser to ensure consistency across app
+   */
+  const toNum = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    let cleaned = String(val).trim();
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+      cleaned = '-' + cleaned.slice(1, -1);
+    }
+    cleaned = cleaned.replace(/[^0-9.-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
+
   const stats = useMemo(() => {
     if (!expenses && !budgets) return { paidSpend: 0, pendingBills: 0, totalBudgetAmount: 0, totalBalance: 0 };
     
     const paid = (expenses || [])
       .filter(e => e.status === 'paid' || !e.status)
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      .reduce((sum, e) => sum + toNum(e.amount), 0);
 
     const pending = (expenses || [])
       .filter(e => e.status === 'unpaid')
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      .reduce((sum, e) => sum + toNum(e.amount), 0);
 
-    const budget = (budgets || []).reduce((sum, b) => sum + (Number(b.limit) || 0), 0);
+    const budget = (budgets || []).reduce((sum, b) => sum + toNum(b.limit), 0);
     const balance = budget - (paid + pending);
 
     return { paidSpend: paid, pendingBills: pending, totalBudgetAmount: budget, totalBalance: balance };
