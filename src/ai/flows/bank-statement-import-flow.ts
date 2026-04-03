@@ -83,22 +83,6 @@ function getCategory(description: string): string {
   return 'Miscellaneous';
 }
 
-/**
- * Clean Description (Deterministic)
- */
-function cleanDescription(description: string): string {
-  // We keep more of the original text now to satisfy "Full Text" requirement
-  // but we still strip excessive whitespace and redundant transaction codes
-  return description
-    .replace(/UPI\//gi, '')
-    .replace(/IMPS\//gi, '')
-    .replace(/NEFT\//gi, '')
-    .replace(/RTGS\//gi, '')
-    .replace(/TRANSFER\//gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 export async function processBankStatementManual(input: BankStatementInput): Promise<BankStatementOutput> {
   const { userId, transactions } = input;
   
@@ -106,7 +90,6 @@ export async function processBankStatementManual(input: BankStatementInput): Pro
     throw new Error("Missing required User ID for statement processing.");
   }
 
-  // Filter ONLY debits
   const debitsOnly = transactions.filter(t => t.type === "debit");
 
   if (debitsOnly.length === 0) {
@@ -114,13 +97,12 @@ export async function processBankStatementManual(input: BankStatementInput): Pro
   }
 
   const finalTransactions = debitsOnly.map((t, idx) => {
-    const cleanedDesc = cleanDescription(t.description);
     return {
       id: `txn_${idx}_${Date.now()}`,
       date: t.date,
-      description: cleanedDesc || t.description,
+      description: t.description,
       amount: Math.abs(t.amount),
-      category: getCategory(cleanedDesc || t.description),
+      category: getCategory(t.description),
       confidence: 1.0, 
       status: "pending" as const,
       actions: { canEdit: true, canApprove: true, canReject: true }

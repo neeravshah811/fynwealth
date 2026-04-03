@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview generateAIInsight - Genkit flow for financial insights.
@@ -36,9 +35,9 @@ const generateAIInsightFlow = ai.defineFlow(
     const { prompt: userPrompt } = input;
     
     try {
-      // Call Gemini API via Genkit using gemini-2.0-flash
+      // Call Gemini API via Genkit using gemini-2.5-flash
       const response = await ai.generate({
-        model: 'googleai/gemini-2.0-flash',
+        model: 'googleai/gemini-2.5-flash',
         prompt: `You are a concise financial advisor for FynWealth. 
         Provide a short, structured financial insight based on the input.
         Format: Insight: [Short observation]. Action: [Actionable step].

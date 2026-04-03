@@ -80,7 +80,6 @@ export function BankStatementImport() {
 
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
-    // Match common bank date formats: 01/01/2024, 01-Jan-2024, 2024-01-01
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
@@ -89,25 +88,19 @@ export function BankStatementImport() {
     if (val === null || val === undefined) return 0;
     let s = String(val).trim().toUpperCase();
     
-    // Handle accounting parentheses
     if (s.startsWith('(') && s.endsWith(')')) {
       s = '-' + s.slice(1, -1);
     }
     
-    // Remove everything except digits, comma, dot, and minus
     s = s.replace(/[^0-9.,-]/g, '');
     if (!s) return 0;
 
-    // Detect format: If comma is the decimal (European)
-    // Heuristic: If comma appears once and is followed by 2 digits, and no dot exists, or comma is last
     const lastComma = s.lastIndexOf(',');
     const lastDot = s.lastIndexOf('.');
     
     if (lastComma > lastDot) {
-      // Comma is the decimal separator (e.g. 1.234,56)
       s = s.replace(/\./g, '').replace(',', '.');
     } else {
-      // Dot is the decimal separator (e.g. 1,234.56)
       s = s.replace(/,/g, '');
     }
     
@@ -117,7 +110,7 @@ export function BankStatementImport() {
 
   const extractTransactionsFromRows = (rows: any[][]): any[] => {
     const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'spent', 'expense'];
-    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary'];
+    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary', 'cashback'];
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value'];
@@ -126,8 +119,7 @@ export function BankStatementImport() {
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
 
-    // 1. Identify Table Header
-    for(let i = 0; i < Math.min(rows.length, 50); i++) {
+    for(let i = 0; i < Math.min(rows.length, 100); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
       const hasAmt = row.some(c => amtKeys.some(k => c === k || c.includes(k)));
@@ -145,9 +137,8 @@ export function BankStatementImport() {
     }
 
     const results: any[] = [];
-    const startIdx = 0; // We scan from row 0 to capture prefix entries
 
-    for (let i = startIdx; i < rows.length; i++) {
+    for (let i = 0; i < rows.length; i++) {
       if (i === headerIdx) continue;
       
       const row = rows[i];
@@ -158,11 +149,9 @@ export function BankStatementImport() {
       let foundAmount = 0;
       let isDebit = false;
 
-      // 2. Logic for statements WITH identified headers
       if (headerIdx !== -1 && i > headerIdx) {
         const dateVal = row[dateIdx] || "";
         
-        // Multi-line description support: If row has no date, append text to previous transaction
         if (!isDateLike(dateVal) && results.length > 0) {
           const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
           if (extraText) {
@@ -174,41 +163,40 @@ export function BankStatementImport() {
         if (isDateLike(dateVal)) {
           foundDate = String(dateVal);
           
-          // Identify description: use descIdx or pick longest string
           if (descIdx !== -1 && row[descIdx]) {
             foundDesc = String(row[descIdx]);
           } else {
             foundDesc = row.filter(c => String(c).length > 5 && !isDateLike(String(c)) && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
           }
 
-          // Check Debit vs Credit column
           if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
             foundAmount = cleanAmount(row[debitIdx]);
             isDebit = true;
           } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
-            isDebit = false; // It's a credit
+            isDebit = false; 
           } else if (amountIdx !== -1) {
             const rawAmt = cleanAmount(row[amountIdx]);
-            // If only one amount column, negative usually means debit, but some banks use positive for debit in dedicated columns
-            foundAmount = rawAmt;
+            foundAmount = Math.abs(rawAmt);
             isDebit = rawAmt < 0; 
           }
         }
       } 
-      // 3. Brute Force logic for prefix rows or missing headers
       else {
         const dateCol = row.find(c => isDateLike(String(c)));
         const amountCandidates = row.map(c => cleanAmount(c)).filter(n => n !== 0);
         
         if (dateCol && amountCandidates.length > 0) {
           foundDate = String(dateCol);
-          foundAmount = amountCandidates[0];
+          foundAmount = Math.abs(amountCandidates[0]);
           foundDesc = row.filter(c => String(c).trim().length > 3 && !isDateLike(String(c)) && cleanAmount(c) === 0).join(' ') || "Entry";
-          isDebit = true; // Heuristic default
+          
+          const rowText = row.join(' ').toLowerCase();
+          const isIncome = creditKeys.some(k => rowText.includes(k));
+          isDebit = !isIncome;
         }
       }
 
-      if (foundDate && Math.abs(foundAmount) > 0 && isDebit) {
+      if (foundDate && foundAmount > 0 && isDebit) {
         results.push({
           date: foundDate,
           description: foundDesc.trim(),
@@ -234,7 +222,6 @@ export function BankStatementImport() {
       const rows: Record<number, any[]> = {};
       
       items.forEach(item => {
-        // Round Y to group items on roughly same line
         const y = Math.round(item.transform[5]);
         if (!rows[y]) rows[y] = [];
         rows[y].push(item);
@@ -291,7 +278,7 @@ export function BankStatementImport() {
         setReviewMode(true);
         toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
       } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "The file was read, but no debit transactions were identified." });
+        toast({ variant: "destructive", title: "No Expenses Found", description: "No debit transactions identified." });
       }
     } catch (err: any) {
       console.error("Import Error:", err);
@@ -324,7 +311,7 @@ export function BankStatementImport() {
   const handleConfirmImport = async () => {
     if (!user?.uid || !db) return;
     if (approvedTxns.length === 0) {
-      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve at least one transaction to continue." });
+      toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve entries to continue." });
       return;
     }
 
@@ -348,7 +335,7 @@ export function BankStatementImport() {
         'stats.totalExpenses': increment(approvedTxns.length)
       });
 
-      toast({ title: "Vault Synced", description: `Successfully recorded ${approvedTxns.length} expenses.` });
+      toast({ title: "Vault Synced", description: `Recorded ${approvedTxns.length} expenses.` });
       setIsOpen(false);
       reset();
     } catch (err) {
@@ -385,7 +372,7 @@ export function BankStatementImport() {
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
               <FileText className="w-6 h-6" />
-              Statement Audit
+              Statement Review
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
               Deterministic parsing for PDF, Excel, and CSV statements.
@@ -400,7 +387,7 @@ export function BankStatementImport() {
               <div className="space-y-2">
                 <h3 className="font-bold text-lg">{loading ? "Scanning Document..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload your bank export. We'll identify debit entries from every page and filter out credits.
+                  Upload your bank export. We'll identify debit entries and capture full narrations.
                 </p>
               </div>
               
@@ -450,8 +437,7 @@ export function BankStatementImport() {
                               </Badge>
                             </div>
                             
-                            {/* Full text narration - No truncate */}
-                            <p className="font-bold text-sm text-foreground leading-relaxed">
+                            <p className="font-bold text-sm text-foreground leading-relaxed break-words">
                               {t.description}
                             </p>
 
