@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that generates concise saving tips for high-spend categories.
@@ -44,6 +43,7 @@ Requirements:
 1. For each category, provide 1 tip specific to that spending behavior.
 2. If Subscriptions are high, suggest plan optimization. If Food is high, suggest meal prep.
 3. Keep tips very short (max 10 words).
+4. Use the EXACT totalSpent provided in the input for your reasoning. Do not perform your own math.
 
 Categories:
 {{#each categories}}

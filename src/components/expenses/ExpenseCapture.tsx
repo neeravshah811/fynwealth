@@ -293,9 +293,9 @@ export function ExpenseCapture() {
   };
 
   const processVoice = async (audioBlob: Blob) => {
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result) {
@@ -313,20 +313,16 @@ export function ExpenseCapture() {
             subcategories: []
           });
           if (matchedCat) await loadSubcategories(matchedCat.id, true);
-          setLoading(false);
-          setProcessingMessage("");
           setIsReviewDialogOpen(true);
-        } else {
-          setLoading(false);
-          setProcessingMessage("");
         }
-      };
-      reader.readAsDataURL(audioBlob);
-    } catch (err) {
-      toast({ variant: "destructive", title: "AI Transcribe Failed", description: "Failed to process audio. Try speaking again." });
-      setLoading(false);
-      setProcessingMessage("");
-    }
+      } catch (err) {
+        toast({ variant: "destructive", title: "AI Transcribe Failed", description: "Failed to process audio. Try speaking again." });
+      } finally {
+        setLoading(false);
+        setProcessingMessage("");
+      }
+    };
+    reader.readAsDataURL(audioBlob);
   };
 
   const processImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -340,9 +336,9 @@ export function ExpenseCapture() {
     previewReader.onloadend = () => { setAttachmentData(previewReader.result as string); };
     previewReader.readAsDataURL(file);
 
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
         const base64String = reader.result as string;
         const result = await scanBillExpenseCapture({ billImage: base64String });
         if (result) {
@@ -359,20 +355,16 @@ export function ExpenseCapture() {
             subcategories: []
           });
           if (matchedCat) await loadSubcategories(matchedCat.id, true);
-          setLoading(false);
-          setProcessingMessage("");
           setIsReviewDialogOpen(true);
-        } else {
-          setLoading(false);
-          setProcessingMessage("");
         }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Scan Error", description: "AI failed to analyze receipt." });
-      setLoading(false);
-      setProcessingMessage("");
-    }
+      } catch (err) {
+        toast({ variant: "destructive", title: "Scan Error", description: "AI failed to analyze receipt." });
+      } finally {
+        setLoading(false);
+        setProcessingMessage("");
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (

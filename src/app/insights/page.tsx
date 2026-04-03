@@ -65,7 +65,7 @@ export default function InsightsPage() {
     const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
     return expenses
-      .filter(e => e.date >= startStr && e.date <= endStr)
+      .filter(e => e.date >= startStr && e.date <= endStr && (e.status === 'paid' || !e.status))
       .reduce((sum, e) => sum + Math.abs(toNum(e.amount)), 0);
   }, [expenses, viewMonth, viewYear]);
 
@@ -102,13 +102,12 @@ export default function InsightsPage() {
     };
   }, [expenses, viewMonth, viewYear]);
 
-  // Pre-calculate accurate top categories for Savings Strategies
   const accurateTopCategories = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
     const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
     const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
-    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr);
+    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr && (e.status === 'paid' || !e.status));
 
     const categoryTotals: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
@@ -138,9 +137,11 @@ export default function InsightsPage() {
       const monthlyData: Record<string, number> = {};
       
       expenses.forEach(e => {
-        const monthKey = e.date.substring(0, 7);
-        if (monthKey <= targetMonthKey) {
-          monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+        if (e.status === 'paid' || !e.status) {
+          const monthKey = e.date.substring(0, 7);
+          if (monthKey <= targetMonthKey) {
+            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+          }
         }
       });
 
