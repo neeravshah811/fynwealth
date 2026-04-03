@@ -74,7 +74,7 @@ export default function InsightsPage() {
       return expenses.filter(e => e.date >= startStr && e.date <= endStr);
     };
 
-    // Strict numeric sorting to prevent string-based comparison errors (e.g. "50" > "25000")
+    // Strict numeric sorting to prevent string-based comparison errors
     const sortDesc = (arr: any[]) => [...arr]
       .filter(e => toNum(e.amount) > 0)
       .sort((a, b) => toNum(b.amount) - toNum(a.amount));
@@ -110,12 +110,18 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      const allExpensesMapped = expenses.map(e => ({ 
-        date: e.date, 
-        amount: Math.abs(toNum(e.amount))
-      }));
+      // 1. Aggregate Monthly Totals for Fast/Accurate Forecasting
+      // Instead of sending 100s of rows, we send 12-24 monthly summaries
+      const monthlyData: Record<string, number> = {};
+      expenses.forEach(e => {
+        const monthKey = e.date.substring(0, 7); // YYYY-MM
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+      });
+      const aggregatedHistory = Object.entries(monthlyData)
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-      // Pre-aggregate categories locally for 100% accuracy in Savings Strategy
+      // 2. Pre-aggregate Categories for Savings Strategy (Current Month Only)
       const targetDate = new Date(viewYear, viewMonth);
       const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
       const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
@@ -133,9 +139,10 @@ export default function InsightsPage() {
         .sort((a, b) => b.totalSpent - a.totalSpent)
         .slice(0, 4);
       
+      // Call AI Flows in Parallel
       const [pResult, uResult] = await Promise.all([
         predictHeavySpendingMonths({ 
-          expenses: allExpensesMapped
+          expenses: aggregatedHistory 
         }),
         identifyUnnecessaryExpenses({ 
           categories: topCategories 

@@ -1,7 +1,8 @@
+
 'use server';
 /**
  * @fileOverview An AI agent that generates concise saving tips for high-spend categories.
- * Now receives pre-calculated totals to ensure 100% mathematical accuracy.
+ * Optimized for rapid response by processing pre-calculated totals.
  */
 
 import {ai} from '@/ai/genkit';
@@ -37,22 +38,21 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
   prompt: `You are a precise financial auditor for FynWealth.
-Provide exactly 1 concise, actionable savings tip for each of the following top spending categories.
+Provide exactly 1 concise, actionable savings tip for each category based on the volume spent.
 
 Requirements:
-1. Use the provided category names and amounts exactly as they are.
-2. For each category, provide exactly 1 tip that is specific to that category's typical behavior.
-3. Keep tips very short (max 12 words).
+1. For each category, provide 1 tip specific to that spending behavior.
+2. If Subscriptions are high, suggest plan optimization. If Food is high, suggest meal prep.
+3. Keep tips very short (max 10 words).
 
 Categories:
 {{#each categories}}
-- Category: {{{categoryName}}}, Amount Spent: {{{totalSpent}}}
+- Category: {{{categoryName}}}, Total: {{{totalSpent}}}
 {{/each}}
 
 Rules:
-- Output exactly 4 categories if 4 are provided.
-- Tips must be concise and actionable.
-- No conversational filler.`,
+- No conversational filler.
+- Be actionable and data-driven.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(

@@ -2,18 +2,19 @@
 'use server';
 /**
  * @fileOverview Predicts upcoming heavy spending and compares month-over-month trends.
+ * Optimized for speed by processing aggregated monthly totals.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const ExpenseSchema = z.object({
-  date: z.string(),
-  amount: z.number(),
+const AggregatedExpenseSchema = z.object({
+  date: z.string().describe('The month in YYYY-MM format.'),
+  amount: z.number().describe('The total expense for that month.'),
 });
 
 const HeavySpendingMonthPredictionInputSchema = z.object({
-  expenses: z.array(ExpenseSchema),
+  expenses: z.array(AggregatedExpenseSchema),
 });
 export type HeavySpendingMonthPredictionInput = z.infer<typeof HeavySpendingMonthPredictionInputSchema>;
 
@@ -29,16 +30,18 @@ const prompt = ai.definePrompt({
   name: 'predictHeavySpendingMonthsPrompt',
   input: { schema: z.object({ expensesJson: z.string() }) },
   output: { schema: HeavySpendingMonthPredictionOutputSchema },
-  prompt: `You are a precise financial analyst for FynWealth. Analyze historical data: {{{expensesJson}}}
+  prompt: `You are a precise financial analyst for FynWealth. Analyze aggregated monthly totals: {{{expensesJson}}}
 
 Tasks:
-1. Calculate percentage increase/decrease from the most recent full month to the previous one.
-2. Predict exactly "predictedNextMonthTotal" based on trends.
-3. Provide a short MoM comparison string.
+1. Identify the most recent month and its total.
+2. Compare it to the month immediately preceding it.
+3. Calculate the percentage increase/decrease.
+4. Predict exactly "predictedNextMonthTotal" for the following month based on this trend.
+5. Provide a short MoM comparison string (max 15 words).
 
 Rules:
 - Be concise.
-- Use strictly numeric values.
+- Use numeric values for calculations.
 - No conversational filler.`,
 });
 
