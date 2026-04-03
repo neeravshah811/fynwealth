@@ -38,7 +38,7 @@ export function CategoryPieChart() {
   const { data: expensesData } = useCollection(expensesQuery);
 
   const data = useMemo(() => {
-    const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
+    const expenses = (expensesData || []);
     return expenses
       .reduce((acc: any[], curr) => {
         let catName = curr.categoryName || curr.category || "General";

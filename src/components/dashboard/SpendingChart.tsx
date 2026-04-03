@@ -24,7 +24,7 @@ export function SpendingChart() {
   const { user } = useUser();
   const db = useFirestore();
 
-  // Fetch Expenses - Only show actualized spend
+  // Fetch Expenses - Show all spend (paid and unpaid) for the month
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     const startDate = format(new Date(viewYear, viewMonth, 1), 'yyyy-MM-dd');
@@ -40,8 +40,8 @@ export function SpendingChart() {
   const { data: expensesData } = useCollection(expensesQuery);
 
   const data = useMemo(() => {
-    // Filter by status 'paid' or no status to match Dashboard Metrics
-    const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
+    // Include all transactions for the month to match user expectation
+    const expenses = (expensesData || []);
     return expenses
       .reduce((acc: any[], curr) => {
         let catName = curr.categoryName || curr.category || "General";

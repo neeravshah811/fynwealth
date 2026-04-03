@@ -28,7 +28,7 @@ import {
 import { predictHeavySpendingMonths } from "@/ai/flows/heavy-spending-month-prediction";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
-import { formatDistanceToNow, format, startOfMonth, endOfMonth } from "date-fns";
+import { formatDistanceToNow, format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -83,21 +83,29 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      // Normalize Financial Commit for AI consistency
-      const expenseData = expenses.map(e => ({ 
+      const targetDate = new Date(viewYear, viewMonth);
+      
+      // All expenses for historical prediction context
+      const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
         amount: Math.abs(e.amount), 
         description: e.description || e.note || "Expense", 
         category: (e.categoryName === "Financial Commitments" || e.category === "Financial Commitments") ? "Financial Commit" : (e.categoryName || e.category || "General") 
       }));
+
+      // Current month expenses ONLY for specific Savings Strategy totals
+      const currentMonthExpensesMapped = allExpensesMapped.filter(e => {
+        const d = new Date(e.date);
+        return isSameMonth(d, targetDate) && d.getFullYear() === viewYear;
+      });
       
-      // Parallelize AI calls for smoother performance
+      // Parallelize AI calls
       const [pResult, uResult] = await Promise.all([
         predictHeavySpendingMonths({ 
-          expenses: expenseData.map(e => ({ date: e.date, amount: e.amount })) 
+          expenses: allExpensesMapped.map(e => ({ date: e.date, amount: e.amount })) 
         }),
         identifyUnnecessaryExpenses({ 
-          expenses: expenseData 
+          expenses: currentMonthExpensesMapped 
         })
       ]);
 
@@ -116,17 +124,19 @@ export default function InsightsPage() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [expenses, setInsights]);
+  }, [expenses, setInsights, viewMonth, viewYear]);
 
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const sixHours = 6 * 60 * 60 * 1000;
+      
+      // Refresh if never generated, if data is old, or if we switched to a new month context
       if (!insights.predictions || !insights.unnecessary || (Date.now() - lastGen > sixHours)) {
         loadInsights();
       }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated, error, loading]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated, error, loading, viewMonth, viewYear]);
 
   if (!mounted) return (
     <div className="flex items-center justify-center min-h-[60vh]">
