@@ -13,6 +13,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +27,8 @@ import {
   X,
   ThumbsUp,
   RotateCcw,
-  AlertCircle
+  Lock,
+  Unlock
 } from "lucide-react";
 import { processBankStatementManual } from "@/ai/flows/bank-statement-import-flow";
 import { toast } from "@/hooks/use-toast";
@@ -62,6 +65,13 @@ export function BankStatementImport() {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [reviewMode, setReviewMode] = useState(false);
+  
+  // Password logic state
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [passwordError, setPasswordError] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const db = useFirestore();
@@ -80,7 +90,6 @@ export function BankStatementImport() {
 
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
-    // Support YYYY-MM-DD, DD/MM/YYYY, DD-MMM-YY etc
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
@@ -88,33 +97,22 @@ export function BankStatementImport() {
   const cleanAmount = (val: any): number => {
     if (val === null || val === undefined) return 0;
     let s = String(val).trim().toUpperCase();
-    
-    // Handle accounting negative (500.00)
     if (s.startsWith('(') && s.endsWith(')')) {
       s = '-' + s.slice(1, -1);
     }
-    
-    // Handle thousand separators and localized commas
-    // If it has a comma and it looks like a thousand separator (e.g. 1,000.00)
     s = s.replace(/[^0-9.,-]/g, '');
     if (!s) return 0;
-
     const lastComma = s.lastIndexOf(',');
     const lastDot = s.lastIndexOf('.');
-    
-    // Simple heuristic for European format (1.000,00) vs US format (1,000.00)
     if (lastComma > lastDot) {
-      // If comma is the decimal separator
       if (s.length - lastComma === 3) {
         s = s.replace(/\./g, '').replace(',', '.');
       } else {
         s = s.replace(/,/g, '');
       }
     } else {
-      // Comma is thousand separator
       s = s.replace(/,/g, '');
     }
-    
     const num = parseFloat(s);
     return isNaN(num) ? 0 : num;
   };
@@ -126,18 +124,15 @@ export function BankStatementImport() {
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value'];
-
     const negativeKeywords = ['salary', 'interest credit', 'refund', 'cashback', 'reversal', 'income', 'deposit', 'received'];
 
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
 
-    // Scan for header row
     for(let i = 0; i < Math.min(rows.length, 50); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
       const hasAmt = row.some(c => amtKeys.some(k => c === k || c.includes(k)));
-
       if (hasDate && hasAmt) {
         headerIdx = i;
         dateIdx = row.findIndex(c => dateKeys.some(k => c === k || c.includes(k)));
@@ -151,44 +146,32 @@ export function BankStatementImport() {
     }
 
     const results: any[] = [];
-
-    // Brute force data extraction if no header found or starting from Row 0 to be inclusive
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (row.length < 1) continue;
-
       let foundDate = "";
       let foundDesc = "";
       let foundAmount = 0;
       let isDebit = false;
-
-      // 1. Look for Date
       const dateColIdx = row.findIndex(c => isDateLike(String(c)));
       if (dateColIdx === -1) {
-        // Multi-line description support
         if (results.length > 0 && row.some(c => String(c).length > 10)) {
           const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
           results[results.length - 1].description += ' ' + extraText;
         }
         continue;
       }
-
       foundDate = String(row[dateColIdx]);
-
-      // 2. Identify Amount & Type
       if (headerIdx !== -1 && i > headerIdx) {
-        // Mapping based on header
         if (descIdx !== -1 && row[descIdx]) {
           foundDesc = String(row[descIdx]);
         } else {
           foundDesc = row.filter((c, idx) => idx !== dateColIdx && idx !== balanceIdx && String(c).length > 5 && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
         }
-
         if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
           foundAmount = cleanAmount(row[debitIdx]);
           isDebit = true;
         } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
-          // Explicit credit column value
           isDebit = false;
         } else if (amountIdx !== -1) {
           const rawAmt = cleanAmount(row[amountIdx]);
@@ -196,7 +179,6 @@ export function BankStatementImport() {
           isDebit = rawAmt < 0 || (!row[creditIdx] && rawAmt !== 0);
         }
       } else {
-        // Brute force guess
         const amountCandidates = row.map((c, idx) => ({ val: cleanAmount(c), idx })).filter(o => o.val !== 0 && o.idx !== dateColIdx && o.idx !== balanceIdx);
         if (amountCandidates.length > 0) {
           const bestAmount = amountCandidates[0];
@@ -205,11 +187,8 @@ export function BankStatementImport() {
           isDebit = bestAmount.val < 0 || row.join(' ').toLowerCase().includes('dr');
         }
       }
-
-      // 3. Strict Keyword Filtering for Income
       const lowerDesc = foundDesc.toLowerCase();
       const hasIncomeKeyword = negativeKeywords.some(k => lowerDesc.includes(k));
-
       if (foundDate && foundAmount > 0 && isDebit && !hasIncomeKeyword) {
         results.push({
           date: foundDate,
@@ -219,50 +198,68 @@ export function BankStatementImport() {
         });
       }
     }
-
     return results;
   };
 
-  const parsePdfManual = async (file: File): Promise<any[]> => {
+  const parsePdfManual = async (file: File, password?: string): Promise<any[]> => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let allTextRows: string[][] = [];
+    const loadingTask = pdfjs.getDocument({ 
+      data: arrayBuffer,
+      password: password
+    });
+    
+    let pdf;
+    try {
+      pdf = await loadingTask.promise;
+    } catch (err: any) {
+      if (err.name === 'PasswordException') {
+        throw new Error('PASSWORD_REQUIRED');
+      }
+      throw err;
+    }
 
+    let allTextRows: string[][] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
-      
       const items = textContent.items as any[];
       const rows: Record<number, any[]> = {};
-      
       items.forEach(item => {
         const y = Math.round(item.transform[5]);
         if (!rows[y]) rows[y] = [];
         rows[y].push(item);
       });
-
       const sortedY = Object.keys(rows).map(Number).sort((a, b) => b - a);
       sortedY.forEach(y => {
         const sortedRowItems = rows[y].sort((a, b) => a.transform[4] - b.transform[4]);
         allTextRows.push(sortedRowItems.map(item => item.str.trim()));
       });
     }
-
     return extractTransactionsFromRows(allTextRows);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid || !db) return;
-
     setLoading(true);
+    setPasswordError(false);
 
     try {
       const extension = file.name.split('.').pop()?.toLowerCase();
       let parsedData: any[] = [];
 
       if (extension === 'pdf') {
-        parsedData = await parsePdfManual(file);
+        try {
+          parsedData = await parsePdfManual(file);
+        } catch (err: any) {
+          if (err.message === 'PASSWORD_REQUIRED') {
+            setPendingFile(file);
+            setIsPasswordDialogOpen(true);
+            setLoading(false);
+            return;
+          }
+          throw err;
+        }
       } else if (extension === 'xlsx' || extension === 'xls') {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -272,38 +269,57 @@ export function BankStatementImport() {
       } else {
         const text = await file.text();
         const rows = text.split(/\r?\n/).map(line => {
-          // Smart CSV split handling quoted commas
           const matches = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
           return matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : [];
         });
         parsedData = extractTransactionsFromRows(rows);
       }
       
-      if (!parsedData || parsedData.length === 0) {
-        throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
-      }
-
-      const result = await processBankStatementManual({
-        userId: user.uid,
-        transactions: parsedData
-      });
-
-      if (result && result.transactions && result.transactions.length > 0) {
-        setTransactions(result.transactions);
-        setReviewMode(true);
-        toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
-      } else {
-        toast({ variant: "destructive", title: "No Expenses Found", description: "No debit transactions identified." });
-      }
+      await handleParsedData(parsedData);
     } catch (err: any) {
       console.error("Import Error:", err);
-      toast({ 
-        variant: "destructive", 
-        title: "Import Failed", 
-        description: err.message || "Failed to parse statement." 
-      });
+      toast({ variant: "destructive", title: "Import Failed", description: err.message || "Failed to parse statement." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!pendingFile || !pdfPassword) return;
+    setLoading(true);
+    setPasswordError(false);
+    try {
+      const parsedData = await parsePdfManual(pendingFile, pdfPassword);
+      await handleParsedData(parsedData);
+      setIsPasswordDialogOpen(false);
+      setPdfPassword("");
+      setPendingFile(null);
+    } catch (err: any) {
+      if (err.message === 'PASSWORD_REQUIRED' || err.name === 'PasswordException') {
+        setPasswordError(true);
+        toast({ variant: "destructive", title: "Incorrect Password", description: "Please enter the correct statement password." });
+      } else {
+        toast({ variant: "destructive", title: "Unlocking Failed", description: "Could not open document." });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleParsedData = async (parsedData: any[]) => {
+    if (!parsedData || parsedData.length === 0) {
+      throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
+    }
+    const result = await processBankStatementManual({
+      userId: user!.uid,
+      transactions: parsedData
+    });
+    if (result && result.transactions && result.transactions.length > 0) {
+      setTransactions(result.transactions);
+      setReviewMode(true);
+      toast({ title: "Audit Complete", description: `Extracted ${result.transactions.length} potential expenses.` });
+    } else {
+      toast({ variant: "destructive", title: "No Expenses Found", description: "No debit transactions identified." });
     }
   };
 
@@ -329,7 +345,6 @@ export function BankStatementImport() {
       toast({ variant: "destructive", title: "Nothing Approved", description: "Please approve entries to continue." });
       return;
     }
-
     setLoading(true);
     try {
       approvedTxns.forEach(t => {
@@ -345,11 +360,7 @@ export function BankStatementImport() {
           createdAt: serverTimestamp()
         });
       });
-      
-      updateDocumentNonBlocking(doc(db, 'users', user.uid), {
-        'stats.totalExpenses': increment(approvedTxns.length)
-      });
-
+      updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(approvedTxns.length) });
       toast({ title: "Vault Synced", description: `Recorded ${approvedTxns.length} expenses.` });
       setIsOpen(false);
       reset();
@@ -364,6 +375,9 @@ export function BankStatementImport() {
     setReviewMode(false);
     setTransactions([]);
     setLoading(false);
+    setIsPasswordDialogOpen(false);
+    setPdfPassword("");
+    setPendingFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -515,6 +529,52 @@ export function BankStatementImport() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Prompt Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => !open && setIsPasswordDialogOpen(false)}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-[24px] border-none shadow-2xl">
+          <DialogHeader className="text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-inner border border-amber-100">
+              <Lock className="w-8 h-8" />
+            </div>
+            <DialogTitle className="text-2xl font-headline font-bold">Protected PDF</DialogTitle>
+            <DialogDescription className="text-sm font-medium">
+              This bank statement is encrypted. Please enter the password provided by your bank to unlock it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pdf-password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Password</Label>
+              <Input 
+                id="pdf-password"
+                type="password"
+                placeholder="••••••••"
+                value={pdfPassword}
+                onChange={(e) => setPdfPassword(e.target.value)}
+                className={cn(
+                  "h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-bold transition-all focus:ring-2",
+                  passwordError ? "ring-2 ring-destructive" : "focus:ring-primary"
+                )}
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+              />
+              {passwordError && (
+                <p className="text-[10px] font-bold text-destructive uppercase tracking-tighter mt-1 ml-1">Incorrect password. Please try again.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95 text-base" 
+              onClick={handlePasswordSubmit}
+              disabled={loading || !pdfPassword}
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Unlock className="w-5 h-5 mr-2" />}
+              Unlock & Process
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
