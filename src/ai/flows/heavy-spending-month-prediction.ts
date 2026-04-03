@@ -34,10 +34,10 @@ const prompt = ai.definePrompt({
 
 Tasks:
 1. Identify the most recent month and its total.
-2. Compare it to the month immediately preceding it.
-3. Calculate the percentage increase/decrease.
-4. Predict exactly "predictedNextMonthTotal" for the following month based on this trend.
-5. Provide a short MoM comparison string (max 15 words).
+2. Compare it to the month immediately preceding it (if available).
+3. Calculate the percentage increase/decrease between the most recent month and the preceding one. If only one month exists, use 0.
+4. Predict exactly "predictedNextMonthTotal" for the following month by calculating the mathematical average of ALL monthly amounts provided in the input.
+5. Provide a short MoM comparison string (max 15 words) explaining the trend between the last two recorded months.
 
 Rules:
 - Be concise.

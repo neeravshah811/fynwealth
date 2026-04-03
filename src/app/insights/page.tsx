@@ -34,6 +34,7 @@ export default function InsightsPage() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const fetchingRef = useRef(false);
+  const lastAnalyzedPeriod = useRef<string>("");
 
   // Fetch All Expenses for Analysis
   const expensesQuery = useMemoFirebase(() => {
@@ -111,7 +112,6 @@ export default function InsightsPage() {
 
     try {
       // 1. Aggregate Monthly Totals for Fast/Accurate Forecasting
-      // Instead of sending 100s of rows, we send 12-24 monthly summaries
       const monthlyData: Record<string, number> = {};
       expenses.forEach(e => {
         const monthKey = e.date.substring(0, 7); // YYYY-MM
@@ -154,6 +154,8 @@ export default function InsightsPage() {
         unnecessary: uResult
       });
       
+      lastAnalyzedPeriod.current = `${viewYear}-${viewMonth}`;
+      
       if (isManual) {
         toast({ title: "Analysis Refreshed", description: "Report updated with latest vault data." });
       }
@@ -168,10 +170,12 @@ export default function InsightsPage() {
 
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
+      const currentPeriod = `${viewYear}-${viewMonth}`;
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const oneHour = 1 * 60 * 60 * 1000;
       
-      if (!insights.predictions || !insights.unnecessary || (Date.now() - lastGen > oneHour)) {
+      // Refresh if never generated, period changed, or data is stale (1h)
+      if (!insights.predictions || !insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod || (Date.now() - lastGen > oneHour)) {
         loadInsights();
       }
     }
