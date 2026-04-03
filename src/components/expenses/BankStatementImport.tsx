@@ -80,6 +80,7 @@ export function BankStatementImport() {
 
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
+    // Support YYYY-MM-DD, DD/MM/YYYY, DD-MMM-YY etc
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
   };
@@ -88,23 +89,29 @@ export function BankStatementImport() {
     if (val === null || val === undefined) return 0;
     let s = String(val).trim().toUpperCase();
     
+    // Handle accounting negative (500.00)
     if (s.startsWith('(') && s.endsWith(')')) {
       s = '-' + s.slice(1, -1);
     }
     
+    // Handle thousand separators and localized commas
+    // If it has a comma and it looks like a thousand separator (e.g. 1,000.00)
     s = s.replace(/[^0-9.,-]/g, '');
     if (!s) return 0;
 
     const lastComma = s.lastIndexOf(',');
     const lastDot = s.lastIndexOf('.');
     
+    // Simple heuristic for European format (1.000,00) vs US format (1,000.00)
     if (lastComma > lastDot) {
+      // If comma is the decimal separator
       if (s.length - lastComma === 3) {
         s = s.replace(/\./g, '').replace(',', '.');
       } else {
         s = s.replace(/,/g, '');
       }
     } else {
+      // Comma is thousand separator
       s = s.replace(/,/g, '');
     }
     
@@ -125,6 +132,7 @@ export function BankStatementImport() {
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
 
+    // Scan for header row
     for(let i = 0; i < Math.min(rows.length, 50); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
@@ -144,6 +152,7 @@ export function BankStatementImport() {
 
     const results: any[] = [];
 
+    // Brute force data extraction if no header found or starting from Row 0 to be inclusive
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (row.length < 1) continue;
@@ -153,8 +162,10 @@ export function BankStatementImport() {
       let foundAmount = 0;
       let isDebit = false;
 
+      // 1. Look for Date
       const dateColIdx = row.findIndex(c => isDateLike(String(c)));
       if (dateColIdx === -1) {
+        // Multi-line description support
         if (results.length > 0 && row.some(c => String(c).length > 10)) {
           const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
           results[results.length - 1].description += ' ' + extraText;
@@ -164,7 +175,9 @@ export function BankStatementImport() {
 
       foundDate = String(row[dateColIdx]);
 
+      // 2. Identify Amount & Type
       if (headerIdx !== -1 && i > headerIdx) {
+        // Mapping based on header
         if (descIdx !== -1 && row[descIdx]) {
           foundDesc = String(row[descIdx]);
         } else {
@@ -175,6 +188,7 @@ export function BankStatementImport() {
           foundAmount = cleanAmount(row[debitIdx]);
           isDebit = true;
         } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
+          // Explicit credit column value
           isDebit = false;
         } else if (amountIdx !== -1) {
           const rawAmt = cleanAmount(row[amountIdx]);
@@ -182,6 +196,7 @@ export function BankStatementImport() {
           isDebit = rawAmt < 0 || (!row[creditIdx] && rawAmt !== 0);
         }
       } else {
+        // Brute force guess
         const amountCandidates = row.map((c, idx) => ({ val: cleanAmount(c), idx })).filter(o => o.val !== 0 && o.idx !== dateColIdx && o.idx !== balanceIdx);
         if (amountCandidates.length > 0) {
           const bestAmount = amountCandidates[0];
@@ -191,6 +206,7 @@ export function BankStatementImport() {
         }
       }
 
+      // 3. Strict Keyword Filtering for Income
       const lowerDesc = foundDesc.toLowerCase();
       const hasIncomeKeyword = negativeKeywords.some(k => lowerDesc.includes(k));
 
@@ -256,6 +272,7 @@ export function BankStatementImport() {
       } else {
         const text = await file.text();
         const rows = text.split(/\r?\n/).map(line => {
+          // Smart CSV split handling quoted commas
           const matches = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
           return matches ? matches.map(m => m.replace(/^"|"$/g, '').trim()) : [];
         });

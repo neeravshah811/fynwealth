@@ -43,20 +43,20 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   prompt: `You are an AI financial assistant called FynWealth.
 Analyze the following list of expenses. 
 
-CRITICAL INSTRUCTION: Do not provide insights on specific high-end individual transactions. Instead, aggregate the data by category.
-Identify categories where the user is spending the most money or where spending seems disproportionately high relative to a typical balanced budget.
+CRITICAL INSTRUCTION: Do not provide insights on specific high-end individual transactions or luxury items. 
+Instead, AGGREGATE the data by category. Focus on identifying categories where the total volume of spending is disproportionately high.
 
 For each flagged category, provide:
 1. The total spent in that category.
 2. A specific, actionable saving tip to optimize that category (e.g., 'Consider meal prepping to reduce Dining Out expenses').
-3. The reason why this category stands out.
+3. The reason why this category stands out in the overall budget.
 
 Expenses:
 {{#each expenses}}
 - Date: {{{date}}}, Description: {{{description}}}, Amount: {{{amount}}}, Category: {{{category}}}
 {{/each}}
 
-Provide a general summary of the user's financial health based on these category trends.`,
+Provide a general summary of the user's financial health based on these CATEGORY trends.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(

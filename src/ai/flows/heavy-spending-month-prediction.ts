@@ -38,9 +38,9 @@ const prompt = ai.definePrompt({
 Analyze the provided historical expense data: {{{expensesJson}}}
 
 Tasks:
-1. Compare spending levels across the months provided in the data.
-2. Predict the total expected expenditure for the very next month based on the average and recurring trends.
-3. Identify future months (up to 12 months ahead) that are likely to have spending spikes based on patterns detected (e.g., annual subscriptions, holiday seasons, or periodic bills).
+1. COMPARE spending levels across the months provided in the data. Highlight if current month spend is higher or lower than the historical average.
+2. Predict the total expected expenditure for the VERY NEXT month based on the average and recurring trends detected.
+3. Identify future months (up to 12 months ahead) that are likely to have spending spikes based on patterns (e.g., annual subscriptions, holiday seasons, or periodic bills).
 4. Provide a brief summary of whether the user's spending is increasing, decreasing, or stable compared to previous periods.
 
 Format the output strictly according to the schema.`,
