@@ -1,28 +1,26 @@
-
 'use server';
 /**
- * @fileOverview An AI agent that analyzes spending patterns to identify top spending categories and concise saving tips.
+ * @fileOverview An AI agent that generates concise saving tips for high-spend categories.
+ * Now receives pre-calculated totals to ensure 100% mathematical accuracy.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const ExpenseSchema = z.object({
-  date: z.string().describe('The date of the expense in YYYY-MM-DD format.'),
-  description: z.string().describe('A brief description of the expense.'),
-  amount: z.number().describe('The amount of the expense.'),
-  category: z.string().describe('The category of the expense.'),
+const CategoryInputSchema = z.object({
+  categoryName: z.string().describe('The name of the high-spend category.'),
+  totalSpent: z.number().describe('Total amount spent in this category for the month.'),
 });
 
 const IdentifyUnnecessaryExpensesInputSchema = z.object({
-  expenses: z.array(ExpenseSchema).describe('A list of recorded expenses for analysis.'),
+  categories: z.array(CategoryInputSchema).max(4).describe('Top 4 highest spending categories.'),
 });
 export type IdentifyUnnecessaryExpensesInput = z.infer<typeof IdentifyUnnecessaryExpensesInputSchema>;
 
 const IdentifiedCategorySchema = z.object({
-  categoryName: z.string().describe('The name of the high-spend category.'),
-  totalSpent: z.number().describe('Total amount spent in this category.'),
-  savingTip: z.string().describe('Exactly 1 concise, actionable tip.'),
+  categoryName: z.string().describe('The name of the category.'),
+  totalSpent: z.number().describe('The amount passed in.'),
+  savingTip: z.string().describe('Exactly 1 concise, actionable tip for this category.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
@@ -39,22 +37,22 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
   prompt: `You are a precise financial auditor for FynWealth.
-Analyze the provided expenses and output exactly the TOP 4 highest spending categories.
+Provide exactly 1 concise, actionable savings tip for each of the following top spending categories.
 
 Requirements:
-1. Identify the top 4 categories by volume.
-2. For each, provide exactly 1 concise savings tip.
-3. Use currency context from data.
+1. Use the provided category names and amounts exactly as they are.
+2. For each category, provide exactly 1 tip that is specific to that category's typical behavior.
+3. Keep tips very short (max 12 words).
 
-Expenses:
-{{#each expenses}}
-- Date: {{{date}}}, Description: {{{description}}}, Amount: {{{amount}}}, Category: {{{category}}}
+Categories:
+{{#each categories}}
+- Category: {{{categoryName}}}, Amount Spent: {{{totalSpent}}}
 {{/each}}
 
 Rules:
-- Strictly top 4 categories only.
+- Output exactly 4 categories if 4 are provided.
 - Tips must be concise and actionable.
-- No explanations or extra headings.`,
+- No conversational filler.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
@@ -70,7 +68,7 @@ const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
       return output;
     } catch (err: any) {
       console.error("[unnecessaryExpenseIdentificationFlow] Error:", err.message);
-      throw new Error("Failed to identify category trends. Please try again later.");
+      throw new Error("Failed to generate saving tips. Please try again later.");
     }
   }
 );

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -99,22 +98,32 @@ export default function InsightsPage() {
       
       const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
-        amount: Math.abs(e.amount), 
-        description: e.description || e.note || e.categoryName || e.category || "Expense", 
-        category: (e.categoryName === "Financial Commitments" || e.category === "Financial Commitments") ? "Financial Commit" : (e.categoryName || e.category || "General") 
+        amount: Math.abs(e.amount)
       }));
 
-      const currentMonthExpensesMapped = allExpensesMapped.filter(e => {
+      // Pre-aggregate categories locally for 100% accuracy in Savings Strategy
+      const currentMonthExpenses = expenses.filter(e => {
         const d = new Date(e.date);
         return isSameMonth(d, targetDate) && d.getFullYear() === viewYear;
       });
+
+      const categoryTotals: Record<string, number> = {};
+      currentMonthExpenses.forEach(e => {
+        const cat = e.categoryName || e.category || "General";
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(e.amount);
+      });
+
+      const topCategories = Object.entries(categoryTotals)
+        .map(([name, total]) => ({ categoryName: name, totalSpent: total }))
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 4);
       
       const [pResult, uResult] = await Promise.all([
         predictHeavySpendingMonths({ 
-          expenses: allExpensesMapped.map(e => ({ date: e.date, amount: e.amount })) 
+          expenses: allExpensesMapped
         }),
         identifyUnnecessaryExpenses({ 
-          expenses: currentMonthExpensesMapped 
+          categories: topCategories 
         })
       ]);
 
@@ -140,6 +149,7 @@ export default function InsightsPage() {
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const oneHour = 1 * 60 * 60 * 1000;
       
+      // If view date changed or insights are stale, reload
       if (!insights.predictions || !insights.unnecessary || (Date.now() - lastGen > oneHour)) {
         loadInsights();
       }
@@ -252,21 +262,25 @@ export default function InsightsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-rose-600 flex items-center gap-2">Top 3 Highest</h5>
-                    {discoveries.current.highest.map((e) => (
+                    {discoveries.current.highest.length > 0 ? discoveries.current.highest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="p-4 text-xs italic text-muted-foreground">No data found.</div>
+                    )}
                   </div>
                   <div className="space-y-3">
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-2">Top 3 Lowest</h5>
-                    {discoveries.current.lowest.map((e) => (
+                    {discoveries.current.lowest.length > 0 ? discoveries.current.lowest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="p-4 text-xs italic text-muted-foreground">No data found.</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -274,26 +288,32 @@ export default function InsightsPage() {
               {/* Last Month */}
               <div className="space-y-6 pt-4 border-t border-muted/50">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 py-1 bg-muted/20 rounded-full inline-block">Last Month ({format(subMonths(new Date(viewYear, viewMonth), 1), 'MMM')})</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Highest</h5>
-                    {discoveries.last.highest.map((e) => (
-                      <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
-                      </div>
-                    ))}
+                {discoveries.last.highest.length === 0 && discoveries.last.lowest.length === 0 ? (
+                  <div className="py-8 text-center bg-muted/10 rounded-xl border border-dashed border-muted">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest italic">No data from last month</p>
                   </div>
-                  <div className="space-y-3">
-                    <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Lowest</h5>
-                    {discoveries.last.lowest.map((e) => (
-                      <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
-                      </div>
-                    ))}
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Highest</h5>
+                      {discoveries.last.highest.map((e) => (
+                        <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
+                          <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
+                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Lowest</h5>
+                      {discoveries.last.lowest.map((e) => (
+                        <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
+                          <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
+                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
