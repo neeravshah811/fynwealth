@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -18,12 +19,11 @@ import {
   ArrowDownRight,
   Target,
   Search,
-  ChevronDown
 } from "lucide-react";
 import { predictHeavySpendingMonths } from "@/ai/flows/heavy-spending-month-prediction";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
-import { formatDistanceToNow, format, startOfMonth, endOfMonth, isSameMonth, subMonths } from "date-fns";
+import { formatDistanceToNow, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function InsightsPage() {
@@ -58,11 +58,12 @@ export default function InsightsPage() {
     const lastStart = startOfMonth(lastMonthDate);
     const lastEnd = endOfMonth(lastMonthDate);
 
-    const filterTxns = (start: Date, end: Date) => 
-      expenses.filter(e => {
-        const d = new Date(e.date);
-        return d >= start && d <= end;
-      });
+    // Robust string-based filtering for YYYY-MM-DD formatted strings
+    const filterTxns = (start: Date, end: Date) => {
+      const startStr = format(start, 'yyyy-MM-dd');
+      const endStr = format(end, 'yyyy-MM-dd');
+      return expenses.filter(e => e.date >= startStr && e.date <= endStr);
+    };
 
     const sortDesc = (arr: any[]) => [...arr].sort((a, b) => b.amount - a.amount);
     const sortAsc = (arr: any[]) => [...arr].sort((a, b) => a.amount - b.amount).filter(e => e.amount > 0);
@@ -94,18 +95,17 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      const targetDate = new Date(viewYear, viewMonth);
-      
       const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
         amount: Math.abs(e.amount)
       }));
 
       // Pre-aggregate categories locally for 100% accuracy in Savings Strategy
-      const currentMonthExpenses = expenses.filter(e => {
-        const d = new Date(e.date);
-        return isSameMonth(d, targetDate) && d.getFullYear() === viewYear;
-      });
+      const targetDate = new Date(viewYear, viewMonth);
+      const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
+      const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
+      
+      const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr);
 
       const categoryTotals: Record<string, number> = {};
       currentMonthExpenses.forEach(e => {
@@ -149,7 +149,6 @@ export default function InsightsPage() {
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const oneHour = 1 * 60 * 60 * 1000;
       
-      // If view date changed or insights are stale, reload
       if (!insights.predictions || !insights.unnecessary || (Date.now() - lastGen > oneHour)) {
         loadInsights();
       }
@@ -268,7 +267,7 @@ export default function InsightsPage() {
                         <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground">No data found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground">No records found.</div>
                     )}
                   </div>
                   <div className="space-y-3">
@@ -279,7 +278,7 @@ export default function InsightsPage() {
                         <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground">No data found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground">No records found.</div>
                     )}
                   </div>
                 </div>
@@ -338,7 +337,7 @@ export default function InsightsPage() {
                       <span className="font-bold text-sm text-foreground truncate">{cat.categoryName}</span>
                       <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{currency.symbol}{formatAmount(cat.totalSpent)}</p>
                     </div>
-                    <div className="p-4 bg-white rounded-2xl border border-accent/10 shadow-sm">
+                    <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <Target className="w-3.5 h-3.5 text-accent" />
                         <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Concise Tip</span>
