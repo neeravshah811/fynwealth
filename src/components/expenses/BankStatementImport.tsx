@@ -42,7 +42,7 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
 const CATEGORIES = [
   'Education / Kids',
   'Essentials',
-  'Financial Commitments',
+  'Financial Commit',
   'Food and Groceries',
   'Health & Personal',
   'Household & Family',

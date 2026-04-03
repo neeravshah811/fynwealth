@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Manual Bank Statement Processing Engine.
@@ -68,7 +69,7 @@ function getCategory(description: string): string {
   
   if (d.includes('pharmacy') || d.includes('apollo') || d.includes('1mg') || d.includes('gym') || d.includes('cult.fit') || d.includes('doctor') || d.includes('hospital') || d.includes('medicine') || d.includes('health')) return 'Health & Personal';
   
-  if (d.includes('emi') || d.includes('nach') || d.includes('loan') || d.includes('lic') || d.includes('insurance') || d.includes('policy') || d.includes('premium')) return 'Financial Commitments';
+  if (d.includes('emi') || d.includes('nach') || d.includes('loan') || d.includes('lic') || d.includes('insurance') || d.includes('policy') || d.includes('premium')) return 'Financial Commit';
   
   if (d.includes('sip') || d.includes('mutual fund') || d.includes('zerodha') || d.includes('groww') || d.includes('stocks') || d.includes('equity') || d.includes('upstox') || d.includes('angelone')) return 'Investments';
   

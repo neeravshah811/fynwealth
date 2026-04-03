@@ -28,7 +28,7 @@ export const SYSTEM_CATEGORIES: Record<string, string[]> = {
     "Vehicle EMI",
     "Vehicle Maintenance"
   ],
-  "Financial Commitments": [
+  "Financial Commit": [
     "Loans / EMI",
     "Credit Card Bills",
     "Insurance Premiums",
