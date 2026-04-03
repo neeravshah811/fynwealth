@@ -66,7 +66,7 @@ export function ExpenseCapture() {
     const catMap = new Map();
     categoriesRaw.forEach(cat => {
       let name = cat.name?.trim();
-      // Normalization: Ensure 'Financial Commitments' displays as 'Financial Commit'
+      // Force normalization for UI consistency
       if (name === "Financial Commitments") name = "Financial Commit";
       
       const normalized = name.toLowerCase();

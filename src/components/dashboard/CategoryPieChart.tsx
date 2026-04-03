@@ -44,7 +44,9 @@ export function CategoryPieChart() {
         let catName = curr.categoryName || curr.category || "General";
         
         // Normalization: Ensure naming consistency for graphs
-        if (catName === "Financial Commitments") catName = "Financial Commit";
+        if (catName === "Financial Commitments" || catName === "Financial Commit") {
+          catName = "Financial Commit";
+        }
         
         const existing = acc.find(item => item.name === catName);
         if (existing) {

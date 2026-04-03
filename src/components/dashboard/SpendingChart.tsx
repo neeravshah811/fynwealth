@@ -46,8 +46,10 @@ export function SpendingChart() {
       .reduce((acc: any[], curr) => {
         let catName = curr.categoryName || curr.category || "General";
         
-        // Normalization: Consolidate naming variations
-        if (catName === "Financial Commitments") catName = "Financial Commit";
+        // Normalization: Ensure 'Financial Commit' is consistent across graphs
+        if (catName === "Financial Commitments" || catName === "Financial Commit") {
+          catName = "Financial Commit";
+        }
         
         const existing = acc.find(item => item.name === catName);
         if (existing) {

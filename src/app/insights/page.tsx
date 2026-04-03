@@ -64,13 +64,15 @@ export default function InsightsPage() {
         category: e.categoryName || e.category || "General" 
       }));
       
-      const pResult = await predictHeavySpendingMonths({ 
-        expenses: expenseData.map(e => ({ date: e.date, amount: e.amount })) 
-      });
-      
-      const uResult = await identifyUnnecessaryExpenses({ 
-        expenses: expenseData 
-      });
+      // Parallelize AI calls for significantly faster performance
+      const [pResult, uResult] = await Promise.all([
+        predictHeavySpendingMonths({ 
+          expenses: expenseData.map(e => ({ date: e.date, amount: e.amount })) 
+        }),
+        identifyUnnecessaryExpenses({ 
+          expenses: expenseData 
+        })
+      ]);
 
       setInsights({
         predictions: pResult,
