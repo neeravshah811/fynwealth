@@ -1,17 +1,14 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useUser } from '@/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   updateProfile as updateFirebaseProfile,
-  sendPasswordResetEmail,
   signOut
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
@@ -24,19 +21,22 @@ import { Logo } from '@/components/Logo';
 import { Loader2, Mail, Lock, User, ArrowRight, Chrome, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const auth = useAuth();
   const db = useFirestore();
+  const router = useRouter();
+  const { user: currentUser, isUserLoading } = useUser();
   const { updateProfile: updateStoreProfile, setTutorialCompleted, setTourStepIndex, currency } = useFynWealthStore();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signin');
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   const syncUserToFirestore = async (user: any, isNew: boolean = false) => {
     try {
@@ -69,9 +69,11 @@ export default function LoginPage() {
     }
   };
 
+  // Handle Redirect Result on Mount
   useEffect(() => {
     if (!auth) return;
 
+    // Firebase Auth provides getRedirectResult to catch the credential after Google redirects back
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
@@ -90,8 +92,10 @@ export default function LoginPage() {
 
             setTourStepIndex(0);
             setTutorialCompleted(false);
-
-            toast({ title: 'Welcome!', description: 'Signed in with Google successfully.' });
+            toast({ title: 'Welcome!', description: 'Successfully signed in with Google.' });
+            
+            // Explicit navigation after successful redirect catch
+            router.push('/dashboard');
           } catch (err: any) {
             if (err.message === 'BAN_ACTIVE') {
               toast({ variant: 'destructive', title: 'Account Disabled', description: 'This account has been terminated by an administrator.' });
@@ -101,10 +105,17 @@ export default function LoginPage() {
         setCheckingRedirect(false);
       })
       .catch((error: any) => {
-        console.error("Redirect check failed", error);
+        console.error("Redirect handshake failed:", error);
         setCheckingRedirect(false);
       });
-  }, [auth, updateStoreProfile, setTutorialCompleted, setTourStepIndex, db]);
+  }, [auth, db, router, updateStoreProfile, setTutorialCompleted, setTourStepIndex]);
+
+  // If user is already logged in and redirect check is done, send to dashboard
+  useEffect(() => {
+    if (!isUserLoading && !checkingRedirect && currentUser) {
+      router.push('/dashboard');
+    }
+  }, [currentUser, isUserLoading, checkingRedirect, router]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +146,7 @@ export default function LoginPage() {
         setTutorialCompleted(false);
         toast({ title: 'Welcome Back!', description: 'Successfully signed in.' });
       }
+      router.push('/dashboard');
     } catch (error: any) {
       let message = 'An authentication error occurred.';
       if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
@@ -148,43 +160,13 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-
-    // Use Redirect for Mobile, Popup for Desktop for 100% reliability
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      signInWithRedirect(auth, provider);
-    } else {
-      signInWithPopup(auth, provider)
-        .then(async (result) => {
-          const user = result.user;
-          try {
-            await syncUserToFirestore(user, false);
-            if (user.displayName) {
-              const [firstName = '', ...rest] = user.displayName.split(' ');
-              updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || '' });
-            }
-            setTourStepIndex(0);
-            setTutorialCompleted(false);
-            toast({ title: 'Welcome!', description: 'Signed in with Google.' });
-          } catch (err: any) {
-            if (err.message === 'BAN_ACTIVE') {
-              toast({ variant: 'destructive', title: 'Account Disabled', description: 'This account has been terminated.' });
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Popup failed", error);
-          toast({ variant: 'destructive', title: 'Google Login Failed', description: 'Could not complete Google sign in.' });
-        })
-        .finally(() => setGoogleLoading(false));
-    }
+    // Use signInWithRedirect for 100% compatibility across mobile and desktop
+    signInWithRedirect(auth, provider);
   };
 
-  if (checkingRedirect) {
+  if (checkingRedirect || isUserLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
@@ -219,9 +201,8 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5 rounded-xl shadow-sm"
                   onClick={handleGoogleLogin}
-                  disabled={loading || googleLoading}
                 >
-                  {googleLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Chrome className="w-4 h-4 mr-2 text-primary" />}
+                  <Chrome className="w-4 h-4 mr-2 text-primary" />
                   Continue with Google
                 </Button>
 
@@ -273,7 +254,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl" disabled={loading || googleLoading}>
+              <Button type="submit" className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl" disabled={loading}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                 {mode === 'signin' && 'Sign In'}
                 {mode === 'signup' && 'Create Account'}

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useUser, useFirestore, useAuth } from '@/firebase';
@@ -13,6 +12,11 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
+/**
+ * AuthGuard provides robust route protection and session verification.
+ * It ensures authenticated users can access protected routes and unauthenticated
+ * users are funneled to the login page.
+ */
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
@@ -24,8 +28,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   useEffect(() => {
     async function verifyRole() {
+      // 1. Wait for Firebase initial auth check
       if (isUserLoading) return;
 
+      // 2. Handle Unauthenticated Users
       if (!user) {
         setIsVerifyingRole(false);
         if (pathname !== '/login') {
@@ -34,50 +40,52 @@ export function AuthGuard({ children }: AuthGuardProps) {
         return;
       }
 
-      // Skip verification if already done for this session/user
+      // Skip verification if already completed for this specific user session
       if (verifyAttempted.current && pathname !== '/login') {
         setIsVerifyingRole(false);
         return;
       }
 
       try {
-        // 1. Check Blacklist (Ban logic)
+        // 3. Security Check: Verify Blacklist (Ban logic)
         const blacklistDoc = await getDoc(doc(db, 'blacklist', user.uid));
         if (blacklistDoc.exists()) {
           await signOut(auth);
           router.push('/login');
           toast({
             variant: 'destructive',
-            title: 'Session Expired',
-            description: 'Your account is no longer authorized to access this platform.',
+            title: 'Session Revoked',
+            description: 'This account has been restricted by an administrator.',
           });
           return;
         }
 
-        // 2. Check Admin Status
+        // 4. Role-based Routing (Admin vs User)
         if (user.email) {
           const adminRef = collection(db, 'admins');
           const q = query(adminRef, where('email', '==', user.email), limit(1));
           const snapshot = await getDocs(q);
-          const adminExists = !snapshot.empty || user.email === 'admin@fynwealth.com';
+          const isAdmin = !snapshot.empty || user.email === 'admin@fynwealth.com';
           
           verifyAttempted.current = true;
 
+          // If user is on login page but authenticated, move them forward
           if (pathname === '/login') {
-            if (adminExists) {
+            if (isAdmin) {
               router.push('/admin-dashboard');
             } else {
               router.push('/dashboard');
             }
           }
         } else {
-          // If email is missing (some anonymous logins), assume regular user
+          // Fallback for anonymous or incomplete sessions
           setIsVerifyingRole(false);
           if (pathname === '/login') router.push('/dashboard');
           return;
         }
       } catch (error) {
-        // Default to safe behavior on error
+        console.error("AuthGuard Verification Error:", error);
+        // Fail safe: funnel to dashboard
         if (pathname === '/login') {
           router.push('/dashboard');
         }
@@ -89,18 +97,19 @@ export function AuthGuard({ children }: AuthGuardProps) {
     verifyRole();
   }, [user, isUserLoading, pathname, router, db, auth]);
 
+  // Global Loading State
   if (isUserLoading || isVerifyingRole) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-sm font-medium text-muted-foreground animate-pulse">Initializing Security...</p>
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Establishing Secure Session...</p>
         </div>
       </div>
     );
   }
 
-  // Handle standard auth redirects
+  // Handle standard redirect edge cases
   if (!user && pathname !== '/login') return null;
   if (user && pathname === '/login') return null;
 
