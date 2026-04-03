@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -47,7 +46,7 @@ const TOUR_STEPS: Step[] = [
   },
   {
     title: "Capture Everything",
-    description: "Add expenses manually, scan physical bills with your camera, or just use your voice to record transactions instantly.",
+    description: "Add all your expenses in one go - Import your bank statement, enter manually, scan bills with your camera, or record transactions instantly using your voice.",
     targetId: "tour-expense-capture",
     path: "/expenses",
     icon: Receipt,

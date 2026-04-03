@@ -46,7 +46,7 @@ const steps = [
   {
     title: 'Capture Everything',
     description:
-      'Add expenses manually, scan physical bills with your camera, or just use your voice to record transactions instantly.',
+      'Add all your expenses in one go - Import your bank statement, enter manually, scan bills with your camera, or record transactions instantly using your voice.',
     icon: Receipt,
     color: 'text-accent',
   },
