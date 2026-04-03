@@ -84,8 +84,8 @@ export function WalkthroughTour() {
   useEffect(() => {
     setMounted(true);
     if (!tutorialCompleted) {
-      // Small delay to let the initial page settle
-      const timer = setTimeout(() => setIsVisible(true), 1500);
+      // Reduced delay from 1500 to 600ms for faster load
+      const timer = setTimeout(() => setIsVisible(true), 600);
       return () => clearTimeout(timer);
     }
   }, [tutorialCompleted]);
@@ -106,6 +106,7 @@ export function WalkthroughTour() {
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
       
+      // Reduced delay from 400 to 150ms
       setTimeout(() => {
         const rect = element.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
@@ -114,7 +115,7 @@ export function WalkthroughTour() {
         } else {
           setSpotlightRect(null);
         }
-      }, 400);
+      }, 150);
     } else {
       setSpotlightRect(null);
     }
@@ -128,7 +129,8 @@ export function WalkthroughTour() {
       setSpotlightRect(null);
       router.push(currentStep.path);
     } else {
-      const timer = setTimeout(calculateSpotlight, 500);
+      // Reduced delay from 500 to 200ms
+      const timer = setTimeout(calculateSpotlight, 200);
       return () => clearTimeout(timer);
     }
 
