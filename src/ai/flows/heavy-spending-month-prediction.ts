@@ -1,7 +1,7 @@
 'use server';
 /**
- * @fileOverview Predicts upcoming heavy spending and compares month-over-month trends.
- * Optimized for speed by processing aggregated monthly totals.
+ * @fileOverview Predicts upcoming spending based on strict historical averaging.
+ * Optimized for accuracy using pre-aggregated monthly totals.
  */
 
 import {ai} from '@/ai/genkit';
@@ -18,10 +18,9 @@ const HeavySpendingMonthPredictionInputSchema = z.object({
 export type HeavySpendingMonthPredictionInput = z.infer<typeof HeavySpendingMonthPredictionInputSchema>;
 
 const HeavySpendingMonthPredictionOutputSchema = z.object({
-  predictedNextMonthTotal: z.number().describe('The predicted total expense amount for the next month.'),
-  percentageChange: z.number().describe('The percentage drop or increase compared to the previous recorded month.'),
-  trendDirection: z.enum(['up', 'down', 'stable']).describe('The direction of spending.'),
-  historicalComparison: z.string().describe('A brief comparison string.'),
+  currentMonthExpected: z.number().describe('Average of total spending from all previous months.'),
+  nextMonthExpected: z.number().describe('Average of total spending including the current month.'),
+  percentageChange: z.number().describe('Percentage increase or decrease between Current Month Expected vs Last Month Actual Spend.'),
 });
 export type HeavySpendingMonthPredictionOutput = z.infer<typeof HeavySpendingMonthPredictionOutputSchema>;
 
@@ -29,19 +28,20 @@ const prompt = ai.definePrompt({
   name: 'predictHeavySpendingMonthsPrompt',
   input: { schema: z.object({ expensesJson: z.string() }) },
   output: { schema: HeavySpendingMonthPredictionOutputSchema },
-  prompt: `You are a precise financial analyst for FynWealth. Analyze aggregated monthly totals: {{{expensesJson}}}
+  prompt: `You are a precise financial calculator for FynWealth. Analyze aggregated monthly totals: {{{expensesJson}}}
 
-Tasks:
-1. Identify the most recent month in the input and its total.
-2. Compare it to the month immediately preceding it in the input (if available).
-3. Calculate the percentage increase/decrease between that most recent month and the preceding one. If only one month exists, use 0.
-4. Predict exactly "predictedNextMonthTotal" for the following month by calculating the simple mathematical average of the "amount" values for ALL months explicitly listed in the input array. Do not include or assume any months not listed in the input.
-5. Provide a short MoM comparison string (max 15 words) explaining the trend between the last two recorded months.
+Strict Logic:
+1. Identify the 'current month' (the most recent month in the input).
+2. "Current Month Expected": Calculate the mathematical average of all months EXCEPT the current month. If no previous months exist, use the current month's total.
+3. "Next Month Expected": Calculate the mathematical average of ALL months in the input (including the current month).
+4. "Percentage Change": Calculate the percentage change between the "Current Month Expected" and the "Last Month Actual Spend" (the month immediately preceding the current one). 
+   Formula: ((CurrentMonthExpected - LastMonthActual) / LastMonthActual) * 100.
+   If only one month exists, percentage is 0.
 
 Rules:
-- Be concise.
-- Use numeric values for calculations.
-- No conversational filler.`,
+- Round all values to 2 decimal places.
+- No explanations, no extra text.
+- Use accurate calculations based on provided data.`,
 });
 
 const predictHeavySpendingMonthsFlow = ai.defineFlow(
@@ -54,10 +54,9 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
     try {
       if (!input.expenses || input.expenses.length === 0) {
         return {
-          predictedNextMonthTotal: 0,
-          percentageChange: 0,
-          trendDirection: 'stable',
-          historicalComparison: "No historical records found in your vault."
+          currentMonthExpected: 0,
+          nextMonthExpected: 0,
+          percentageChange: 0
         };
       }
 
@@ -65,28 +64,25 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
       const {output} = await prompt({expensesJson});
       
       if (!output) {
-        // Fallback calculation if AI fails to produce schema-compliant output
+        // Fallback calculation if AI fails
         const total = input.expenses.reduce((s, e) => s + e.amount, 0);
-        const avg = total / input.expenses.length;
+        const avgAll = total / input.expenses.length;
         return {
-          predictedNextMonthTotal: avg,
-          percentageChange: 0,
-          trendDirection: 'stable',
-          historicalComparison: "Analysis simplified due to processing limit."
+          currentMonthExpected: avgAll,
+          nextMonthExpected: avgAll,
+          percentageChange: 0
         };
       }
       
       return output;
     } catch (err: any) {
       console.error("[predictHeavySpendingMonthsFlow] Error:", err.message);
-      // Fail gracefully with mathematical average fallback
       const total = input.expenses?.length > 0 ? input.expenses.reduce((s, e) => s + e.amount, 0) : 0;
       const avg = input.expenses?.length > 0 ? total / input.expenses.length : 0;
       return {
-        predictedNextMonthTotal: avg,
-        percentageChange: 0,
-        trendDirection: 'stable',
-        historicalComparison: "Forecast based on historical average."
+        currentMonthExpected: avg,
+        nextMonthExpected: avg,
+        percentageChange: 0
       };
     }
   }

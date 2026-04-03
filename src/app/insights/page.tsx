@@ -48,8 +48,8 @@ export default function InsightsPage() {
   const expenses = expensesData || [];
 
   /**
-   * Robust numeric parser aligned with dashboard
-   * Removes symbols, commas, and supports accounting parentheses
+   * Robust numeric parser aligned with dashboard.
+   * Ensures net spending calculation (positives - negatives).
    */
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
@@ -69,13 +69,12 @@ export default function InsightsPage() {
     const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
     return expenses
-      .filter(e => e.date >= startStr && e.date <= endStr && (e.status === 'paid' || !e.status))
+      .filter(e => e.date >= startStr && e.date <= endStr && e.status === 'paid')
       .reduce((sum, e) => sum + toNum(e.amount), 0);
   }, [expenses, viewMonth, viewYear]);
 
   const discoveries = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
-    
     const currentStartStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
     const currentEndStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
@@ -83,9 +82,8 @@ export default function InsightsPage() {
     const lastStartStr = format(startOfMonth(lastMonthDate), 'yyyy-MM-dd');
     const lastEndStr = format(endOfMonth(lastMonthDate), 'yyyy-MM-dd');
 
-    // Filter only positive expenses for discovery lists to avoid EMI/Refund confusion
     const filterAndSort = (arr: any[], direction: 'asc' | 'desc') => [...arr]
-      .filter(e => toNum(e.amount) > 0 && (e.status === 'paid' || !e.status))
+      .filter(e => toNum(e.amount) > 0 && e.status === 'paid')
       .sort((a, b) => {
         const valA = toNum(a.amount);
         const valB = toNum(b.amount);
@@ -112,7 +110,7 @@ export default function InsightsPage() {
     const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
     const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
-    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr && (e.status === 'paid' || !e.status));
+    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr && e.status === 'paid');
 
     const categoryTotals: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
@@ -142,7 +140,7 @@ export default function InsightsPage() {
       const monthlyData: Record<string, number> = {};
       
       expenses.forEach(e => {
-        if (e.status === 'paid' || !e.status) {
+        if (e.status === 'paid') {
           const monthKey = e.date.substring(0, 7);
           if (monthKey <= targetMonthKey) {
             monthlyData[monthKey] = (monthlyData[monthKey] || 0) + toNum(e.amount);
@@ -155,12 +153,8 @@ export default function InsightsPage() {
         .sort((a, b) => a.date.localeCompare(b.date));
       
       const [pResult, uResult] = await Promise.all([
-        predictHeavySpendingMonths({ 
-          expenses: aggregatedHistory 
-        }),
-        identifyUnnecessaryExpenses({ 
-          categories: accurateTopCategories 
-        })
+        predictHeavySpendingMonths({ expenses: aggregatedHistory }),
+        identifyUnnecessaryExpenses({ categories: accurateTopCategories })
       ]);
 
       setInsights({
@@ -169,13 +163,10 @@ export default function InsightsPage() {
       });
       
       lastAnalyzedPeriod.current = `${viewYear}-${viewMonth}`;
-      
-      if (isManual) {
-        toast({ title: "Analysis Refreshed", description: "Report updated with latest vault data." });
-      }
+      if (isManual) toast({ title: "Report Ready", description: "Updated with latest vault data." });
     } catch (err: any) {
       console.error("Failed to load insights", err);
-      setError("AI analysis paused. Check your vault data.");
+      setError("AI analysis paused. Ensure vault data is available.");
     } finally {
       setLoading(false);
       fetchingRef.current = false;
@@ -185,14 +176,11 @@ export default function InsightsPage() {
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
       const currentPeriod = `${viewYear}-${viewMonth}`;
-      const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
-      const oneHour = 1 * 60 * 60 * 1000;
-      
-      if (!insights.predictions || !insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod || (Date.now() - lastGen > oneHour)) {
+      if (!insights.predictions || !insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod) {
         loadInsights();
       }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated, error, loading, viewMonth, viewYear]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, error, loading, viewMonth, viewYear]);
 
   if (!mounted) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -200,24 +188,20 @@ export default function InsightsPage() {
     </div>
   );
 
-  const formatAmount = (amount: number) => Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (amount: number) => amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const hasData = !!(insights.predictions || insights.unnecessary);
-
-  if (loading && !hasData) {
+  if (loading && !insights.predictions) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-10">
         <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 shadow-inner">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
         </div>
-        <p className="text-xl font-headline font-bold text-primary animate-pulse">Generating precise analysis...</p>
+        <p className="text-xl font-headline font-bold text-primary animate-pulse">Analyzing Vault Patterns...</p>
       </div>
     );
   }
 
-  const getDisplayName = (e: any) => {
-    return e.description || e.note || e.categoryName || e.category || "Expense";
-  };
+  const getDisplayName = (e: any) => e.description || e.note || e.categoryName || e.category || "Expense";
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-6xl mx-auto pb-24">
@@ -259,15 +243,15 @@ export default function InsightsPage() {
             <CardContent className="p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Spent</p>
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Expected</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
-                    {currency.symbol}{formatAmount(currentMonthTotal)}
+                    {currency.symbol}{insights.predictions?.currentMonthExpected ? formatAmount(insights.predictions.currentMonthExpected) : "0.00"}
                   </p>
                 </div>
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Next Month Expected</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
-                    {currency.symbol}{insights.predictions?.predictedNextMonthTotal ? formatAmount(insights.predictions.predictedNextMonthTotal) : "0.00"}
+                    {currency.symbol}{insights.predictions?.nextMonthExpected ? formatAmount(insights.predictions.nextMonthExpected) : "0.00"}
                   </p>
                 </div>
               </div>
@@ -278,18 +262,28 @@ export default function InsightsPage() {
                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conclusion & Comparison Result</h4>
                 </div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <p className="text-sm text-foreground leading-relaxed font-bold italic flex-1">
-                    {insights.predictions?.historicalComparison || "Analyzing your historical spending patterns..."}
-                  </p>
+                  <div className="flex-1">
+                    {insights.predictions?.percentageChange !== undefined ? (
+                      <p className="text-sm text-foreground leading-relaxed font-bold italic">
+                        {insights.predictions.percentageChange > 0 
+                          ? `Spending is trending ${insights.predictions.percentageChange.toFixed(2)}% higher compared to your historical baseline.`
+                          : insights.predictions.percentageChange < 0 
+                            ? `Spending has optimized by ${Math.abs(insights.predictions.percentageChange).toFixed(2)}% vs your historical average.`
+                            : "Spending aligns exactly with your historical baseline."}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Establishing spending baseline...</p>
+                    )}
+                  </div>
                   {insights.predictions?.percentageChange !== undefined && insights.predictions.percentageChange !== 0 && (
                     <div className={cn(
                       "px-4 py-2 rounded-xl text-xs font-bold border shrink-0 flex items-center gap-2",
-                      insights.predictions.trendDirection === 'down' 
+                      insights.predictions.percentageChange < 0 
                         ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
                         : "bg-amber-50 text-amber-700 border-amber-100"
                     )}>
-                      {insights.predictions.trendDirection === 'down' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      {Math.abs(insights.predictions.percentageChange)}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Previous Data
+                      {insights.predictions.percentageChange < 0 ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                      {Math.abs(insights.predictions.percentageChange).toFixed(2)}% vs Last Month Actual
                     </div>
                   )}
                 </div>
@@ -315,10 +309,10 @@ export default function InsightsPage() {
                     {discoveries.current.highest.length > 0 ? discoveries.current.highest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(e.amount)}</span>
+                        <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No recorded expenses found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No records identified.</div>
                     )}
                   </div>
                   <div className="space-y-3">
@@ -326,10 +320,10 @@ export default function InsightsPage() {
                     {discoveries.current.lowest.length > 0 ? discoveries.current.lowest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(e.amount)}</span>
+                        <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
                       </div>
                     )) : (
-                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No recorded expenses found.</div>
+                      <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No records identified.</div>
                     )}
                   </div>
                 </div>
@@ -348,7 +342,7 @@ export default function InsightsPage() {
                       {discoveries.last.highest.map((e) => (
                         <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
                           <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
+                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
                         </div>
                       ))}
                     </div>
@@ -357,7 +351,7 @@ export default function InsightsPage() {
                       {discoveries.last.lowest.map((e) => (
                         <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
                           <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
+                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
                         </div>
                       ))}
                     </div>
@@ -391,10 +385,10 @@ export default function InsightsPage() {
                       <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
                         <div className="flex items-center gap-2 mb-2">
                           <Target className="w-3.5 h-3.5 text-accent" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Concise Tip</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-accent">AI TIP</span>
                         </div>
                         <p className="text-sm font-bold text-foreground leading-snug">
-                          {aiCat?.savingTip || "Review your usage patterns to identify potential savings in this category."}
+                          {aiCat?.savingTip || "Analyze your usage patterns to find potential savings in this category."}
                         </p>
                       </div>
                     </div>
@@ -402,7 +396,7 @@ export default function InsightsPage() {
                 })}
                 {accurateTopCategories.length === 0 && (
                   <div className="text-center py-20 text-muted-foreground font-medium italic text-sm">
-                    No high spending identified for this period.
+                    No high spending identified.
                   </div>
                 )}
               </div>
