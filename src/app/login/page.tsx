@@ -6,12 +6,12 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
   updateProfile as updateFirebaseProfile,
   signOut
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,6 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import { Loader2, Mail, Lock, User, ArrowRight, Chrome, ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -40,14 +39,17 @@ export default function LoginPage() {
 
   const syncUserToFirestore = async (user: any, isNew: boolean = false) => {
     try {
+      // 1. Check Blacklist
       const blacklistDoc = await getDoc(doc(db, 'blacklist', user.uid));
       if (blacklistDoc.exists()) {
         await signOut(auth);
         throw new Error('BAN_ACTIVE');
       }
 
+      // 2. Prepare Profile
       const userRef = doc(db, 'users', user.uid);
       const userData: any = {
+        uid: user.uid,
         email: user.email,
         name: user.displayName || name || 'Anonymous User',
         lastActive: serverTimestamp(),
@@ -58,59 +60,56 @@ export default function LoginPage() {
       if (isNew) {
         userData.createdAt = serverTimestamp();
         userData.stats = { totalExpenses: 0, totalReminders: 0 };
-        const statsRef = doc(db, 'analytics', 'appStats');
-        setDocumentNonBlocking(statsRef, { totalUsers: increment(1) }, { merge: true });
+        // Increment global count
+        await setDoc(doc(db, 'analytics', 'appStats'), { totalUsers: increment(1) }, { merge: true });
       }
 
-      setDocumentNonBlocking(userRef, userData, { merge: true });
+      // 3. Save to Cloud
+      await setDoc(userRef, userData, { merge: true });
+      
+      // 4. Update Local Store
+      if (userData.name) {
+        const [firstName = '', ...rest] = userData.name.split(' ');
+        updateStoreProfile({
+          firstName,
+          lastName: rest.join(' '),
+          email: user.email || ''
+        });
+      }
     } catch (error: any) {
       if (error.message === 'BAN_ACTIVE') throw error;
-      console.error("Failed to sync user profile", error);
+      console.error("Cloud Sync Error:", error);
+      throw error;
     }
   };
 
-  // Handle Redirect Result on Mount
+  // Handle Mount Logic (Redirect Catch)
   useEffect(() => {
     if (!auth) return;
 
-    // Firebase Auth provides getRedirectResult to catch the credential after Google redirects back
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
-          const user = result.user;
           try {
-            await syncUserToFirestore(user, false);
-            
-            if (user.displayName) {
-              const [firstName = '', ...rest] = user.displayName.split(' ');
-              updateStoreProfile({
-                firstName,
-                lastName: rest.join(' '),
-                email: user.email || ''
-              });
-            }
-
+            await syncUserToFirestore(result.user, false);
             setTourStepIndex(0);
             setTutorialCompleted(false);
-            toast({ title: 'Welcome!', description: 'Successfully signed in with Google.' });
-            
-            // Explicit navigation after successful redirect catch
             router.push('/dashboard');
           } catch (err: any) {
             if (err.message === 'BAN_ACTIVE') {
-              toast({ variant: 'destructive', title: 'Account Disabled', description: 'This account has been terminated by an administrator.' });
+              toast({ variant: 'destructive', title: 'Access Denied', description: 'This account has been disabled.' });
             }
           }
         }
         setCheckingRedirect(false);
       })
       .catch((error: any) => {
-        console.error("Redirect handshake failed:", error);
+        console.error("Auth Handshake Error:", error);
         setCheckingRedirect(false);
       });
-  }, [auth, db, router, updateStoreProfile, setTutorialCompleted, setTourStepIndex]);
+  }, [auth, db, router]);
 
-  // If user is already logged in and redirect check is done, send to dashboard
+  // Auth Guard: If already logged in, skip login page
   useEffect(() => {
     if (!isUserLoading && !checkingRedirect && currentUser) {
       router.push('/dashboard');
@@ -124,46 +123,63 @@ export default function LoginPage() {
     try {
       if (mode === 'signup') {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        await updateFirebaseProfile(user, { displayName: name });
-        await syncUserToFirestore(user, true);
-        
-        const [firstName = '', ...rest] = name.split(' ');
-        updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || email });
-        setTourStepIndex(0);
-        setTutorialCompleted(false);
-        toast({ title: 'Welcome to FynWealth!', description: 'Your account has been created successfully.' });
-      } else if (mode === 'signin') {
+        await updateFirebaseProfile(userCredential.user, { displayName: name });
+        await syncUserToFirestore(userCredential.user, true);
+        toast({ title: 'Welcome!', description: 'Account created successfully.' });
+      } else {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        await syncUserToFirestore(user, false);
-        
-        if (user.displayName) {
-          const [firstName = '', ...rest] = user.displayName.split(' ');
-          updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || email });
-        }
-        setTourStepIndex(0);
-        setTutorialCompleted(false);
-        toast({ title: 'Welcome Back!', description: 'Successfully signed in.' });
+        await syncUserToFirestore(userCredential.user, false);
+        toast({ title: 'Welcome Back!', description: 'Signed in successfully.' });
       }
+      setTourStepIndex(0);
+      setTutorialCompleted(false);
       router.push('/dashboard');
     } catch (error: any) {
-      let message = 'An authentication error occurred.';
-      if (error.code === 'auth/email-already-in-use') message = 'This email is already in use.';
+      let message = 'Verification failed.';
+      if (error.code === 'auth/email-already-in-use') message = 'Email already registered.';
       if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
-      if (error.message === 'BAN_ACTIVE') message = 'This account has been disabled by an administrator.';
+      if (error.message === 'BAN_ACTIVE') message = 'Account disabled by admin.';
       
-      toast({ variant: 'destructive', title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed', description: message });
+      toast({ variant: 'destructive', title: 'Auth Error', description: message });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    setLoading(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    // Use signInWithRedirect for 100% compatibility across mobile and desktop
-    signInWithRedirect(auth, provider);
+    
+    try {
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        await syncUserToFirestore(result.user, false);
+        setTourStepIndex(0);
+        setTutorialCompleted(false);
+        toast({ title: 'Success', description: 'Logged in with Google.' });
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      console.error("Google Popup Error:", error);
+      
+      let errorMessage = "Could not complete Google Sign-in.";
+      if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = "Domain not authorized. Please add fynwealth-six.vercel.app to Authorized Domains in Firebase Console.";
+      } else if (error.message === 'BAN_ACTIVE') {
+        errorMessage = "This account has been disabled by an administrator.";
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = "Popup was blocked by your browser. Please allow popups for this site.";
+      }
+
+      toast({ 
+        variant: 'destructive', 
+        title: 'Login Failed', 
+        description: errorMessage 
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (checkingRedirect || isUserLoading) {
@@ -201,8 +217,9 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full h-12 text-sm font-bold border-muted hover:bg-muted/5 rounded-xl shadow-sm"
                   onClick={handleGoogleLogin}
+                  disabled={loading}
                 >
-                  <Chrome className="w-4 h-4 mr-2 text-primary" />
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Chrome className="w-4 h-4 mr-2 text-primary" />}
                   Continue with Google
                 </Button>
 
