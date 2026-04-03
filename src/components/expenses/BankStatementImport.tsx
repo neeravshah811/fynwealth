@@ -94,26 +94,50 @@ export function BankStatementImport() {
     return dateRegex.test(s);
   };
 
+  /**
+   * Robust Date Normalization
+   * Maps various formats to YYYY-MM-DD
+   */
   const normalizeDate = (dateStr: string): string => {
     const s = dateStr.trim();
-    const parts = s.split(/[-/.]/);
-    
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    const monthMap: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+
+    const parts = s.split(/[-/.\s,]+/).filter(Boolean);
     if (parts.length === 3) {
-      let day, month, year;
+      let d = "", m = "", y = "";
+
+      // YYYY-MM-DD
       if (parts[0].length === 4) {
-        year = parts[0];
-        month = parts[1];
-        day = parts[2];
-      } else {
-        day = parts[0];
-        month = parts[1];
-        year = parts[2];
+        y = parts[0];
+        m = parts[1];
+        d = parts[2];
+      } 
+      // DD-MM-YYYY or DD-MM-YY
+      else {
+        d = parts[0];
+        m = parts[1];
+        y = parts[2];
       }
-      const d = day.padStart(2, '0').substring(0, 2);
-      const m = month.padStart(2, '0').substring(0, 2);
-      let y = year;
-      if (y.length === 2) y = '20' + y;
-      return `${y}-${m}-${d}`;
+
+      // Handle Alpha month
+      const mLower = m.toLowerCase().substring(0, 3);
+      if (monthMap[mLower]) {
+        m = monthMap[mLower];
+      }
+
+      const finalD = d.padStart(2, '0').substring(0, 2);
+      const finalM = m.padStart(2, '0').substring(0, 2);
+      let finalY = y;
+      if (finalY.length === 2) finalY = '20' + finalY;
+
+      if (/^\d{4}$/.test(finalY) && /^\d{2}$/.test(finalM) && /^\d{2}$/.test(finalD)) {
+        return `${finalY}-${finalM}-${finalD}`;
+      }
     }
     return s;
   };
@@ -281,7 +305,6 @@ export function BankStatementImport() {
 
       await handleParsedData(parsedData);
       
-      // Cleanup on success
       setIsPasswordDialogOpen(false);
       setPdfPassword("");
       setPendingFile(null);
@@ -298,22 +321,47 @@ export function BankStatementImport() {
     await runImport(file);
   };
 
+  /**
+   * Enhanced Deduplication Logic
+   * Creates unique fingerprints for every recorded expense to prevent overlap.
+   */
   const handleParsedData = async (parsedData: any[]) => {
-    // Deduplication Logic
-    const dates = parsedData.map(t => t.date).sort();
+    if (!user?.uid || !db) return;
+
+    // Filter out invalid dates before processing
+    const validParsed = parsedData.filter(t => t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date));
+    
+    if (validParsed.length === 0) {
+      toast({ variant: "destructive", title: "Format Error", description: "Could not identify valid dates in statement." });
+      reset();
+      return;
+    }
+
+    const dates = validParsed.map(t => t.date).sort();
     const minDate = dates[0];
     const maxDate = dates[dates.length - 1];
 
+    // 1. Fetch existing expenses in the statement's date range
     const existingExpensesRef = collection(db, 'users', user!.uid, 'expenses');
     const q = query(existingExpensesRef, where('date', '>=', minDate), where('date', '<=', maxDate));
     const snapshot = await getDocs(q);
+
+    // 2. Helper to sanitize description for comparison
+    const sanitize = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+
+    // 3. Create fingerprints for existing records
     const existingFingerprints = new Set(snapshot.docs.map(doc => {
       const d = doc.data();
-      return `${d.date}_${Number(d.amount).toFixed(2)}_${(d.description || d.note || "").toLowerCase().trim()}`;
+      const amt = Number(d.amount).toFixed(2);
+      const desc = sanitize(d.description || d.note || "");
+      return `${d.date}_${amt}_${desc}`;
     }));
 
-    const uniqueParsed = parsedData.filter(t => {
-      const fingerprint = `${t.date}_${Number(t.amount).toFixed(2)}_${t.description.toLowerCase().trim()}`;
+    // 4. Filter statement data against existing fingerprints
+    const uniqueParsed = validParsed.filter(t => {
+      const amt = Number(t.amount).toFixed(2);
+      const desc = sanitize(t.description);
+      const fingerprint = `${t.date}_${amt}_${desc}`;
       return !existingFingerprints.has(fingerprint);
     });
 
@@ -323,11 +371,15 @@ export function BankStatementImport() {
       return;
     }
 
+    // 5. Pass only truly new entries to AI for categorization
     const result = await processBankStatementManual({ userId: user!.uid, transactions: uniqueParsed });
     if (result && result.transactions && result.transactions.length > 0) {
       setTransactions(result.transactions);
       setReviewMode(true);
       toast({ title: "Scanning Complete", description: `Found ${result.transactions.length} new entries.` });
+    } else {
+      toast({ title: "No New Data", description: "All readable debit entries are already recorded." });
+      reset();
     }
   };
 
