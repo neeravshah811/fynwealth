@@ -9,18 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Sparkles, 
-  TrendingUp, 
   Loader2, 
   RefreshCw,
   Clock,
   PieChart,
-  ArrowUpRight,
-  ArrowDownRight,
   Target,
   Search,
   AlertCircle
 } from "lucide-react";
-import { predictHeavySpendingMonths } from "@/ai/flows/heavy-spending-month-prediction";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -49,7 +45,6 @@ export default function InsightsPage() {
 
   /**
    * Robust numeric parser aligned with dashboard.
-   * Ensures net spending calculation (positives - negatives).
    */
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
@@ -62,16 +57,6 @@ export default function InsightsPage() {
     const n = parseFloat(cleaned);
     return isNaN(n) ? 0 : n;
   };
-
-  const currentMonthTotal = useMemo(() => {
-    const targetDate = new Date(viewYear, viewMonth);
-    const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
-    const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
-    
-    return expenses
-      .filter(e => e.date >= startStr && e.date <= endStr && e.status === 'paid')
-      .reduce((sum, e) => sum + toNum(e.amount), 0);
-  }, [expenses, viewMonth, viewYear]);
 
   const discoveries = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
@@ -136,29 +121,9 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      const targetMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
-      const monthlyData: Record<string, number> = {};
-      
-      expenses.forEach(e => {
-        if (e.status === 'paid') {
-          const monthKey = e.date.substring(0, 7);
-          if (monthKey <= targetMonthKey) {
-            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + toNum(e.amount);
-          }
-        }
-      });
-
-      const aggregatedHistory = Object.entries(monthlyData)
-        .map(([date, amount]) => ({ date, amount }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-      
-      const [pResult, uResult] = await Promise.all([
-        predictHeavySpendingMonths({ expenses: aggregatedHistory }),
-        identifyUnnecessaryExpenses({ categories: accurateTopCategories })
-      ]);
+      const uResult = await identifyUnnecessaryExpenses({ categories: accurateTopCategories });
 
       setInsights({
-        predictions: pResult,
         unnecessary: uResult
       });
       
@@ -171,16 +136,16 @@ export default function InsightsPage() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [expenses, accurateTopCategories, setInsights, viewMonth, viewYear]);
+  }, [accurateTopCategories, setInsights, viewMonth, viewYear]);
 
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
       const currentPeriod = `${viewYear}-${viewMonth}`;
-      if (!insights.predictions || !insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod) {
+      if (!insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod) {
         loadInsights();
       }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, error, loading, viewMonth, viewYear]);
+  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.unnecessary, error, loading, viewMonth, viewYear]);
 
   if (!mounted) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -190,7 +155,7 @@ export default function InsightsPage() {
 
   const formatAmount = (amount: number) => amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  if (loading && !insights.predictions) {
+  if (loading && !insights.unnecessary) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-10">
         <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 shadow-inner">
@@ -232,72 +197,12 @@ export default function InsightsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden">
-            <CardHeader className="bg-primary/5 p-8 border-b">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                  <TrendingUp className="w-6 h-6" />
-                </div>
-                <CardTitle className="text-xl font-headline font-bold">1. Spending Forecast</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Expected</p>
-                  <p className="text-4xl font-bold text-primary tracking-tighter">
-                    {currency.symbol}{insights.predictions?.currentMonthExpected ? formatAmount(insights.predictions.currentMonthExpected) : "0.00"}
-                  </p>
-                </div>
-                <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Next Month Expected</p>
-                  <p className="text-4xl font-bold text-primary tracking-tighter">
-                    {currency.symbol}{insights.predictions?.nextMonthExpected ? formatAmount(insights.predictions.nextMonthExpected) : "0.00"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-[24px] bg-muted/20 border border-muted/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <AlertCircle className="w-5 h-5 text-primary opacity-60" />
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conclusion & Comparison Result</h4>
-                </div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    {insights.predictions?.percentageChange !== undefined ? (
-                      <p className="text-sm text-foreground leading-relaxed font-bold italic">
-                        {insights.predictions.percentageChange > 0 
-                          ? `Spending is trending ${insights.predictions.percentageChange.toFixed(2)}% higher compared to your historical baseline.`
-                          : insights.predictions.percentageChange < 0 
-                            ? `Spending has optimized by ${Math.abs(insights.predictions.percentageChange).toFixed(2)}% vs your historical average.`
-                            : "Spending aligns exactly with your historical baseline."}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Establishing spending baseline...</p>
-                    )}
-                  </div>
-                  {insights.predictions?.percentageChange !== undefined && insights.predictions.percentageChange !== 0 && (
-                    <div className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-bold border shrink-0 flex items-center gap-2",
-                      insights.predictions.percentageChange < 0 
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
-                        : "bg-amber-50 text-amber-700 border-amber-100"
-                    )}>
-                      {insights.predictions.percentageChange < 0 ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      {Math.abs(insights.predictions.percentageChange).toFixed(2)}% vs Last Month Actual
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden">
             <CardHeader className="p-8 pb-4">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-2xl bg-amber-50 text-amber-600">
                   <Search className="w-6 h-6" />
                 </div>
-                <CardTitle className="text-xl font-headline font-bold">2. Spend Discoveries</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">1. Spend Discoveries</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-8 pt-4 space-y-10">
@@ -369,7 +274,7 @@ export default function InsightsPage() {
                 <div className="p-3 rounded-2xl bg-accent/10 text-accent">
                   <PieChart className="w-6 h-6" />
                 </div>
-                <CardTitle className="text-xl font-headline font-bold">3. Savings Strategies</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">2. Savings Strategies</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
