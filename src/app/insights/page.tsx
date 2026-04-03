@@ -100,7 +100,7 @@ export default function InsightsPage() {
       const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
         amount: Math.abs(e.amount), 
-        description: e.description || e.note || "Expense", 
+        description: e.description || e.note || e.categoryName || e.category || "Expense", 
         category: (e.categoryName === "Financial Commitments" || e.category === "Financial Commitments") ? "Financial Commit" : (e.categoryName || e.category || "General") 
       }));
 
@@ -166,6 +166,10 @@ export default function InsightsPage() {
       </div>
     );
   }
+
+  const getDisplayName = (e: any) => {
+    return e.description || e.note || e.categoryName || e.category || "Expense";
+  };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-6xl mx-auto pb-24">
@@ -250,7 +254,7 @@ export default function InsightsPage() {
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-rose-600 flex items-center gap-2">Top 3 Highest</h5>
                     {discoveries.current.highest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 flex items-center justify-between">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{e.description || e.note}</span>
+                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     ))}
@@ -259,7 +263,7 @@ export default function InsightsPage() {
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-2">Top 3 Lowest</h5>
                     {discoveries.current.lowest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{e.description || e.note}</span>
+                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     ))}
@@ -275,7 +279,7 @@ export default function InsightsPage() {
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Highest</h5>
                     {discoveries.last.highest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{e.description || e.note}</span>
+                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     ))}
@@ -284,7 +288,7 @@ export default function InsightsPage() {
                     <h5 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Top 3 Lowest</h5>
                     {discoveries.last.lowest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
-                        <span className="text-xs font-bold truncate max-w-[150px]">{e.description || e.note}</span>
+                        <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
                         <span className="text-xs font-bold">{currency.symbol}{formatAmount(e.amount)}</span>
                       </div>
                     ))}
