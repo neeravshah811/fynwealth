@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from "react";
@@ -43,7 +44,11 @@ export function SpendingChart() {
     const expenses = (expensesData || []).filter(e => e.status === 'paid' || !e.status);
     return expenses
       .reduce((acc: any[], curr) => {
-        const catName = curr.categoryName || curr.category || "General";
+        let catName = curr.categoryName || curr.category || "General";
+        
+        // Normalization: Consolidate naming variations
+        if (catName === "Financial Commitments") catName = "Financial Commit";
+        
         const existing = acc.find(item => item.name === catName);
         if (existing) {
           existing.value += (Number(curr.amount) || 0);

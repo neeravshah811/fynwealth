@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -64,11 +65,15 @@ export function ExpenseCapture() {
     if (!categoriesRaw) return [];
     const catMap = new Map();
     categoriesRaw.forEach(cat => {
-      const normalized = cat.name?.trim().toLowerCase();
+      let name = cat.name?.trim();
+      // Normalization: Ensure 'Financial Commitments' displays as 'Financial Commit'
+      if (name === "Financial Commitments") name = "Financial Commit";
+      
+      const normalized = name.toLowerCase();
       if (!normalized) return;
       
       if (!catMap.has(normalized) || cat.userId === user?.uid) {
-        catMap.set(normalized, cat);
+        catMap.set(normalized, { ...cat, name });
       }
     });
     return Array.from(catMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
