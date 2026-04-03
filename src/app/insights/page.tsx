@@ -19,6 +19,7 @@ import {
   ArrowDownRight,
   Target,
   Search,
+  AlertCircle
 } from "lucide-react";
 import { predictHeavySpendingMonths } from "@/ai/flows/heavy-spending-month-prediction";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
@@ -52,7 +53,6 @@ export default function InsightsPage() {
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    // Remove symbols, commas, and handle negative paren notation
     let cleaned = String(val).trim();
     if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
       cleaned = '-' + cleaned.slice(1, -1);
@@ -61,6 +61,17 @@ export default function InsightsPage() {
     const n = parseFloat(cleaned);
     return isNaN(n) ? 0 : n;
   };
+
+  // Pre-calculate current month total for the "Current month expected" card
+  const currentMonthTotal = useMemo(() => {
+    const targetDate = new Date(viewYear, viewMonth);
+    const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
+    const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
+    
+    return expenses
+      .filter(e => e.date >= startStr && e.date <= endStr)
+      .reduce((sum, e) => sum + Math.abs(toNum(e.amount)), 0);
+  }, [expenses, viewMonth, viewYear]);
 
   // Calculate Discoveries for Current and Last Month
   const discoveries = useMemo(() => {
@@ -73,14 +84,12 @@ export default function InsightsPage() {
     const lastStart = startOfMonth(lastMonthDate);
     const lastEnd = endOfMonth(lastMonthDate);
 
-    // Robust string-based filtering for YYYY-MM-DD formatted strings
     const filterTxns = (start: Date, end: Date) => {
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
       return expenses.filter(e => e.date >= startStr && e.date <= endStr);
     };
 
-    // Strict numeric sorting
     const sortDesc = (arr: any[]) => [...arr]
       .filter(e => toNum(e.amount) > 0)
       .sort((a, b) => toNum(b.amount) - toNum(a.amount));
@@ -116,13 +125,11 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      // 1. Aggregate Monthly Totals for Contextual Forecasting
-      // We only include months up to the viewed month to provide a "point-in-time" history
       const targetMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
       const monthlyData: Record<string, number> = {};
       
       expenses.forEach(e => {
-        const monthKey = e.date.substring(0, 7); // YYYY-MM
+        const monthKey = e.date.substring(0, 7);
         if (monthKey <= targetMonthKey) {
           monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
         }
@@ -132,7 +139,6 @@ export default function InsightsPage() {
         .map(([date, amount]) => ({ date, amount }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      // 2. Pre-aggregate Categories for Savings Strategy (Current Month Only)
       const targetDate = new Date(viewYear, viewMonth);
       const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
       const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
@@ -150,7 +156,6 @@ export default function InsightsPage() {
         .sort((a, b) => b.totalSpent - a.totalSpent)
         .slice(0, 4);
       
-      // Call AI Flows in Parallel
       const [pResult, uResult] = await Promise.all([
         predictHeavySpendingMonths({ 
           expenses: aggregatedHistory 
@@ -185,7 +190,6 @@ export default function InsightsPage() {
       const lastGen = insights.lastGenerated ? new Date(insights.lastGenerated).getTime() : 0;
       const oneHour = 1 * 60 * 60 * 1000;
       
-      // Refresh if never generated, period changed, or data is stale (1h)
       if (!insights.predictions || !insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod || (Date.now() - lastGen > oneHour)) {
         loadInsights();
       }
@@ -248,37 +252,52 @@ export default function InsightsPage() {
         <div className="lg:col-span-2 space-y-8">
           <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden">
             <CardHeader className="bg-primary/5 p-8 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                    <TrendingUp className="w-6 h-6" />
-                  </div>
-                  <CardTitle className="text-xl font-headline font-bold">1. Spending Forecast</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                  <TrendingUp className="w-6 h-6" />
                 </div>
-                {insights.predictions?.percentageChange !== undefined && (
-                  <Badge className={cn(
-                    "px-4 py-1.5 rounded-lg text-xs font-bold border-none",
-                    insights.predictions.trendDirection === 'down' ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
-                  )}>
-                    {insights.predictions.trendDirection === 'down' ? <ArrowDownRight className="w-3.5 h-3.5 mr-1 inline" /> : <ArrowUpRight className="w-3.5 h-3.5 mr-1 inline" />}
-                    {insights.predictions.percentageChange}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'}
-                  </Badge>
-                )}
+                <CardTitle className="text-xl font-headline font-bold">1. Spending Forecast</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-8">
+            <CardContent className="p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Card 1: Current Month */}
+                <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Expected</p>
+                  <p className="text-4xl font-bold text-primary tracking-tighter">
+                    {currency.symbol}{formatAmount(currentMonthTotal)}
+                  </p>
+                </div>
+                {/* Card 2: Next Month */}
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Next Month Expected</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
                     {currency.symbol}{insights.predictions?.predictedNextMonthTotal ? formatAmount(insights.predictions.predictedNextMonthTotal) : "0.00"}
                   </p>
                 </div>
-                <div className="p-6 rounded-[24px] bg-muted/20 border border-muted/50 flex flex-col items-center justify-center text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-3 tracking-widest">Comparison Result</p>
-                  <p className="text-sm text-foreground leading-relaxed font-bold italic">
-                    {insights.predictions?.historicalComparison || "Analyzing historical data..."}
+              </div>
+
+              {/* Comparison Result / Conclusion below cards */}
+              <div className="p-6 rounded-[24px] bg-muted/20 border border-muted/50">
+                <div className="flex items-center gap-3 mb-3">
+                  <AlertCircle className="w-5 h-5 text-primary opacity-60" />
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conclusion & Comparison Result</h4>
+                </div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <p className="text-sm text-foreground leading-relaxed font-bold italic flex-1">
+                    {insights.predictions?.historicalComparison || "Analyzing your historical spending patterns..."}
                   </p>
+                  {insights.predictions?.percentageChange !== undefined && (
+                    <div className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-bold border shrink-0 flex items-center gap-2",
+                      insights.predictions.trendDirection === 'down' 
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                        : "bg-amber-50 text-amber-700 border-amber-100"
+                    )}>
+                      {insights.predictions.trendDirection === 'down' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                      {insights.predictions.percentageChange}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Last Month
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
