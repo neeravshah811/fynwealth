@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview An AI agent that analyzes spending patterns to identify high-spend categories and calculated saving opportunities.
+ * @fileOverview An AI agent that analyzes spending patterns to identify top spending categories and concise saving tips.
  */
 
 import {ai} from '@/ai/genkit';
@@ -22,14 +22,11 @@ export type IdentifyUnnecessaryExpensesInput = z.infer<typeof IdentifyUnnecessar
 const IdentifiedCategorySchema = z.object({
   categoryName: z.string().describe('The name of the high-spend category.'),
   totalSpent: z.number().describe('Total amount spent in this category.'),
-  potentialSavings: z.number().describe('Calculated estimate of how much the user could realistically save next month (numeric).'),
-  savingTip: z.string().describe('Actionable advice to reduce spending (e.g., "You can save ₹500 by optimizing OTT plans").'),
-  reason: z.string().describe('Why this category was flagged.'),
+  savingTip: z.string().describe('Exactly 1 concise, actionable tip.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
-  highSpendCategories: z.array(IdentifiedCategorySchema).describe('Analysis of top spending categories.'),
-  summary: z.string().describe('A general financial health summary.'),
+  highSpendCategories: z.array(IdentifiedCategorySchema).max(4).describe('Top 4 spending categories with specific tips.'),
 });
 export type IdentifyUnnecessaryExpensesOutput = z.infer<typeof IdentifyUnnecessaryExpensesOutputSchema>;
 
@@ -41,20 +38,23 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   name: 'unnecessaryExpenseIdentificationPrompt',
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
-  prompt: `You are an expert financial auditor for FynWealth.
-Analyze the provided expenses. Focus on CATEGORY level trends.
+  prompt: `You are a precise financial auditor for FynWealth.
+Analyze the provided expenses and output exactly the TOP 4 highest spending categories.
 
-CRITICAL: 
-1. Provide specific, numeric "potentialSavings" for each flagged category.
-2. The "savingTip" should be punchy and valuable, e.g., "You can save ₹1,200 next month by optimizing Subscriptions and Recharge plans 📊".
-3. Group items like "Financial Commitments" or "Financial Commit" together under "Financial Commit".
+Requirements:
+1. Identify the top 4 categories by volume.
+2. For each, provide exactly 1 concise savings tip.
+3. Use currency context from data.
 
 Expenses:
 {{#each expenses}}
 - Date: {{{date}}}, Description: {{{description}}}, Amount: {{{amount}}}, Category: {{{category}}}
 {{/each}}
 
-Identify categories with high volume and provide actionable, numeric savings strategies.`,
+Rules:
+- Strictly top 4 categories only.
+- Tips must be concise and actionable.
+- No explanations or extra headings.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(

@@ -21,14 +21,7 @@ const HeavySpendingMonthPredictionOutputSchema = z.object({
   predictedNextMonthTotal: z.number().describe('The predicted total expense amount for the next month.'),
   percentageChange: z.number().describe('The percentage drop or increase compared to the previous recorded month.'),
   trendDirection: z.enum(['up', 'down', 'stable']).describe('The direction of spending.'),
-  historicalComparison: z.string().describe('A brief comparison, e.g., "Your total monthly expense dropped 12% from last month 👏".'),
-  futureSpikes: z.array(z.object({
-    month: z.string(),
-    year: z.number(),
-    reason: z.string(),
-    confidence: z.number(),
-  })).describe('Predictions for future heavy months.'),
-  summary: z.string().describe('Overall spending trend forecast.'),
+  historicalComparison: z.string().describe('A brief comparison string.'),
 });
 export type HeavySpendingMonthPredictionOutput = z.infer<typeof HeavySpendingMonthPredictionOutputSchema>;
 
@@ -36,16 +29,17 @@ const prompt = ai.definePrompt({
   name: 'predictHeavySpendingMonthsPrompt',
   input: { schema: z.object({ expensesJson: z.string() }) },
   output: { schema: HeavySpendingMonthPredictionOutputSchema },
-  prompt: `You are a predictive financial analyst for FynWealth.
-Analyze the historical data: {{{expensesJson}}}
+  prompt: `You are a precise financial analyst for FynWealth. Analyze historical data: {{{expensesJson}}}
 
 Tasks:
-1. Calculate the percentage change from the most recent full month to the previous one.
-2. Provide a "historicalComparison" string like: "Your total monthly expense dropped 15% from last month 👏" or "Spending increased by 5% 📊".
-3. Predict the exact "predictedNextMonthTotal".
-4. Identify future seasonal spikes.
+1. Calculate percentage increase/decrease from the most recent full month to the previous one.
+2. Predict exactly "predictedNextMonthTotal" based on trends.
+3. Provide a short MoM comparison string.
 
-Format the output strictly according to the schema.`,
+Rules:
+- Be concise.
+- Use strictly numeric values.
+- No conversational filler.`,
 });
 
 const predictHeavySpendingMonthsFlow = ai.defineFlow(
