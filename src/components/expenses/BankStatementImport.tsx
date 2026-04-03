@@ -235,50 +235,70 @@ export function BankStatementImport() {
     return extractTransactionsFromRows(allTextRows);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user?.uid || !db) return;
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!['pdf', 'xlsx', 'xls'].includes(extension || '')) {
-      toast({ variant: "destructive", title: "Invalid Format", description: "Only PDF and Excel formats are supported." });
-      return;
-    }
+  const runImport = async (file: File, password?: string) => {
+    if (!user?.uid || !db) return;
+    
     setLoading(true);
     setPasswordError(false);
+    
     try {
+      const extension = file.name.split('.').pop()?.toLowerCase();
       let parsedData: any[] = [];
+      
       if (extension === 'pdf') {
         try {
-          parsedData = await parsePdfManual(file);
+          parsedData = await parsePdfManual(file, password);
         } catch (err: any) {
           if (err.message === 'PASSWORD_REQUIRED') {
-            setPendingFile(file);
-            setIsPasswordDialogOpen(true);
+            if (password) {
+              setPasswordError(true);
+              toast({ variant: "destructive", title: "Incorrect Password", description: "The password provided is invalid for this PDF." });
+            } else {
+              setPendingFile(file);
+              setIsPasswordDialogOpen(true);
+            }
             setLoading(false);
             return;
           }
           throw err;
         }
-      } else {
+      } else if (['xlsx', 'xls'].includes(extension || '')) {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
         parsedData = extractTransactionsFromRows(json as any[][]);
+      } else {
+        toast({ variant: "destructive", title: "Invalid Format", description: "Only PDF and Excel formats are supported." });
+        setLoading(false);
+        return;
       }
+
+      if (parsedData.length === 0) {
+        toast({ variant: "destructive", title: "No Transactions", description: "No readable debit entries found in the statement." });
+        setLoading(false);
+        return;
+      }
+
       await handleParsedData(parsedData);
+      
+      // Cleanup on success
+      setIsPasswordDialogOpen(false);
+      setPdfPassword("");
+      setPendingFile(null);
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Import Failed", description: err.message || "Failed to parse statement." });
+      toast({ variant: "destructive", title: "Import Failed", description: err.message || "Failed to process statement." });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleParsedData = async (parsedData: any[]) => {
-    if (!parsedData || parsedData.length === 0) {
-      toast({ variant: "destructive", title: "No Transactions", description: "No readable debit entries found." });
-      return;
-    }
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await runImport(file);
+  };
 
+  const handleParsedData = async (parsedData: any[]) => {
     // Deduplication Logic
     const dates = parsedData.map(t => t.date).sort();
     const minDate = dates[0];
@@ -476,7 +496,7 @@ export function BankStatementImport() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => !open && setIsPasswordDialogOpen(false)}>
+      <Dialog open={isPasswordDialogOpen} onOpenChange={(open) => { if (!open) reset(); setIsPasswordDialogOpen(open); }}>
         <DialogContent className="sm:max-w-[400px] p-8 rounded-[24px] border-none shadow-2xl">
           <DialogHeader className="text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-inner border border-amber-100"><Lock className="w-8 h-8" /></div>
@@ -485,9 +505,26 @@ export function BankStatementImport() {
           </DialogHeader>
           <div className="py-6 space-y-2">
             <Label htmlFor="pdf-password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Password</Label>
-            <Input id="pdf-password" type="password" placeholder="••••••••" value={pdfPassword} onChange={(e) => setPdfPassword(e.target.value)} className={cn("h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-bold transition-all focus:ring-2", passwordError ? "ring-2 ring-destructive" : "focus:ring-primary")} autoFocus />
+            <Input 
+              id="pdf-password" 
+              type="password" 
+              placeholder="••••••••" 
+              value={pdfPassword} 
+              onChange={(e) => setPdfPassword(e.target.value)} 
+              className={cn("h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-bold transition-all focus:ring-2", passwordError ? "ring-2 ring-destructive" : "focus:ring-primary")} 
+              autoFocus 
+            />
           </div>
-          <DialogFooter><Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={() => { setPasswordError(false); handleFileChange({ target: { files: [pendingFile!] } } as any); }} disabled={loading || !pdfPassword}>{loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Unlock className="w-5 h-5 mr-2" />}Unlock & Process</Button></DialogFooter>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg" 
+              onClick={() => runImport(pendingFile!, pdfPassword)} 
+              disabled={loading || !pdfPassword}
+            >
+              {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Unlock className="w-5 h-5 mr-2" />}
+              Unlock & Process
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
