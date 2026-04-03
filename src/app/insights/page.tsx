@@ -52,7 +52,12 @@ export default function InsightsPage() {
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
-    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    // Remove symbols, commas, and handle negative paren notation
+    let cleaned = String(val).trim();
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+      cleaned = '-' + cleaned.slice(1, -1);
+    }
+    cleaned = cleaned.replace(/[^0-9.-]/g, '');
     const n = parseFloat(cleaned);
     return isNaN(n) ? 0 : n;
   };
@@ -75,7 +80,7 @@ export default function InsightsPage() {
       return expenses.filter(e => e.date >= startStr && e.date <= endStr);
     };
 
-    // Strict numeric sorting to prevent string-based comparison errors
+    // Strict numeric sorting
     const sortDesc = (arr: any[]) => [...arr]
       .filter(e => toNum(e.amount) > 0)
       .sort((a, b) => toNum(b.amount) - toNum(a.amount));
@@ -111,12 +116,18 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      // 1. Aggregate Monthly Totals for Fast/Accurate Forecasting
+      // 1. Aggregate Monthly Totals for Contextual Forecasting
+      // We only include months up to the viewed month to provide a "point-in-time" history
+      const targetMonthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
       const monthlyData: Record<string, number> = {};
+      
       expenses.forEach(e => {
         const monthKey = e.date.substring(0, 7); // YYYY-MM
-        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+        if (monthKey <= targetMonthKey) {
+          monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Math.abs(toNum(e.amount));
+        }
       });
+
       const aggregatedHistory = Object.entries(monthlyData)
         .map(([date, amount]) => ({ date, amount }))
         .sort((a, b) => a.date.localeCompare(b.date));
