@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -37,7 +36,6 @@ export default function InsightsPage() {
   const fetchingRef = useRef(false);
   const lastAnalyzedPeriod = useRef<string>("");
 
-  // Fetch All Expenses for Analysis
   const expensesQuery = useMemoFirebase(() => {
     if (!db || !user?.uid) return null;
     return query(
@@ -49,7 +47,6 @@ export default function InsightsPage() {
   const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
   const expenses = expensesData || [];
 
-  // Helper to ensure numeric accuracy regardless of data type
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -62,7 +59,6 @@ export default function InsightsPage() {
     return isNaN(n) ? 0 : n;
   };
 
-  // Pre-calculate current month total for the "Current month expected" card
   const currentMonthTotal = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
     const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
@@ -73,22 +69,15 @@ export default function InsightsPage() {
       .reduce((sum, e) => sum + Math.abs(toNum(e.amount)), 0);
   }, [expenses, viewMonth, viewYear]);
 
-  // Calculate Discoveries for Current and Last Month
   const discoveries = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
     
-    const currentStart = startOfMonth(targetDate);
-    const currentEnd = endOfMonth(targetDate);
+    const currentStartStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
+    const currentEndStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
     
     const lastMonthDate = subMonths(targetDate, 1);
-    const lastStart = startOfMonth(lastMonthDate);
-    const lastEnd = endOfMonth(lastMonthDate);
-
-    const filterTxns = (start: Date, end: Date) => {
-      const startStr = format(start, 'yyyy-MM-dd');
-      const endStr = format(end, 'yyyy-MM-dd');
-      return expenses.filter(e => e.date >= startStr && e.date <= endStr);
-    };
+    const lastStartStr = format(startOfMonth(lastMonthDate), 'yyyy-MM-dd');
+    const lastEndStr = format(endOfMonth(lastMonthDate), 'yyyy-MM-dd');
 
     const sortDesc = (arr: any[]) => [...arr]
       .filter(e => toNum(e.amount) > 0)
@@ -98,8 +87,8 @@ export default function InsightsPage() {
       .filter(e => toNum(e.amount) > 0)
       .sort((a, b) => toNum(a.amount) - toNum(b.amount));
 
-    const currentTxns = filterTxns(currentStart, currentEnd);
-    const lastTxns = filterTxns(lastStart, lastEnd);
+    const currentTxns = expenses.filter(e => e.date >= currentStartStr && e.date <= currentEndStr);
+    const lastTxns = expenses.filter(e => e.date >= lastStartStr && e.date <= lastEndStr);
 
     return {
       current: {
@@ -111,6 +100,26 @@ export default function InsightsPage() {
         lowest: sortAsc(lastTxns).slice(0, 3)
       }
     };
+  }, [expenses, viewMonth, viewYear]);
+
+  // Pre-calculate accurate top categories for Savings Strategies
+  const accurateTopCategories = useMemo(() => {
+    const targetDate = new Date(viewYear, viewMonth);
+    const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
+    const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
+    
+    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr);
+
+    const categoryTotals: Record<string, number> = {};
+    currentMonthExpenses.forEach(e => {
+      const cat = e.categoryName || e.category || "General";
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(toNum(e.amount));
+    });
+
+    return Object.entries(categoryTotals)
+      .map(([name, total]) => ({ categoryName: name, totalSpent: total }))
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 4);
   }, [expenses, viewMonth, viewYear]);
 
   useEffect(() => {
@@ -138,30 +147,13 @@ export default function InsightsPage() {
       const aggregatedHistory = Object.entries(monthlyData)
         .map(([date, amount]) => ({ date, amount }))
         .sort((a, b) => a.date.localeCompare(b.date));
-
-      const targetDate = new Date(viewYear, viewMonth);
-      const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
-      const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
-      
-      const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr);
-
-      const categoryTotals: Record<string, number> = {};
-      currentMonthExpenses.forEach(e => {
-        const cat = e.categoryName || e.category || "General";
-        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(toNum(e.amount));
-      });
-
-      const topCategories = Object.entries(categoryTotals)
-        .map(([name, total]) => ({ categoryName: name, totalSpent: total }))
-        .sort((a, b) => b.totalSpent - a.totalSpent)
-        .slice(0, 4);
       
       const [pResult, uResult] = await Promise.all([
         predictHeavySpendingMonths({ 
           expenses: aggregatedHistory 
         }),
         identifyUnnecessaryExpenses({ 
-          categories: topCategories 
+          categories: accurateTopCategories 
         })
       ]);
 
@@ -182,7 +174,7 @@ export default function InsightsPage() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [expenses, setInsights, viewMonth, viewYear]);
+  }, [expenses, accurateTopCategories, setInsights, viewMonth, viewYear]);
 
   useEffect(() => {
     if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
@@ -248,7 +240,6 @@ export default function InsightsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* 1. Spending Forecast */}
         <div className="lg:col-span-2 space-y-8">
           <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden">
             <CardHeader className="bg-primary/5 p-8 border-b">
@@ -261,14 +252,12 @@ export default function InsightsPage() {
             </CardHeader>
             <CardContent className="p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Card 1: Current Month */}
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Current Month Expected</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
                     {currency.symbol}{formatAmount(currentMonthTotal)}
                   </p>
                 </div>
-                {/* Card 2: Next Month */}
                 <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 flex flex-col items-center justify-center text-center">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground mb-2 tracking-widest">Next Month Expected</p>
                   <p className="text-4xl font-bold text-primary tracking-tighter">
@@ -277,7 +266,6 @@ export default function InsightsPage() {
                 </div>
               </div>
 
-              {/* Comparison Result / Conclusion below cards */}
               <div className="p-6 rounded-[24px] bg-muted/20 border border-muted/50">
                 <div className="flex items-center gap-3 mb-3">
                   <AlertCircle className="w-5 h-5 text-primary opacity-60" />
@@ -295,7 +283,7 @@ export default function InsightsPage() {
                         : "bg-amber-50 text-amber-700 border-amber-100"
                     )}>
                       {insights.predictions.trendDirection === 'down' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      {insights.predictions.percentageChange}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Last Month
+                      {Math.abs(insights.predictions.percentageChange)}% {insights.predictions.trendDirection === 'down' ? 'Decrease' : 'Increase'} vs Last Month
                     </div>
                   )}
                 </div>
@@ -303,7 +291,6 @@ export default function InsightsPage() {
             </CardContent>
           </Card>
 
-          {/* 2. Spend Discoveries */}
           <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden">
             <CardHeader className="p-8 pb-4">
               <div className="flex items-center gap-4">
@@ -314,7 +301,6 @@ export default function InsightsPage() {
               </div>
             </CardHeader>
             <CardContent className="p-8 pt-4 space-y-10">
-              {/* Current Month */}
               <div className="space-y-6">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary px-3 py-1 bg-primary/5 rounded-full inline-block">Current Month ({format(new Date(viewYear, viewMonth), 'MMM')})</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -343,7 +329,6 @@ export default function InsightsPage() {
                 </div>
               </div>
 
-              {/* Last Month */}
               <div className="space-y-6 pt-4 border-t border-muted/50">
                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 py-1 bg-muted/20 rounded-full inline-block">Last Month ({format(subMonths(new Date(viewYear, viewMonth), 1), 'MMM')})</h4>
                 {discoveries.last.highest.length === 0 && discoveries.last.lowest.length === 0 ? (
@@ -377,7 +362,6 @@ export default function InsightsPage() {
           </Card>
         </div>
 
-        {/* 3. Savings Strategies */}
         <div className="space-y-8">
           <Card className="border-none shadow-sm ring-1 ring-black/5 overflow-hidden h-full">
             <CardHeader className="bg-accent/5 p-8 border-b">
@@ -390,24 +374,27 @@ export default function InsightsPage() {
             </CardHeader>
             <CardContent className="p-8 space-y-6">
               <div className="space-y-5">
-                {insights.unnecessary?.highSpendCategories?.slice(0, 4).map((cat: any, i: number) => (
-                  <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="font-bold text-sm text-foreground truncate">{cat.categoryName}</span>
-                      <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{currency.symbol}{formatAmount(cat.totalSpent)}</p>
-                    </div>
-                    <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Target className="w-3.5 h-3.5 text-accent" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Concise Tip</span>
+                {accurateTopCategories.map((localCat, i) => {
+                  const aiCat = insights.unnecessary?.highSpendCategories?.find((c: any) => c.categoryName === localCat.categoryName);
+                  return (
+                    <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-bold text-sm text-foreground truncate">{localCat.categoryName}</span>
+                        <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{currency.symbol}{formatAmount(localCat.totalSpent)}</p>
                       </div>
-                      <p className="text-sm font-bold text-foreground leading-snug">
-                        {cat.savingTip}
-                      </p>
+                      <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Target className="w-3.5 h-3.5 text-accent" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Concise Tip</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground leading-snug">
+                          {aiCat?.savingTip || "Review your usage patterns to identify potential savings in this category."}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {(!insights.unnecessary || insights.unnecessary.highSpendCategories?.length === 0) && (
+                  );
+                })}
+                {accurateTopCategories.length === 0 && (
                   <div className="text-center py-20 text-muted-foreground font-medium italic text-sm">
                     No high spending identified.
                   </div>

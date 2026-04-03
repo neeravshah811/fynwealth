@@ -10,20 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { 
   Camera, 
   Mic, 
   Plus, 
   Loader2, 
   CheckCircle2, 
-  Repeat, 
   StopCircle,
   Tag,
-  Paperclip,
-  FileText,
   X,
-  ShieldCheck,
   ThumbsUp,
   Sparkles
 } from "lucide-react";
@@ -56,7 +51,6 @@ export function ExpenseCapture() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Taxonomy listeners
   const categoriesQuery = useMemoFirebase(() => {
     if (!db) return null;
     return collection(db, "categories");
@@ -81,7 +75,6 @@ export function ExpenseCapture() {
     return Array.from(catMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [categoriesRaw, user?.uid]);
 
-  // Manual Form States
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [subcategories, setSubcategories] = useState<any[]>([]);
@@ -89,19 +82,16 @@ export function ExpenseCapture() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [frequency, setFrequency] = useState<Frequency>('Monthly');
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
-  // AI Review Dialog States
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [aiReviewData, setAiReviewData] = useState<any>({
     amount: "",
     date: format(new Date(), 'yyyy-MM-dd'),
     note: "",
     categoryId: "",
-    subcategoryId: ""
+    subcategoryId: "",
+    subcategories: []
   });
 
   const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
@@ -180,11 +170,9 @@ export function ExpenseCapture() {
     setSelectedCategory("");
     setSelectedSubcategory("");
     setSubcategories([]);
-    setIsRecurring(false);
-    setFrequency('Monthly');
     setAttachmentData(null);
-    setAttachmentName(null);
     setProcessingMessage("");
+    setLoading(false);
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -235,7 +223,6 @@ export function ExpenseCapture() {
       resetForm();
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed", description: "Check your internet connection." });
-    } finally {
       setLoading(false);
     }
   };
@@ -272,7 +259,6 @@ export function ExpenseCapture() {
       toast({ title: "Approved & Recorded", description: "Expense successfully added to your vault." });
     } catch (err) {
       toast({ variant: "destructive", title: "Approval Failed", description: "Could not record the expense." });
-    } finally {
       setLoading(false);
     }
   };
@@ -301,7 +287,6 @@ export function ExpenseCapture() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // Immediately show processing message
       setLoading(true);
       setProcessingMessage("Analyzing your audio...");
     }
@@ -324,17 +309,22 @@ export function ExpenseCapture() {
             date: result.date || format(new Date(), 'yyyy-MM-dd'),
             note: result.description,
             categoryId: matchedCat?.id || "",
-            subcategoryId: ""
+            subcategoryId: "",
+            subcategories: []
           });
           if (matchedCat) await loadSubcategories(matchedCat.id, true);
+          setLoading(false);
+          setProcessingMessage("");
           setIsReviewDialogOpen(true);
+        } else {
+          setLoading(false);
+          setProcessingMessage("");
         }
       };
       reader.readAsDataURL(audioBlob);
     } catch (err) {
       toast({ variant: "destructive", title: "AI Transcribe Failed", description: "Failed to process audio. Try speaking again." });
       setLoading(false);
-    } finally {
       setProcessingMessage("");
     }
   };
@@ -343,12 +333,11 @@ export function ExpenseCapture() {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
     
-    // Immediately show processing message
     setLoading(true);
     setProcessingMessage("Extracting receipt data...");
 
     const previewReader = new FileReader();
-    previewReader.onloadend = () => { setAttachmentData(previewReader.result as string); setAttachmentName(file.name); };
+    previewReader.onloadend = () => { setAttachmentData(previewReader.result as string); };
     previewReader.readAsDataURL(file);
 
     try {
@@ -366,17 +355,22 @@ export function ExpenseCapture() {
             date: result.transactionDate || format(new Date(), 'yyyy-MM-dd'),
             note: result.merchantName || "",
             categoryId: matchedCat?.id || "",
-            subcategoryId: ""
+            subcategoryId: "",
+            subcategories: []
           });
           if (matchedCat) await loadSubcategories(matchedCat.id, true);
+          setLoading(false);
+          setProcessingMessage("");
           setIsReviewDialogOpen(true);
+        } else {
+          setLoading(false);
+          setProcessingMessage("");
         }
       };
       reader.readAsDataURL(file);
     } catch (err) {
       toast({ variant: "destructive", title: "Scan Error", description: "AI failed to analyze receipt." });
       setLoading(false);
-    } finally {
       setProcessingMessage("");
     }
   };
@@ -510,9 +504,8 @@ export function ExpenseCapture() {
         </Tabs>
       </CardContent>
 
-      {/* AI Review & Edit Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={(open) => {
-        if (!open) setProcessingMessage("");
+        if (!open) resetForm();
         setIsReviewDialogOpen(open);
       }}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
