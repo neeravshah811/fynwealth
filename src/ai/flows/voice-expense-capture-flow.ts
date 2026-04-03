@@ -17,20 +17,7 @@ export type VoiceExpenseCaptureInput = z.infer<typeof VoiceExpenseCaptureInputSc
 
 const VoiceExpenseCaptureOutputSchema = z.object({
   amount: z.number().describe('The numerical amount of the expense.'),
-  category: z
-    .enum([
-      'Food',
-      'Transport',
-      'Utilities',
-      'Rent',
-      'Subscriptions',
-      'Shopping',
-      'Entertainment',
-      'Healthcare',
-      'Education',
-      'Other',
-    ])
-    .describe('The category of the expense.'),
+  category: z.string().describe('Suggested category name based on common financial terms.'),
   description: z.string().describe('A brief description of the expense.'),
   date: z
     .string()
@@ -58,7 +45,7 @@ const extractFromAudioPrompt = ai.definePrompt({
   output: {schema: VoiceExpenseCaptureOutputSchema},
   prompt: `You are an AI financial assistant called FynWealth. Listen to the provided audio and extract the following details: amount, category, description, and date.
       
-Categories MUST be one of: 'Food', 'Transport', 'Utilities', 'Rent', 'Subscriptions', 'Shopping', 'Entertainment', 'Healthcare', 'Education', 'Other'. If the category is unclear, default to 'Other'.
+If the category is unclear, suggest a broad logical category like 'Food', 'Transport', 'Utilities', 'Shopping', or 'Miscellaneous'.
 The date should be in YYYY-MM-DD format. If no date is mentioned, use today's date: {{today}}.
 The amount should be a numerical value. If no amount is clear, return 0.
 
@@ -93,22 +80,6 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
 
       if (typeof amount !== 'number' || isNaN(amount)) {
         amount = 0;
-      }
-
-      const validCategories: VoiceExpenseCaptureOutput['category'][] = [
-        'Food',
-        'Transport',
-        'Utilities',
-        'Rent',
-        'Subscriptions',
-        'Shopping',
-        'Entertainment',
-        'Healthcare',
-        'Education',
-        'Other',
-      ];
-      if (!validCategories.includes(category)) {
-        category = 'Other';
       }
 
       return {
