@@ -1,6 +1,7 @@
+
 'use server';
 /**
- * @fileOverview An AI agent that analyzes spending patterns to identify recurring or potentially unnecessary expenses.
+ * @fileOverview An AI agent that analyzes spending patterns to identify high-spend categories and saving opportunities.
  */
 
 import {ai} from '@/ai/genkit';
@@ -18,16 +19,16 @@ const IdentifyUnnecessaryExpensesInputSchema = z.object({
 });
 export type IdentifyUnnecessaryExpensesInput = z.infer<typeof IdentifyUnnecessaryExpensesInputSchema>;
 
-const IdentifiedExpenseSchema = z.object({
-  description: z.string().describe('The description of the potentially unnecessary or recurring expense.'),
-  amount: z.number().describe('The amount of the expense.'),
-  category: z.string().describe('The category of the expense.'),
-  reason: z.string().describe('The reason why this expense is considered potentially unnecessary or recurring.'),
+const IdentifiedCategorySchema = z.object({
+  categoryName: z.string().describe('The name of the high-spend category.'),
+  totalSpent: z.number().describe('Total amount spent in this category.'),
+  savingTip: z.string().describe('Actionable advice to reduce spending in this specific category.'),
+  reason: z.string().describe('Why this category was flagged for optimization.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
-  unnecessaryExpenses: z.array(IdentifiedExpenseSchema).describe('A list of identified expenses.'),
-  summary: z.string().describe('A general summary of suggestions.'),
+  highSpendCategories: z.array(IdentifiedCategorySchema).describe('Analysis of top spending categories.'),
+  summary: z.string().describe('A general financial health summary.'),
 });
 export type IdentifyUnnecessaryExpensesOutput = z.infer<typeof IdentifyUnnecessaryExpensesOutputSchema>;
 
@@ -39,16 +40,23 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   name: 'unnecessaryExpenseIdentificationPrompt',
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
-  prompt: `You are an AI financial assistant called FynWealth, specialized in helping users identify unnecessary expenses and find saving opportunities.
-Analyze the following list of expenses. Identify recurring expenses and any expenses that could be considered unnecessary or could be optimized.
-For each identified expense, provide a clear reason why it is considered potentially unnecessary or recurring.
+  prompt: `You are an AI financial assistant called FynWealth.
+Analyze the following list of expenses. 
+
+CRITICAL INSTRUCTION: Do not provide insights on specific high-end individual transactions. Instead, aggregate the data by category.
+Identify categories where the user is spending the most money or where spending seems disproportionately high relative to a typical balanced budget.
+
+For each flagged category, provide:
+1. The total spent in that category.
+2. A specific, actionable saving tip to optimize that category (e.g., 'Consider meal prepping to reduce Dining Out expenses').
+3. The reason why this category stands out.
 
 Expenses:
 {{#each expenses}}
 - Date: {{{date}}}, Description: {{{description}}}, Amount: {{{amount}}}, Category: {{{category}}}
 {{/each}}
 
-Based on the provided expenses, list all identified unnecessary or recurring expenses with a reason, and provide a general summary of your findings and suggestions for the user.`,
+Provide a general summary of the user's financial health based on these category trends.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
@@ -64,7 +72,7 @@ const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
       return output;
     } catch (err: any) {
       console.error("[unnecessaryExpenseIdentificationFlow] Error:", err.message);
-      throw new Error("Failed to identify unnecessary expenses. Please try again later.");
+      throw new Error("Failed to identify category trends. Please try again later.");
     }
   }
 );

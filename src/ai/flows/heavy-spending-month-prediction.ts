@@ -1,6 +1,7 @@
+
 'use server';
 /**
- * @fileOverview Predicts upcoming heavy spending months based on historical data.
+ * @fileOverview Predicts upcoming heavy spending and next month's totals based on historical comparisons.
  */
 
 import {ai} from '@/ai/genkit';
@@ -17,12 +18,15 @@ const HeavySpendingMonthPredictionInputSchema = z.object({
 export type HeavySpendingMonthPredictionInput = z.infer<typeof HeavySpendingMonthPredictionInputSchema>;
 
 const HeavySpendingMonthPredictionOutputSchema = z.object({
-  predictions: z.array(z.object({
+  predictedNextMonthTotal: z.number().describe('The predicted total expense amount for the next month.'),
+  historicalComparison: z.string().describe('A brief comparison of current spending vs previous months.'),
+  futureSpikes: z.array(z.object({
     month: z.string(),
     year: z.number(),
     reason: z.string(),
-  })),
-  summary: z.string(),
+    confidence: z.number(),
+  })).describe('Predictions for months with likely high spending.'),
+  summary: z.string().describe('Overall spending trend forecast.'),
 });
 export type HeavySpendingMonthPredictionOutput = z.infer<typeof HeavySpendingMonthPredictionOutputSchema>;
 
@@ -30,7 +34,16 @@ const prompt = ai.definePrompt({
   name: 'predictHeavySpendingMonthsPrompt',
   input: { schema: z.object({ expensesJson: z.string() }) },
   output: { schema: HeavySpendingMonthPredictionOutputSchema },
-  prompt: `Analyze these expenses and predict upcoming heavy spend months: {{{expensesJson}}}`,
+  prompt: `You are a predictive financial analyst for FynWealth.
+Analyze the provided historical expense data: {{{expensesJson}}}
+
+Tasks:
+1. Compare spending levels across the months provided in the data.
+2. Predict the total expected expenditure for the very next month based on the average and recurring trends.
+3. Identify future months (up to 12 months ahead) that are likely to have spending spikes based on patterns detected (e.g., annual subscriptions, holiday seasons, or periodic bills).
+4. Provide a brief summary of whether the user's spending is increasing, decreasing, or stable compared to previous periods.
+
+Format the output strictly according to the schema.`,
 });
 
 const predictHeavySpendingMonthsFlow = ai.defineFlow(
@@ -48,7 +61,7 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("[predictHeavySpendingMonthsFlow] Error:", err.message);
       if (err.message.includes('429')) throw new Error('AI Quota Exceeded.');
-      throw new Error("Failed to predict heavy spending. Please try again later.");
+      throw new Error("Failed to forecast spending. Please try again later.");
     }
   }
 );

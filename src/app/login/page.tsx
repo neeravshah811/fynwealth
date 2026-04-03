@@ -40,7 +40,6 @@ export default function LoginPage() {
 
   const syncUserToFirestore = async (user: any, isNew: boolean = false) => {
     try {
-      // 1. Check Blacklist before proceeding
       const blacklistDoc = await getDoc(doc(db, 'blacklist', user.uid));
       if (blacklistDoc.exists()) {
         await signOut(auth);
@@ -59,13 +58,10 @@ export default function LoginPage() {
       if (isNew) {
         userData.createdAt = serverTimestamp();
         userData.stats = { totalExpenses: 0, totalReminders: 0 };
-        
-        // Update global stats using centralized helper
         const statsRef = doc(db, 'analytics', 'appStats');
         setDocumentNonBlocking(statsRef, { totalUsers: increment(1) }, { merge: true });
       }
 
-      // Save user profile using centralized helper
       setDocumentNonBlocking(userRef, userData, { merge: true });
     } catch (error: any) {
       if (error.message === 'BAN_ACTIVE') throw error;
@@ -73,13 +69,9 @@ export default function LoginPage() {
     }
   };
 
+  // Handle Google Redirect Result (Reliability for Mobile)
   useEffect(() => {
     if (!auth) return;
-
-    if (auth.currentUser) {
-      setCheckingRedirect(false);
-      return;
-    }
 
     getRedirectResult(auth)
       .then(async (result) => {
@@ -100,31 +92,18 @@ export default function LoginPage() {
             setTourStepIndex(0);
             setTutorialCompleted(false);
 
-            toast({
-              title: 'Welcome!',
-              description: 'Signed in with Google successfully.',
-            });
+            toast({ title: 'Welcome!', description: 'Signed in with Google successfully.' });
           } catch (err: any) {
             if (err.message === 'BAN_ACTIVE') {
-              toast({
-                variant: 'destructive',
-                title: 'Account Disabled',
-                description: 'This account has been terminated by an administrator.',
-              });
+              toast({ variant: 'destructive', title: 'Account Disabled', description: 'This account has been terminated by an administrator.' });
             }
           }
         }
         setCheckingRedirect(false);
       })
       .catch((error: any) => {
+        console.error("Redirect check failed", error);
         setCheckingRedirect(false);
-        if (error.code !== 'auth/no-current-user') {
-          toast({
-            variant: 'destructive',
-            title: 'Google Login Failed',
-            description: 'Could not complete the mobile sign-in process.',
-          });
-        }
       });
   }, [auth, updateStoreProfile, setTutorialCompleted, setTourStepIndex, db]);
 
@@ -140,19 +119,10 @@ export default function LoginPage() {
         await syncUserToFirestore(user, true);
         
         const [firstName = '', ...rest] = name.split(' ');
-        updateStoreProfile({
-          firstName,
-          lastName: rest.join(' '),
-          email: user.email || email
-        });
-
+        updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || email });
         setTourStepIndex(0);
         setTutorialCompleted(false);
-
-        toast({
-          title: 'Welcome to FynWealth!',
-          description: 'Your account has been created successfully.',
-        });
+        toast({ title: 'Welcome to FynWealth!', description: 'Your account has been created successfully.' });
       } else if (mode === 'signin') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
@@ -160,16 +130,10 @@ export default function LoginPage() {
         
         if (user.displayName) {
           const [firstName = '', ...rest] = user.displayName.split(' ');
-          updateStoreProfile({
-            firstName,
-            lastName: rest.join(' '),
-            email: user.email || email
-          });
+          updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || email });
         }
-
         setTourStepIndex(0);
         setTutorialCompleted(false);
-
         toast({ title: 'Welcome Back!', description: 'Successfully signed in.' });
       }
     } catch (error: any) {
@@ -178,32 +142,10 @@ export default function LoginPage() {
       if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
       if (error.message === 'BAN_ACTIVE') message = 'This account has been disabled by an administrator.';
       
-      toast({
-        variant: 'destructive',
-        title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed',
-        description: message,
-      });
+      toast({ variant: 'destructive', title: mode === 'signup' ? 'Sign Up Failed' : 'Sign In Failed', description: message });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      toast({ variant: "destructive", title: "Email Required", description: "Please enter your email." });
-      return;
-    }
-    setLoading(true);
-    sendPasswordResetEmail(auth, email)
-      .then(() => {
-        toast({ title: 'Reset Link Sent', description: `Check your inbox at ${email}.` });
-        setMode('signin');
-      })
-      .catch(() => {
-        toast({ variant: 'destructive', title: 'Reset Failed', description: 'Could not send reset email.' });
-      })
-      .finally(() => setLoading(false));
   };
 
   const handleGoogleLogin = () => {
@@ -211,41 +153,34 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
+    // Reliability Hack: Detect if device is mobile
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     if (isMobile) {
+      // Best for Mobile: Avoids popup blockers and sandbox issues
       signInWithRedirect(auth, provider);
     } else {
+      // Best for Desktop: Fast and seamless
       signInWithPopup(auth, provider)
         .then(async (result) => {
           const user = result.user;
           try {
             await syncUserToFirestore(user, false);
-
             if (user.displayName) {
               const [firstName = '', ...rest] = user.displayName.split(' ');
-              updateStoreProfile({
-                firstName,
-                lastName: rest.join(' '),
-                email: user.email || ''
-              });
+              updateStoreProfile({ firstName, lastName: rest.join(' '), email: user.email || '' });
             }
-
             setTourStepIndex(0);
             setTutorialCompleted(false);
-
             toast({ title: 'Welcome!', description: 'Signed in with Google.' });
           } catch (err: any) {
             if (err.message === 'BAN_ACTIVE') {
-              toast({
-                variant: 'destructive',
-                title: 'Account Disabled',
-                description: 'This account has been terminated by an administrator.',
-              });
+              toast({ variant: 'destructive', title: 'Account Disabled', description: 'This account has been terminated.' });
             }
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error("Popup failed", error);
           toast({ variant: 'destructive', title: 'Google Login Failed', description: 'Could not complete Google sign in.' });
         })
         .finally(() => setGoogleLoading(false));
@@ -256,7 +191,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-        <p className="text-sm font-medium text-muted-foreground animate-pulse">Verifying Authentication...</p>
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">Establishing Secure Session...</p>
       </div>
     );
   }
@@ -304,88 +239,44 @@ export default function LoginPage() {
               </>
             )}
 
-            <form onSubmit={mode === 'reset' ? handleResetPassword : handleEmailAuth} className="space-y-4">
+            <form onSubmit={mode === 'reset' ? (e) => { e.preventDefault(); toast({ title: 'Coming Soon', description: 'Reset is disabled for this prototype.' }); } : handleEmailAuth} className="space-y-4">
               {mode === 'signup' && (
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                    Full Name
-                  </Label>
+                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Full Name</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Jane Doe"
-                      className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required={mode === 'signup'}
-                    />
+                    <Input id="name" type="text" placeholder="Jane Doe" className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl" value={name} onChange={(e) => setName(e.target.value)} required={mode === 'signup'} />
                   </div>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">
-                  Email Address
-                </Label>
+                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Email Address</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="jane@example.com"
-                    className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                  <Input id="email" type="email" placeholder="jane@example.com" className="pl-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
               </div>
 
               {mode !== 'reset' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
-                    <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Password
-                    </Label>
+                    <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</Label>
                     {mode === 'signin' && (
-                      <button 
-                        type="button"
-                        onClick={() => setMode('reset')}
-                        className="text-[10px] font-bold text-primary hover:underline"
-                      >
-                        Forgot password?
-                      </button>
+                      <button type="button" onClick={() => setMode('reset')} className="text-[10px] font-bold text-primary hover:underline">Forgot password?</button>
                     )}
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className="pl-10 pr-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required={mode !== 'reset'}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
+                    <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="pl-10 pr-10 h-12 bg-muted/30 border-none ring-1 ring-muted focus:ring-2 focus:ring-primary rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required={mode !== 'reset'} />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
               )}
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl"
-                disabled={loading || googleLoading}
-              >
+              <Button type="submit" className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl" disabled={loading || googleLoading}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                 {mode === 'signin' && 'Sign In'}
                 {mode === 'signup' && 'Create Account'}
@@ -395,30 +286,15 @@ export default function LoginPage() {
 
             <div className="text-center space-y-4">
               {mode === 'reset' ? (
-                <button 
-                  type="button"
-                  className="text-xs font-bold text-muted-foreground hover:text-primary transition-all flex items-center justify-center mx-auto"
-                  onClick={() => setMode('signin')}
-                >
-                  <ChevronLeft className="w-3 h-3 mr-1" />
-                  Back to Sign In
+                <button type="button" className="text-xs font-bold text-muted-foreground hover:text-primary transition-all flex items-center justify-center mx-auto" onClick={() => setMode('signin')}>
+                  <ChevronLeft className="w-3 h-3 mr-1" /> Back to Sign In
                 </button>
               ) : (
-                <button 
-                  type="button"
-                  className="text-xs font-bold text-primary hover:underline transition-all"
-                  onClick={(): void => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                >
+                <button type="button" className="text-xs font-bold text-primary hover:underline transition-all" onClick={(): void => setMode(mode === 'signin' ? 'signup' : 'signin')}>
                   {mode === 'signin' ? "Don't have an account? Create one" : "Already have an account? Sign in"}
                 </button>
               )}
             </div>
-          </div>
-          
-          <div className="mt-8 pt-6 border-t border-muted/50 text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-              Secure Cloud Storage • AES-256 Encryption
-            </p>
           </div>
         </CardContent>
       </Card>
