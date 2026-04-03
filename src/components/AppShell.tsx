@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -10,6 +11,7 @@ import { TutorialTrigger } from '@/components/TutorialTrigger';
 import { NotificationManager } from '@/components/NotificationManager';
 import { SideDrawer } from "@/components/dashboard/SideDrawer";
 import { BottomNav } from "@/components/dashboard/BottomNav";
+import { DataPrivacyConsent } from '@/components/DataPrivacyConsent';
 
 /**
  * AppShell manages the visibility of the Dashboard UI elements.
@@ -92,6 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <SplashScreen />
+      <DataPrivacyConsent />
       <TutorialTrigger />
       <NotificationManager />
       
