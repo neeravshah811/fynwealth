@@ -47,6 +47,15 @@ export default function InsightsPage() {
   const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
   const expenses = expensesData || [];
 
+  // Helper to ensure numeric accuracy regardless of data type
+  const toNum = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
+
   // Calculate Discoveries for Current and Last Month
   const discoveries = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
@@ -65,9 +74,14 @@ export default function InsightsPage() {
       return expenses.filter(e => e.date >= startStr && e.date <= endStr);
     };
 
-    // Fix: Explicit numeric sorting to prevent string-based comparison errors
-    const sortDesc = (arr: any[]) => [...arr].sort((a, b) => Number(b.amount) - Number(a.amount));
-    const sortAsc = (arr: any[]) => [...arr].sort((a, b) => Number(a.amount) - Number(b.amount)).filter(e => Number(e.amount) > 0);
+    // Strict numeric sorting to prevent string-based comparison errors (e.g. "50" > "25000")
+    const sortDesc = (arr: any[]) => [...arr]
+      .filter(e => toNum(e.amount) > 0)
+      .sort((a, b) => toNum(b.amount) - toNum(a.amount));
+
+    const sortAsc = (arr: any[]) => [...arr]
+      .filter(e => toNum(e.amount) > 0)
+      .sort((a, b) => toNum(a.amount) - toNum(b.amount));
 
     const currentTxns = filterTxns(currentStart, currentEnd);
     const lastTxns = filterTxns(lastStart, lastEnd);
@@ -98,7 +112,7 @@ export default function InsightsPage() {
     try {
       const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
-        amount: Math.abs(Number(e.amount))
+        amount: Math.abs(toNum(e.amount))
       }));
 
       // Pre-aggregate categories locally for 100% accuracy in Savings Strategy
@@ -111,7 +125,7 @@ export default function InsightsPage() {
       const categoryTotals: Record<string, number> = {};
       currentMonthExpenses.forEach(e => {
         const cat = e.categoryName || e.category || "General";
-        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(Number(e.amount));
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(toNum(e.amount));
       });
 
       const topCategories = Object.entries(categoryTotals)
@@ -162,7 +176,7 @@ export default function InsightsPage() {
     </div>
   );
 
-  const formatAmount = (amount: number) => Math.abs(Number(amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (amount: number) => Math.abs(toNum(amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hasData = !!(insights.predictions || insights.unnecessary);
 
