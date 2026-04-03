@@ -65,8 +65,9 @@ export default function InsightsPage() {
       return expenses.filter(e => e.date >= startStr && e.date <= endStr);
     };
 
-    const sortDesc = (arr: any[]) => [...arr].sort((a, b) => b.amount - a.amount);
-    const sortAsc = (arr: any[]) => [...arr].sort((a, b) => a.amount - b.amount).filter(e => e.amount > 0);
+    // Fix: Explicit numeric sorting to prevent string-based comparison errors
+    const sortDesc = (arr: any[]) => [...arr].sort((a, b) => Number(b.amount) - Number(a.amount));
+    const sortAsc = (arr: any[]) => [...arr].sort((a, b) => Number(a.amount) - Number(b.amount)).filter(e => Number(e.amount) > 0);
 
     const currentTxns = filterTxns(currentStart, currentEnd);
     const lastTxns = filterTxns(lastStart, lastEnd);
@@ -97,7 +98,7 @@ export default function InsightsPage() {
     try {
       const allExpensesMapped = expenses.map(e => ({ 
         date: e.date, 
-        amount: Math.abs(e.amount)
+        amount: Math.abs(Number(e.amount))
       }));
 
       // Pre-aggregate categories locally for 100% accuracy in Savings Strategy
@@ -110,7 +111,7 @@ export default function InsightsPage() {
       const categoryTotals: Record<string, number> = {};
       currentMonthExpenses.forEach(e => {
         const cat = e.categoryName || e.category || "General";
-        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(e.amount);
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(Number(e.amount));
       });
 
       const topCategories = Object.entries(categoryTotals)
@@ -161,7 +162,7 @@ export default function InsightsPage() {
     </div>
   );
 
-  const formatAmount = (amount: number) => Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatAmount = (amount: number) => Math.abs(Number(amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hasData = !!(insights.predictions || insights.unnecessary);
 
@@ -197,10 +198,13 @@ export default function InsightsPage() {
             )}
           </div>
         </div>
-        <Button variant="outline" onClick={() => loadInsights(true)} className="h-11 px-8 font-bold shadow-sm rounded-xl" disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-3" />}
-          Refresh Report
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">{format(new Date(viewYear, viewMonth), 'MMMM yyyy')}</p>
+          <Button variant="outline" onClick={() => loadInsights(true)} className="h-11 px-8 font-bold shadow-sm rounded-xl" disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-3" />}
+            Refresh Report
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
