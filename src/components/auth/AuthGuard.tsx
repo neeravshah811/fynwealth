@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useUser, useFirestore, useAuth } from '@/firebase';
@@ -24,9 +25,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isVerifyingRole, setIsVerifyingRole] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const verifyAttempted = useRef(false);
 
   useEffect(() => {
+    setMounted(true);
     async function verifyRole() {
       // 1. Wait for Firebase initial auth check
       if (isUserLoading) return;
@@ -97,13 +100,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
     verifyRole();
   }, [user, isUserLoading, pathname, router, db, auth]);
 
-  // Global Loading State
-  if (isUserLoading || isVerifyingRole) {
+  // Global Loading State - with mounted check to prevent hydration mismatch
+  if (!mounted || isUserLoading || isVerifyingRole) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-sm font-medium text-muted-foreground animate-pulse">Establishing Secure Session...</p>
+          <p className="text-sm font-medium text-muted-foreground animate-pulse" suppressHydrationWarning>
+            Establishing Secure Session...
+          </p>
         </div>
       </div>
     );

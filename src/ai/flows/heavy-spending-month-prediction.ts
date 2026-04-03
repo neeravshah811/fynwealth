@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Predicts upcoming heavy spending and compares month-over-month trends.

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -82,6 +83,7 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
+      // Normalize Financial Commit for AI consistency
       const expenseData = expenses.map(e => ({ 
         date: e.date, 
         amount: Math.abs(e.amount), 
@@ -126,7 +128,11 @@ export default function InsightsPage() {
     }
   }, [mounted, expenses.length, expensesLoading, loadInsights, insights.predictions, insights.unnecessary, insights.lastGenerated, error, loading]);
 
-  if (!mounted) return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-10 h-10 text-primary/30 animate-spin" /></div>;
+  if (!mounted) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="w-10 h-10 text-primary/30 animate-spin" />
+    </div>
+  );
 
   const formatAmount = (amount: number) => Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -161,7 +167,7 @@ export default function InsightsPage() {
             {insights.lastGenerated ? (
               <>
                 <Clock className="w-4 h-4" />
-                <span>Refreshed {formatDistanceToNow(new Date(insights.lastGenerated))} ago</span>
+                <span suppressHydrationWarning>Refreshed {formatDistanceToNow(new Date(insights.lastGenerated))} ago</span>
               </>
             ) : (
               <span>Calculated Strategic category analysis</span>
