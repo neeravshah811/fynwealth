@@ -120,16 +120,13 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       const collectionsToClear = ['expenses', 'budgets', 'bills', 'folders'];
       const batch = writeBatch(db);
       
-      // 1. Clear all user sub-collections
       for (const collName of collectionsToClear) {
         const snapshot = await getDocs(collection(db, 'users', user.uid, collName));
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
       }
       
-      // 2. Delete user profile
       batch.delete(doc(db, 'users', user.uid));
       
-      // 3. Blacklist UID permanently to prevent re-registration (standard security practice for this app)
       const blacklistRef = doc(db, 'blacklist', user.uid);
       batch.set(blacklistRef, {
         uid: user.uid,
@@ -140,16 +137,13 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       
       await batch.commit();
       
-      // 4. Attempt Auth Deletion
       try {
         await user.delete();
       } catch (authErr: any) {
         console.warn("Auth deletion failed (requires recent login):", authErr);
-        // Fallback: Just sign out, the blacklist prevents them from coming back
         await signOut(auth);
       }
 
-      // 5. Cleanup local state
       clearAllData();
       setIsOpen(false);
       toast({ title: "Account Removed", description: "Your profile and data have been permanently deleted." });
@@ -164,7 +158,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
 
   const handleCurrencyChange = async (v: string) => {
     setCurrency(v);
-    setIsOpen(false); // Auto-close drawer on selection
+    setIsOpen(false);
     if (db && user?.uid) {
       try {
         await updateDoc(doc(db, 'users', user.uid), { preferredCurrency: v });
@@ -331,7 +325,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
                     checked={privacyMode}
                     onCheckedChange={(val) => {
                       togglePrivacyMode();
-                      setIsOpen(false); // Auto-close drawer
+                      setIsOpen(false);
                     }}
                     className="scale-90"
                   />
@@ -427,7 +421,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               <button 
                 onClick={() => {
                   setLegalDialog("terms");
-                  setIsOpen(false); // Auto-close drawer
+                  setIsOpen(false);
                 }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
@@ -441,7 +435,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               <button 
                 onClick={() => {
                   setLegalDialog("privacy");
-                  setIsOpen(false); // Auto-close drawer
+                  setIsOpen(false);
                 }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
@@ -455,7 +449,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               <button 
                 onClick={() => {
                   setLegalDialog("faq");
-                  setIsOpen(false); // Auto-close drawer
+                  setIsOpen(false);
                 }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
@@ -469,7 +463,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
               <button 
                 onClick={() => {
                   setLegalDialog("feature");
-                  setIsOpen(false); // Auto-close drawer
+                  setIsOpen(false);
                 }}
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors group text-left"
               >
@@ -533,7 +527,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
 
   const legalContent = (
     <Dialog open={legalDialog !== null} onOpenChange={(open) => !open && setLegalDialog(null)}>
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-[32px]">
         <DialogHeader className="p-6 bg-muted/30 border-b shrink-0">
           <DialogTitle className="font-headline text-xl flex items-center gap-2">
             {legalDialog === "terms" && <><FileText className="w-6 h-6 text-primary" /> Terms of Service</>}
@@ -546,36 +540,169 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         <div className="flex-1 overflow-y-auto min-h-0 w-full scrollbar-thin scrollbar-thumb-muted-foreground/20">
           <div className="p-8 space-y-8 text-sm text-muted-foreground leading-relaxed">
             {legalDialog === "terms" && (
-              <>
-                <section>
-                  <h3 className="font-bold text-foreground text-lg mb-2">1. Acceptance of Terms</h3>
-                  <p>By accessing or using FynWealth, you agree to be bound by these Terms of Service.</p>
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <p className="font-bold text-foreground">Effective Date: April 1, 2026</p>
+                  <p className="text-xs">These Terms may be reviewed and updated periodically.</p>
+                </div>
+                <p>By accessing or using FynWealth, you agree to these Terms.</p>
+                
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">1. Nature of Service</h3>
+                  <p>FynWealth is a personal finance management tool that helps users track expenses, organize financial data, and receive AI-generated insights. <strong>FynWealth does not provide financial, investment, tax, or legal advice.</strong></p>
                 </section>
-                <section>
-                  <h3 className="font-bold text-foreground text-lg mb-2">2. Financial Disclaimer</h3>
-                  <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-xl border border-amber-100 dark:border-amber-900/30 flex gap-4">
-                    <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
-                    <p className="text-sm text-amber-800 dark:text-amber-400 font-semibold">FynWealth is a tracking tool and does not provide professional financial advice.</p>
-                  </div>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">2. Eligibility</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>You must be at least 18 years old</li>
+                    <li>You must have the legal capacity to enter into a binding agreement</li>
+                  </ul>
                 </section>
-              </>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">3. User Responsibilities</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Provide accurate and complete information</li>
+                    <li>Maintain confidentiality of your account</li>
+                    <li>Ensure lawful use of the platform</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">4. Financial Data & AI Disclaimer</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Insights are generated using algorithms and may not be fully accurate</li>
+                    <li>Outputs are indicative and should not be solely relied upon</li>
+                    <li>You are responsible for all financial decisions</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">5. Data Inputs & Accuracy</h3>
+                  <p>We process data based on user input and uploaded/imported statements. We do not guarantee completeness, accuracy, or timeliness.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">6. Third-Party Services</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>FynWealth may integrate with third-party tools (present or future)</li>
+                    <li>Use of such services is subject to their respective terms</li>
+                    <li>We are not liable for third-party failures or inaccuracies</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">7. Subscription & Payments</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Some features may be paid in future</li>
+                    <li>Pricing, billing cycles, and features may change with notice</li>
+                    <li>Refund policies (if applicable) will be defined separately</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">8. Account Suspension or Termination</h3>
+                  <p>We may suspend or terminate accounts if Terms are violated or if fraudulent/suspicious activity is detected.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">9. Limitation of Liability</h3>
+                  <p>To the maximum extent permitted by law, FynWealth is not liable for financial loss, incorrect AI insights, or missed payments/alerts.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">10. Compliance with Laws</h3>
+                  <p>Users are responsible for compliance with applicable local laws, including financial and data regulations.</p>
+                </section>
+
+                <section className="space-y-2 pt-4 border-t">
+                  <h3 className="font-bold text-foreground text-base">12. Contact</h3>
+                  <p><a href="mailto:admin@fynwealth.com" className="text-primary hover:underline">admin@fynwealth.com</a></p>
+                </section>
+              </div>
             )}
 
             {legalDialog === "privacy" && (
-              <>
-                <section>
-                  <h3 className="font-bold text-foreground text-lg mb-2">1. Data Collection</h3>
-                  <p>FynWealth utilizes Firebase for secure storage. Your data is encrypted and tied to your account.</p>
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <p className="font-bold text-foreground">Effective Date: April 1, 2026</p>
+                  <p className="text-xs">This policy may be reviewed and updated periodically.</p>
+                </div>
+                <p>FynWealth is committed to protecting your personal and financial data in compliance with global privacy standards, including <strong>GDPR (EU)</strong> and <strong>India’s Digital Personal Data Protection (DPDP) Act</strong>.</p>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">1. Information We Collect</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Personal Data: name, email</li>
+                    <li>Financial Data: transactions, categories, uploaded statements</li>
+                    <li>Technical Data: device, browser, usage patterns</li>
+                  </ul>
                 </section>
-              </>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">2. Purpose of Processing</h3>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>provide expense tracking and insights</li>
+                    <li>generate AI-based financial analysis</li>
+                    <li>send reminders and notifications</li>
+                    <li>improve product performance</li>
+                  </ul>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">3. Legal Basis</h3>
+                  <p>We process personal data based on your consent, performance of contract, and legitimate interests.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">4. Consent</h3>
+                  <p>Data is processed only with your explicit consent. You may withdraw consent at any time by deleting your account.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">5. Data Security</h3>
+                  <p>Encryption in transit and at rest. Secure authentication via Firebase. No storage of banking credentials.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">6. Data Sharing</h3>
+                  <p>We do NOT sell personal data. Data shared only with trusted processors or under legal obligation.</p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="font-bold text-foreground text-base">8. User Rights</h3>
+                  <p>Access, correction, deletion (“right to be forgotten”), and withdrawal of consent.</p>
+                </section>
+
+                <section className="space-y-2 pt-4 border-t">
+                  <h3 className="font-bold text-foreground text-base">14. Contact / Grievance Officer</h3>
+                  <p><a href="mailto:admin@fynwealth.com" className="text-primary hover:underline">admin@fynwealth.com</a></p>
+                </section>
+              </div>
             )}
 
             {legalDialog === "faq" && (
-              <div className="space-y-10">
-                <div>
-                  <h3 className="font-bold text-foreground text-lg mb-2">Is my data secure?</h3>
-                  <p>Yes, we use industry-standard encryption provided by Firebase.</p>
-                </div>
+              <div className="space-y-8">
+                {[
+                  { q: "Is FynWealth free?", a: "Yes, core features are free. Optional premium features may be introduced." },
+                  { q: "Is my financial data safe?", a: "Yes. We use encryption, secure authentication, and do not store banking credentials." },
+                  { q: "Do you access my bank account directly?", a: "No. We do not require bank login credentials. You can import statements securely." },
+                  { q: "How accurate are AI insights?", a: "AI insights are indicative and based on your data. They are not financial advice." },
+                  { q: "Can I delete my data?", a: "Yes. You can delete your data or account at any time." },
+                  { q: "What happens when I delete my account?", a: "All associated data is permanently removed and you are blacklisted from re-registering." },
+                  { q: "Why are some categories incorrect?", a: "AI improves over time. You can manually adjust categories if needed." },
+                  { q: "Do you sell my data?", a: "No. We do not sell personal or financial data." },
+                  { q: "Will I get reminders?", a: "Yes, for upcoming payments and financial events." },
+                  { q: "What formats can I upload?", a: "PDF and Excel bank statements are supported." },
+                  { q: "How does voice entry work?", a: "You can record transactions using voice for quick, hands-free entry." },
+                  { q: "How can I contact support?", a: "Contact us at admin@fynwealth.com" }
+                ].map((item, i) => (
+                  <div key={i} className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">{i + 1}. {item.q}</h3>
+                    <p className="text-muted-foreground">{item.a}</p>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -630,7 +757,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
           className="h-10 w-10 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
           onClick={() => {
             setShowTutorialGlobal(true);
-            setIsOpen(false); // Auto-close drawer
+            setIsOpen(false);
           }}
           title="Show Tutorial"
         >

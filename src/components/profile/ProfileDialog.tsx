@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,7 +22,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,7 +106,6 @@ export function ProfileDialog() {
     if (!featureText.trim()) return;
     
     try {
-      // 1. Log to Firestore
       await addDoc(collection(db, 'featureRequests'), {
         email: displayEmail,
         request: featureText,
@@ -114,7 +113,6 @@ export function ProfileDialog() {
         status: 'pending'
       });
 
-      // 2. Prepare Direct Email
       const subject = encodeURIComponent("FynWealth Feature Request");
       const body = encodeURIComponent(`User: ${displayEmail}\n\nRequest:\n${featureText}`);
       const mailtoUrl = `mailto:admin@fynwealth.com?subject=${subject}&body=${body}`;
@@ -135,7 +133,6 @@ export function ProfileDialog() {
 
   const handleLogout = async () => {
     try {
-      // Reset walkthrough state for next login
       setTutorialCompleted(false);
       await signOut(auth);
       setIsOpen(false);
@@ -315,7 +312,7 @@ export function ProfileDialog() {
       </Dialog>
 
       <Dialog open={activeLegal !== null} onOpenChange={(open) => !open && setActiveLegal(null)}>
-        <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-[32px]">
           <DialogHeader className="p-6 bg-muted/30 border-b shrink-0">
             <DialogTitle className="font-headline text-xl flex items-center gap-2">
               {activeLegal === "terms" && <><FileText className="w-6 h-6 text-primary" /> Terms of Service</>}
@@ -324,46 +321,115 @@ export function ProfileDialog() {
               {activeLegal === "feature" && <><Zap className="w-6 h-6 text-purple-500" /> Feature Request</>}
             </DialogTitle>
             <DialogDescription className="text-xs font-medium mt-1">
-              Last updated: March 2026
+              Last updated: April 2026
             </DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto min-h-0 w-full scrollbar-thin scrollbar-thumb-muted-foreground/20">
             <div className="p-8 space-y-8 text-sm text-muted-foreground leading-relaxed">
               {activeLegal === "terms" && (
-                <>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">1. Acceptance of Terms</h3>
-                    <p>By accessing or using FynWealth, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application.</p>
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <p className="font-bold text-foreground">Effective Date: April 1, 2026</p>
+                    <p className="text-xs">These Terms may be reviewed and updated periodically.</p>
+                  </div>
+                  <p>By accessing or using FynWealth, you agree to these Terms.</p>
+                  
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">1. Nature of Service</h3>
+                    <p>FynWealth is a personal finance management tool that helps users track expenses, organize financial data, and receive AI-generated insights. <strong>FynWealth does not provide financial, investment, tax, or legal advice.</strong></p>
                   </section>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">2. Financial Disclaimer</h3>
-                    <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-xl border border-amber-100 dark:border-amber-900/30 flex gap-4">
-                      <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
-                      <p className="text-sm text-amber-800 dark:text-amber-400 font-semibold leading-normal">FynWealth is a tracking and visualization tool. It does not provide professional financial, investment, or legal advice. AI-generated insights are automated suggestions based on provided data and should be verified independently.</p>
-                    </div>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">2. Eligibility</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>You must be at least 18 years old</li>
+                      <li>You must have the legal capacity to enter into a binding agreement</li>
+                    </ul>
                   </section>
-                </>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">3. User Responsibilities</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Provide accurate and complete information</li>
+                      <li>Maintain confidentiality of your account</li>
+                      <li>Ensure lawful use of the platform</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">4. Financial Data & AI Disclaimer</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Insights are generated using algorithms and may not be fully accurate</li>
+                      <li>Outputs are indicative and should not be solely relied upon</li>
+                      <li>You are responsible for all financial decisions</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">5. Data Inputs & Accuracy</h3>
+                    <p>We process data based on user input and uploaded/imported statements. We do not guarantee completeness, accuracy, or timeliness.</p>
+                  </section>
+
+                  <section className="space-y-2 pt-4 border-t">
+                    <h3 className="font-bold text-foreground text-base">12. Contact</h3>
+                    <p><a href="mailto:admin@fynwealth.com" className="text-primary hover:underline">admin@fynwealth.com</a></p>
+                  </section>
+                </div>
               )}
 
               {activeLegal === "privacy" && (
-                <>
-                  <section>
-                    <h3 className="font-bold text-foreground text-lg mb-2">1. Data Collection</h3>
-                    <p>FynWealth collects information you provide directly through your account and your expense records.</p>
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <p className="font-bold text-foreground">Effective Date: April 1, 2026</p>
+                    <p className="text-xs">This policy may be reviewed and updated periodically.</p>
+                  </div>
+                  <p>FynWealth is committed to protecting your personal and financial data in compliance with global privacy standards, including <strong>GDPR (EU)</strong> and <strong>India’s Digital Personal Data Protection (DPDP) Act</strong>.</p>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">1. Information We Collect</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Personal Data: name, email</li>
+                      <li>Financial Data: transactions, categories, uploaded statements</li>
+                      <li>Technical Data: device, browser, usage patterns</li>
+                    </ul>
                   </section>
-                </>
+
+                  <section className="space-y-2">
+                    <h3 className="font-bold text-foreground text-base">2. Purpose of Processing</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>provide expense tracking and insights</li>
+                      <li>generate AI-based financial analysis</li>
+                      <li>send reminders and notifications</li>
+                      <li>improve product performance</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2 pt-4 border-t">
+                    <h3 className="font-bold text-foreground text-base">14. Contact / Grievance Officer</h3>
+                    <p><a href="mailto:admin@fynwealth.com" className="text-primary hover:underline">admin@fynwealth.com</a></p>
+                  </section>
+                </div>
               )}
 
               {activeLegal === "faq" && (
-                <>
-                  <div className="space-y-10">
-                    <div>
-                      <h3 className="font-bold text-foreground text-lg mb-2">How secure is my data?</h3>
-                      <p>We use Firebase Authentication and Firestore Security Rules to ensure your data is private.</p>
+                <div className="space-y-8">
+                  {[
+                    { q: "Is FynWealth free?", a: "Yes, core features are free. Optional premium features may be introduced." },
+                    { q: "Is my financial data safe?", a: "Yes. We use encryption, secure authentication, and do not store banking credentials." },
+                    { q: "Do you access my bank account directly?", a: "No. We do not require bank login credentials. You can import statements securely." },
+                    { q: "How accurate are AI insights?", a: "AI insights are indicative and based on your data. They are not financial advice." },
+                    { q: "Can I delete my data?", a: "Yes. You can delete your data or account at any time." },
+                    { q: "What happens when I delete my account?", a: "All associated data is permanently removed and you are blacklisted." },
+                    { q: "Do you sell my data?", a: "No. We do not sell personal or financial data." },
+                    { q: "How can I contact support?", a: "Contact us at admin@fynwealth.com" }
+                  ].map((item, i) => (
+                    <div key={i} className="space-y-2">
+                      <h3 className="font-bold text-foreground text-base">{i + 1}. {item.q}</h3>
+                      <p className="text-muted-foreground">{item.a}</p>
                     </div>
-                  </div>
-                </>
+                  ))}
+                </div>
               )}
 
               {activeLegal === "feature" && (
@@ -386,7 +452,7 @@ export function ProfileDialog() {
           </div>
           
           <DialogFooter className="p-6 border-t bg-muted/10 shrink-0">
-            <Button onClick={() => setActiveLegal(null)} className="w-full h-12 text-sm font-bold rounded-xl">Got it, Close</Button>
+            <Button onClick={() => setActiveLegal(null)} className="w-full h-12 text-sm font-bold rounded-xl">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
