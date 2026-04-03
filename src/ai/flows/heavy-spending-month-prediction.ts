@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview Predicts upcoming heavy spending and next month's totals based on historical comparisons.
+ * @fileOverview Predicts upcoming heavy spending and compares month-over-month trends.
  */
 
 import {ai} from '@/ai/genkit';
@@ -19,13 +18,15 @@ export type HeavySpendingMonthPredictionInput = z.infer<typeof HeavySpendingMont
 
 const HeavySpendingMonthPredictionOutputSchema = z.object({
   predictedNextMonthTotal: z.number().describe('The predicted total expense amount for the next month.'),
-  historicalComparison: z.string().describe('A brief comparison of current spending vs previous months.'),
+  percentageChange: z.number().describe('The percentage drop or increase compared to the previous recorded month.'),
+  trendDirection: z.enum(['up', 'down', 'stable']).describe('The direction of spending.'),
+  historicalComparison: z.string().describe('A brief comparison, e.g., "Your total monthly expense dropped 12% from last month 👏".'),
   futureSpikes: z.array(z.object({
     month: z.string(),
     year: z.number(),
     reason: z.string(),
     confidence: z.number(),
-  })).describe('Predictions for months with likely high spending.'),
+  })).describe('Predictions for future heavy months.'),
   summary: z.string().describe('Overall spending trend forecast.'),
 });
 export type HeavySpendingMonthPredictionOutput = z.infer<typeof HeavySpendingMonthPredictionOutputSchema>;
@@ -35,13 +36,13 @@ const prompt = ai.definePrompt({
   input: { schema: z.object({ expensesJson: z.string() }) },
   output: { schema: HeavySpendingMonthPredictionOutputSchema },
   prompt: `You are a predictive financial analyst for FynWealth.
-Analyze the provided historical expense data: {{{expensesJson}}}
+Analyze the historical data: {{{expensesJson}}}
 
 Tasks:
-1. COMPARE spending levels across the months provided in the data. Highlight if current month spend is higher or lower than the historical average.
-2. Predict the total expected expenditure for the VERY NEXT month based on the average and recurring trends detected.
-3. Identify future months (up to 12 months ahead) that are likely to have spending spikes based on patterns (e.g., annual subscriptions, holiday seasons, or periodic bills).
-4. Provide a brief summary of whether the user's spending is increasing, decreasing, or stable compared to previous periods.
+1. Calculate the percentage change from the most recent full month to the previous one.
+2. Provide a "historicalComparison" string like: "Your total monthly expense dropped 15% from last month 👏" or "Spending increased by 5% 📊".
+3. Predict the exact "predictedNextMonthTotal".
+4. Identify future seasonal spikes.
 
 Format the output strictly according to the schema.`,
 });
@@ -60,7 +61,6 @@ const predictHeavySpendingMonthsFlow = ai.defineFlow(
       return output;
     } catch (err: any) {
       console.error("[predictHeavySpendingMonthsFlow] Error:", err.message);
-      if (err.message.includes('429')) throw new Error('AI Quota Exceeded.');
       throw new Error("Failed to forecast spending. Please try again later.");
     }
   }

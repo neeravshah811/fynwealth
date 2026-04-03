@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -67,7 +66,9 @@ export function ExpenseCapture() {
     categoriesRaw.forEach(cat => {
       let name = cat.name?.trim();
       // Force normalization for UI consistency
-      if (name === "Financial Commitments") name = "Financial Commit";
+      if (name === "Financial Commitments" || name === "Financial Commit") {
+        name = "Financial Commit";
+      }
       
       const normalized = name.toLowerCase();
       if (!normalized) return;

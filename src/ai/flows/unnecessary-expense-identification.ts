@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview An AI agent that analyzes spending patterns to identify high-spend categories and saving opportunities.
+ * @fileOverview An AI agent that analyzes spending patterns to identify high-spend categories and calculated saving opportunities.
  */
 
 import {ai} from '@/ai/genkit';
@@ -11,7 +10,7 @@ const ExpenseSchema = z.object({
   date: z.string().describe('The date of the expense in YYYY-MM-DD format.'),
   description: z.string().describe('A brief description of the expense.'),
   amount: z.number().describe('The amount of the expense.'),
-  category: z.string().describe('The category of the expense (e.g., "Subscription", "Dining", "Utilities").'),
+  category: z.string().describe('The category of the expense.'),
 });
 
 const IdentifyUnnecessaryExpensesInputSchema = z.object({
@@ -22,8 +21,9 @@ export type IdentifyUnnecessaryExpensesInput = z.infer<typeof IdentifyUnnecessar
 const IdentifiedCategorySchema = z.object({
   categoryName: z.string().describe('The name of the high-spend category.'),
   totalSpent: z.number().describe('Total amount spent in this category.'),
-  savingTip: z.string().describe('Actionable advice to reduce spending in this specific category.'),
-  reason: z.string().describe('Why this category was flagged for optimization.'),
+  potentialSavings: z.number().describe('Calculated estimate of how much the user could realistically save next month (numeric).'),
+  savingTip: z.string().describe('Actionable advice to reduce spending (e.g., "You can save ₹500 by optimizing OTT plans").'),
+  reason: z.string().describe('Why this category was flagged.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
@@ -40,23 +40,20 @@ const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   name: 'unnecessaryExpenseIdentificationPrompt',
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
-  prompt: `You are an AI financial assistant called FynWealth.
-Analyze the following list of expenses. 
+  prompt: `You are an expert financial auditor for FynWealth.
+Analyze the provided expenses. Focus on CATEGORY level trends.
 
-CRITICAL INSTRUCTION: Do not provide insights on specific high-end individual transactions or luxury items. 
-Instead, AGGREGATE the data by category. Focus on identifying categories where the total volume of spending is disproportionately high.
-
-For each flagged category, provide:
-1. The total spent in that category.
-2. A specific, actionable saving tip to optimize that category (e.g., 'Consider meal prepping to reduce Dining Out expenses').
-3. The reason why this category stands out in the overall budget.
+CRITICAL: 
+1. Provide specific, numeric "potentialSavings" for each flagged category.
+2. The "savingTip" should be punchy and valuable, e.g., "You can save ₹1,200 next month by optimizing Subscriptions and Recharge plans 📊".
+3. Group items like "Financial Commitments" or "Financial Commit" together under "Financial Commit".
 
 Expenses:
 {{#each expenses}}
 - Date: {{{date}}}, Description: {{{description}}}, Amount: {{{amount}}}, Category: {{{category}}}
 {{/each}}
 
-Provide a general summary of the user's financial health based on these CATEGORY trends.`,
+Identify categories with high volume and provide actionable, numeric savings strategies.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
