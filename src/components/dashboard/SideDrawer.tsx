@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -18,13 +19,15 @@ import {
   MessageSquare,
   AlertCircle,
   MoreHorizontal,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFynWealthStore, SUPPORTED_CURRENCIES } from "@/lib/store";
 import { useAuth, useUser, useFirestore } from "@/firebase";
 import { signOut } from "firebase/auth";
-import { collection, addDoc, query, where, getDocs, writeBatch, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, writeBatch, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 import {
   Sheet,
   SheetContent,
@@ -78,6 +81,7 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
   const auth = useAuth();
   const db = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
   const { 
     clearAllData, 
     privacyMode, 
@@ -105,6 +109,56 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
       toast({ title: "Signed Out", description: "Successfully logged out." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to sign out." });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!db || !user) return;
+    
+    setIsClearing(true);
+    try {
+      const collectionsToClear = ['expenses', 'budgets', 'bills', 'folders'];
+      const batch = writeBatch(db);
+      
+      // 1. Clear all user sub-collections
+      for (const collName of collectionsToClear) {
+        const snapshot = await getDocs(collection(db, 'users', user.uid, collName));
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      }
+      
+      // 2. Delete user profile
+      batch.delete(doc(db, 'users', user.uid));
+      
+      // 3. Blacklist UID permanently to prevent re-registration (standard security practice for this app)
+      const blacklistRef = doc(db, 'blacklist', user.uid);
+      batch.set(blacklistRef, {
+        uid: user.uid,
+        email: user.email || 'unknown',
+        deletedAt: serverTimestamp(),
+        reason: 'User self-deletion'
+      });
+      
+      await batch.commit();
+      
+      // 4. Attempt Auth Deletion
+      try {
+        await user.delete();
+      } catch (authErr: any) {
+        console.warn("Auth deletion failed (requires recent login):", authErr);
+        // Fallback: Just sign out, the blacklist prevents them from coming back
+        await signOut(auth);
+      }
+
+      // 5. Cleanup local state
+      clearAllData();
+      setIsOpen(false);
+      toast({ title: "Account Removed", description: "Your profile and data have been permanently deleted." });
+      router.push('/login');
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not complete account removal. Please try signing in again first." });
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -430,6 +484,38 @@ export function SideDrawer({ standalone = false }: { standalone?: boolean }) {
         </ScrollArea>
 
         <div className="p-5 border-t bg-muted/10">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex items-center gap-3 w-full p-4 rounded-xl text-destructive hover:bg-destructive/5 transition-colors font-bold text-xs md:text-sm justify-center mb-2">
+                <Trash2 className="w-5 h-5" />
+                Delete Account
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-2xl border-none shadow-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive flex items-center gap-2 text-xl font-bold font-headline">
+                  <AlertCircle className="w-6 h-6" />
+                  Permanent Deletion
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm mt-2 leading-relaxed">
+                  This will permanently delete your profile and ALL transaction records. 
+                  <strong className="block mt-2 text-foreground font-bold">You will be blacklisted and permanently barred from re-registering with this email.</strong>
+                  This action is irreversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-6">
+                <AlertDialogCancel className="text-sm h-12 rounded-xl font-bold">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteAccount} 
+                  className="bg-destructive text-sm h-12 rounded-xl font-bold hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20"
+                >
+                  {isClearing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Confirm Delete & Ban
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <button 
             onClick={handleLogout}
             className="flex items-center gap-3 w-full p-4 rounded-xl bg-card border text-muted-foreground hover:bg-muted transition-colors font-bold text-xs md:text-sm justify-center shadow-sm"
