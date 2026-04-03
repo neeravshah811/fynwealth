@@ -90,8 +90,38 @@ export function BankStatementImport() {
 
   const isDateLike = (str: string): boolean => {
     const s = String(str).trim();
+    // Match common formats: YYYY-MM-DD, DD/MM/YYYY, DD-MMM-YYYY
     const dateRegex = /(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})|(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4})/;
     return dateRegex.test(s);
+  };
+
+  const normalizeDate = (dateStr: string): string => {
+    const s = dateStr.trim();
+    const parts = s.split(/[-/.]/);
+    
+    if (parts.length === 3) {
+      let day, month, year;
+      // Handle YYYY-MM-DD
+      if (parts[0].length === 4) {
+        year = parts[0];
+        month = parts[1];
+        day = parts[2];
+      } 
+      // Handle DD-MM-YYYY
+      else {
+        day = parts[0];
+        month = parts[1];
+        year = parts[2];
+      }
+
+      const d = day.padStart(2, '0').substring(0, 2);
+      const m = month.padStart(2, '0').substring(0, 2);
+      let y = year;
+      if (y.length === 2) y = '20' + y;
+      
+      return `${y}-${m}-${d}`;
+    }
+    return s;
   };
 
   const cleanAmount = (val: any): number => {
@@ -119,17 +149,20 @@ export function BankStatementImport() {
 
   const extractTransactionsFromRows = (rows: any[][]): any[] => {
     const debitKeys = ['debit', 'withdrawal', 'withdrawals', 'dr', 'payment', 'paid out', 'amount out', 'spent', 'expense'];
-    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary', 'cashback', 'credit limit'];
+    const creditKeys = ['credit', 'deposit', 'deposits', 'cr', 'amount in', 'income', 'interest', 'refund', 'salary', 'cashback', 'credit limit', 'received'];
     const balanceKeys = ['balance', 'bal', 'closing balance', 'available'];
     const descKeys = ['desc', 'narration', 'particulars', 'details', 'remarks', 'description', 'transaction'];
     const dateKeys = ['date', 'dt', 'time', 'transaction date', 'value date'];
     const amtKeys = ['amount', 'amt', 'value'];
-    const negativeKeywords = ['salary', 'interest credit', 'refund', 'cashback', 'reversal', 'income', 'deposit', 'received'];
+    
+    // Explicit keywords that indicate income or non-expense transactions
+    const incomeKeywords = ['salary', 'interest credit', 'refund', 'cashback', 'reversal', 'income', 'deposit', 'received', 'credit', 'funds received', 'transfer from', 'cr'];
 
     let headerIdx = -1;
     let dateIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1, amountIdx = -1, balanceIdx = -1;
 
-    for(let i = 0; i < Math.min(rows.length, 50); i++) {
+    // 1. Identify Headers
+    for(let i = 0; i < Math.min(rows.length, 100); i++) {
       const row = rows[i].map(c => String(c || "").toLowerCase());
       const hasDate = row.some(c => dateKeys.some(k => c === k || c.includes(k)));
       const hasAmt = row.some(c => amtKeys.some(k => c === k || c.includes(k)));
@@ -148,37 +181,53 @@ export function BankStatementImport() {
     const results: any[] = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      if (row.length < 1) continue;
+      if (row.length < 1 || i <= headerIdx) continue;
+
       let foundDate = "";
       let foundDesc = "";
       let foundAmount = 0;
       let isDebit = false;
+
       const dateColIdx = row.findIndex(c => isDateLike(String(c)));
       if (dateColIdx === -1) {
+        // Multi-line description support
         if (results.length > 0 && row.some(c => String(c).length > 10)) {
           const extraText = row.filter(c => String(c).trim().length > 3).join(' ');
           results[results.length - 1].description += ' ' + extraText;
         }
         continue;
       }
-      foundDate = String(row[dateColIdx]);
-      if (headerIdx !== -1 && i > headerIdx) {
+
+      foundDate = normalizeDate(String(row[dateColIdx]));
+
+      // Check for explicit credit markers in the entire row
+      const rowString = row.join(' ').toLowerCase();
+      const isExplicitCredit = row.some(c => String(c).toLowerCase() === 'cr') || 
+                               rowString.includes('credit') || 
+                               rowString.includes('deposit');
+
+      if (headerIdx !== -1) {
         if (descIdx !== -1 && row[descIdx]) {
           foundDesc = String(row[descIdx]);
         } else {
           foundDesc = row.filter((c, idx) => idx !== dateColIdx && idx !== balanceIdx && String(c).length > 5 && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
         }
+
+        // Logic for separated Debit/Credit columns
         if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
           foundAmount = cleanAmount(row[debitIdx]);
           isDebit = true;
         } else if (creditIdx !== -1 && row[creditIdx] && cleanAmount(row[creditIdx]) !== 0) {
           isDebit = false;
-        } else if (amountIdx !== -1) {
+        } 
+        // Logic for single Amount column with DR/CR markers
+        else if (amountIdx !== -1) {
           const rawAmt = cleanAmount(row[amountIdx]);
           foundAmount = Math.abs(rawAmt);
-          isDebit = rawAmt < 0 || (!row[creditIdx] && rawAmt !== 0);
+          isDebit = rawAmt < 0 || (!isExplicitCredit && rawAmt !== 0);
         }
       } else {
+        // No header found - heuristic fallback
         const amountCandidates = row.map((c, idx) => ({ val: cleanAmount(c), idx })).filter(o => o.val !== 0 && o.idx !== dateColIdx && o.idx !== balanceIdx);
         if (amountCandidates.length > 0) {
           const bestAmount = amountCandidates[0];
@@ -187,9 +236,12 @@ export function BankStatementImport() {
           isDebit = bestAmount.val < 0 || row.join(' ').toLowerCase().includes('dr');
         }
       }
+
       const lowerDesc = foundDesc.toLowerCase();
-      const hasIncomeKeyword = negativeKeywords.some(k => lowerDesc.includes(k));
-      if (foundDate && foundAmount > 0 && isDebit && !hasIncomeKeyword) {
+      const hasIncomeKeyword = incomeKeywords.some(k => lowerDesc.includes(k));
+
+      // Final check: Must be debit, must not have income keywords, and amount > 0
+      if (foundDate && foundAmount > 0 && isDebit && !hasIncomeKeyword && !isExplicitCredit) {
         results.push({
           date: foundDate,
           description: foundDesc.trim(),
@@ -308,7 +360,7 @@ export function BankStatementImport() {
 
   const handleParsedData = async (parsedData: any[]) => {
     if (!parsedData || parsedData.length === 0) {
-      throw new Error("No readable transactions found. Ensure file contains Date and Amount.");
+      throw new Error("No readable debit transactions found. Ensure file contains Date and Amount.");
     }
     const result = await processBankStatementManual({
       userId: user!.uid,
@@ -356,12 +408,12 @@ export function BankStatementImport() {
           category: t.category,
           description: t.description,
           note: t.description,
-          status: 'paid',
+          status: 'paid', // All imported transactions are recorded as PAID
           createdAt: serverTimestamp()
         });
       });
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(approvedTxns.length) });
-      toast({ title: "Vault Synced", description: `Recorded ${approvedTxns.length} expenses.` });
+      toast({ title: "Vault Synced", description: `Recorded ${approvedTxns.length} paid expenses.` });
       setIsOpen(false);
       reset();
     } catch (err) {
@@ -404,7 +456,7 @@ export function BankStatementImport() {
               Statement Review
             </DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">
-              Deterministic parsing for PDF, Excel, and CSV statements.
+              Deterministic parsing for PDF, Excel, and CSV statements. Only debit transactions are extracted.
             </DialogDescription>
           </DialogHeader>
 
@@ -416,7 +468,7 @@ export function BankStatementImport() {
               <div className="space-y-2">
                 <h3 className="font-bold text-lg">{loading ? "Scanning Document..." : "Select File"}</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Upload your bank export. We'll identify debit entries and capture full narrations.
+                  Upload your bank export. We'll identify debit entries and filter out all credits/income.
                 </p>
               </div>
               
