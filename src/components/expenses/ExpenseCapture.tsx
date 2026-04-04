@@ -132,6 +132,7 @@ export function ExpenseCapture() {
 
   /**
    * Translates AI standard categories to actual Firestore Category IDs
+   * Uses fuzzy matching to handle variations in naming.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
     const mapping: Record<string, string> = {
@@ -145,7 +146,18 @@ export function ExpenseCapture() {
     };
 
     const targetDisplayName = mapping[aiCat] || mapping['other'];
-    const matched = categories.find(c => c.name === targetDisplayName);
+    
+    // Try exact match first
+    let matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
+    
+    // Try substring match if no exact match (e.g., "Food" in "Food & Groceries")
+    if (!matched) {
+      matched = categories.find(c => 
+        c.name.toLowerCase().includes(aiCat.toLowerCase()) || 
+        targetDisplayName.toLowerCase().includes(c.name.toLowerCase())
+      );
+    }
+
     return matched?.id || "";
   };
 
@@ -197,6 +209,11 @@ export function ExpenseCapture() {
 
   const handleReviewApproval = async () => {
     if (!db || !user?.uid) return;
+    if (!aiReviewData.amount || isNaN(parseFloat(aiReviewData.amount))) {
+      toast({ variant: "destructive", title: "Amount Required", description: "Please verify the numeric amount." });
+      return;
+    }
+
     setLoading(true);
     try {
       const categoryObj = categories.find(c => c.id === aiReviewData.categoryId);
@@ -263,6 +280,7 @@ export function ExpenseCapture() {
       try {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
+        
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
@@ -419,7 +437,7 @@ export function ExpenseCapture() {
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg transition-all active:scale-95 mt-4">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Plus className="w-5 h-5 mr-2" />}
+                {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
                 Add Expense
               </Button>
             </form>
@@ -436,7 +454,7 @@ export function ExpenseCapture() {
               </p>
               {!isRecording ? (
                 <Button onClick={startRecording} disabled={loading} className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
+                  {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Mic className="w-5 h-5 mr-2" />}
                   {loading ? "Processing..." : "Start Recording"}
                 </Button>
               ) : (
@@ -457,7 +475,7 @@ export function ExpenseCapture() {
               <input type="file" className="hidden" id="scan-upload" accept="image/*" capture="environment" onChange={processImage} />
               <Button asChild className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all" disabled={loading}>
                 <label htmlFor="scan-upload" className="cursor-pointer">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Camera className="w-4 h-4 mr-2" />}
+                  {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
                   {loading ? "Analyzing..." : "Scan Now"}
                 </label>
               </Button>
@@ -481,7 +499,7 @@ export function ExpenseCapture() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
-                <Input value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} className="h-11 font-bold rounded-xl" />
+                <Input value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} className="h-11 font-bold rounded-xl" placeholder="0.00" />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>
@@ -490,7 +508,7 @@ export function ExpenseCapture() {
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase opacity-70">Description</Label>
-              <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" />
+              <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" placeholder="e.g. Lunch at Swiggy" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

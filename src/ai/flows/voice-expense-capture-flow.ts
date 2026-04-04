@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for capturing expense details from voice input.
- * Optimized for high-precision extraction using strict parsing rules.
+ * Uses strict parsing rules to extract amount, category, and description.
  * 
  * - voiceExpenseCapture - Extracts amount, category, and description from audio.
  */
@@ -51,13 +51,23 @@ Your job is to extract:
 
 STRICT RULES:
 - Return ONLY valid JSON. No text, no explanation.
-- Convert spoken numbers into digits (e.g., "two hundred" → 200, "one fifty" → 150).
-- If multiple numbers are present, choose the most likely expense amount.
-- Ignore currency words like rupees, rs, ₹.
+- Convert spoken numbers into digits (e.g., "two hundred" → 200, "one fifty" → 150, "five thousand" → 5000).
+- If multiple numbers are present, choose the most likely total expense amount.
+- Ignore currency words like rupees, rs, ₹, bucks, dollars.
 - Map the input to exactly one of the allowed categories.
 - If category is unclear, return "other".
 - Do NOT guess randomly.
-- Use today's date ({{{today}}}) if no date is mentioned in audio.`,
+- Use today's date ({{{today}}}) if no date is mentioned in audio. If "yesterday" is mentioned, calculate it correctly.
+
+Examples:
+Input: spent 250 on lunch  
+Output: {"amount": 250, "category": "food", "description": "Lunch", "date": "{{{today}}}"}
+
+Input: auto 80 rupees  
+Output: {"amount": 80, "category": "transport", "description": "Auto ride", "date": "{{{today}}}"}
+
+Input: bought shirt for 999 yesterday
+Output: {"amount": 999, "category": "shopping", "description": "Shirt purchase", "date": "calculated_yesterday_date"}`,
   prompt: `Today's date is: {{today}}.
 Extract details from this audio: {{media url=audioDataUri}}`,
 });
