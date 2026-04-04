@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo } from "react";
-import { useFynWealthStore, Frequency } from "@/lib/store";
+import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, getDocs, query, where, doc, increment } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,9 +63,6 @@ export function ExpenseCapture() {
     const catMap = new Map();
     categoriesRaw.forEach(cat => {
       let name = cat.name?.trim();
-      if (name === "Financial Commitments" || name === "Financial Commit") {
-        name = "Financial Commit";
-      }
       const normalized = name.toLowerCase();
       if (!normalized) return;
       if (!catMap.has(normalized) || cat.userId === user?.uid) {
@@ -137,42 +134,23 @@ export function ExpenseCapture() {
     loadSubcategories(categoryId);
   };
 
-  const handleAddCustomCategory = async () => {
-    if (!newCategoryName.trim() || !db || !user?.uid) return;
-    setIsCreatingCategory(true);
-    try {
-      const categoryRef = await addDoc(collection(db, "categories"), {
-        name: newCategoryName.trim(),
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      await addDoc(collection(db, "subcategories"), {
-        name: "Others",
-        categoryId: categoryRef.id,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      toast({ title: "Category Created", description: `"${newCategoryName}" added.` });
-      setNewCategoryName("");
-      setIsCustomCategoryOpen(false);
-      handleCategoryChange(categoryRef.id);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to create category." });
-    } finally {
-      setIsCreatingCategory(false);
-    }
-  };
+  /**
+   * Translates AI simplified categories to system category IDs
+   */
+  const mapAiCategoryToId = (aiCat: string): string => {
+    const mapping: Record<string, string> = {
+      'food': 'Food & Groceries',
+      'transport': 'Transportation',
+      'shopping': 'Shopping',
+      'bills': 'Essentials',
+      'entertainment': 'Life & Entertainment',
+      'health': 'Health & Personal',
+      'other': 'Miscellaneous'
+    };
 
-  const resetForm = () => {
-    setAmount("");
-    setNote("");
-    setDate(format(new Date(), 'yyyy-MM-dd'));
-    setSelectedCategory("");
-    setSelectedSubcategory("");
-    setSubcategories([]);
-    setAttachmentData(null);
-    setProcessingMessage("");
-    setLoading(false);
+    const targetName = mapping[aiCat] || mapping['other'];
+    const matched = categories.find(c => c.name === targetName);
+    return matched?.id || "";
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -194,35 +172,29 @@ export function ExpenseCapture() {
       const today = format(new Date(), 'yyyy-MM-dd');
       const status = date > today ? 'unpaid' : 'paid';
 
-      const payload: any = {
+      addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
         userId: user.uid,
         amount: Math.abs(parseFloat(amount)),
         categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown",
-        category: categoryObj?.name || "Unknown",
         subcategoryId: selectedSubcategory || "",
         subcategoryName: subcategoryObj?.name || "Others",
-        subCategory: subcategoryObj?.name || "Others",
         note: note.trim(),
         description: note.trim(),
         date: date,
         billImageData: attachmentData,
         status: status,
         createdAt: serverTimestamp()
-      };
+      });
 
-      addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), payload);
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(1) });
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ 
-        title: status === 'paid' ? "Expense Saved" : "Future Payment Logged", 
-        description: status === 'paid' ? "Synchronized with your cloud vault." : "Marked as unpaid until the due date." 
-      });
+      toast({ title: "Expense Saved" });
       resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Check your internet connection." });
+      toast({ variant: "destructive", title: "Save Failed" });
       setLoading(false);
     }
   };
@@ -241,10 +213,8 @@ export function ExpenseCapture() {
         amount: Math.abs(parseFloat(aiReviewData.amount)),
         categoryId: aiReviewData.categoryId,
         categoryName: categoryObj?.name || "Unknown",
-        category: categoryObj?.name || "Unknown",
         subcategoryId: aiReviewData.subcategoryId || "",
         subcategoryName: subcategoryObj?.name || "Others",
-        subCategory: subcategoryObj?.name || "Others",
         note: aiReviewData.note.trim(),
         description: aiReviewData.note.trim(),
         date: aiReviewData.date,
@@ -256,9 +226,9 @@ export function ExpenseCapture() {
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(1) });
       setIsReviewDialogOpen(false);
       resetForm();
-      toast({ title: "Approved & Recorded", description: "Expense successfully added to your vault." });
+      toast({ title: "Approved & Recorded" });
     } catch (err) {
-      toast({ variant: "destructive", title: "Approval Failed", description: "Could not record the expense." });
+      toast({ variant: "destructive", title: "Approval Failed" });
       setLoading(false);
     }
   };
@@ -266,20 +236,19 @@ export function ExpenseCapture() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: mimeType });
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         await processVoice(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      toast({ variant: "destructive", title: "Microphone Error", description: "Please allow microphone access to use voice capture." });
+      toast({ variant: "destructive", title: "Microphone Error", description: "Please allow microphone access." });
     }
   };
 
@@ -299,24 +268,20 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await voiceExpenseCapture({ audioDataUri: base64String });
         if (result) {
-          const matchedCat = categories.find(c => 
-            c.name.toLowerCase().includes(result.category.toLowerCase()) ||
-            result.category.toLowerCase().includes(c.name.toLowerCase())
-          );
-          
+          const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
             amount: result.amount.toString(),
             date: result.date || format(new Date(), 'yyyy-MM-dd'),
             note: result.description,
-            categoryId: matchedCat?.id || "",
+            categoryId: categoryId,
             subcategoryId: "",
             subcategories: []
           });
-          if (matchedCat) await loadSubcategories(matchedCat.id, true);
+          if (categoryId) await loadSubcategories(categoryId, true);
           setIsReviewDialogOpen(true);
         }
       } catch (err) {
-        toast({ variant: "destructive", title: "AI Transcribe Failed", description: "Failed to process audio. Try speaking again." });
+        toast({ variant: "destructive", title: "AI Sync Error", description: "Failed to transcribe audio." });
       } finally {
         setLoading(false);
         setProcessingMessage("");
@@ -343,8 +308,7 @@ export function ExpenseCapture() {
         const result = await scanBillExpenseCapture({ billImage: base64String });
         if (result) {
           const matchedCat = categories.find(c => 
-            c.name.toLowerCase().includes(result.categorySuggestion?.toLowerCase() || "") ||
-            result.categorySuggestion?.toLowerCase().includes(c.name.toLowerCase())
+            c.name.toLowerCase().includes(result.categorySuggestion?.toLowerCase() || "")
           );
           setAiReviewData({
             amount: Math.abs(result.totalAmount || 0).toString(),
@@ -358,7 +322,7 @@ export function ExpenseCapture() {
           setIsReviewDialogOpen(true);
         }
       } catch (err) {
-        toast({ variant: "destructive", title: "Scan Error", description: "AI failed to analyze receipt." });
+        toast({ variant: "destructive", title: "Scan Error" });
       } finally {
         setLoading(false);
         setProcessingMessage("");
@@ -420,7 +384,6 @@ export function ExpenseCapture() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1 h-5 mb-1">
                     <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Category</Label>
-                    <button type="button" onClick={() => setIsCustomCategoryOpen(true)} className="text-primary hover:text-primary/80 p-1 rounded-full"><Plus className="w-4 h-4" /></button>
                   </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4"><SelectValue placeholder="Select Category" /></SelectTrigger>
@@ -462,7 +425,7 @@ export function ExpenseCapture() {
               </div>
               <h3 className="font-bold text-base mb-2">{isRecording ? "Listening..." : "Voice Capture"}</h3>
               <p className="text-xs text-muted-foreground px-8 mb-8 leading-relaxed max-w-xs">
-                {isRecording ? "Speak your expense clearly..." : "Say: \"Spent 500 on dinner yesterday.\""}
+                {isRecording ? "Speak your expense clearly..." : "Say: \"spent two hundred fifty on lunch\""}
               </p>
               {!isRecording ? (
                 <Button onClick={startRecording} disabled={loading} className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all">
@@ -550,19 +513,6 @@ export function ExpenseCapture() {
               Approve & Save
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
-        <DialogContent className="sm:max-w-[400px] p-8 rounded-[20px] border-none shadow-2xl">
-          <DialogHeader><DialogTitle className="text-xl font-headline font-bold text-primary">New Category</DialogTitle></DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Name</label>
-              <Input placeholder="e.g. Travel 2026" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 rounded-xl text-sm font-bold shadow-sm px-4" autoFocus />
-            </div>
-          </div>
-          <DialogFooter><Button className="w-full h-14 font-bold rounded-xl shadow-lg transition-all" onClick={handleAddCustomCategory} disabled={isCreatingCategory || !newCategoryName.trim()}>{isCreatingCategory ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Create Now"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

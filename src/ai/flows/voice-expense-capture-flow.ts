@@ -1,7 +1,9 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for capturing expense details from voice input.
- * Optimized for low-latency transcription and extraction.
+ * Optimized for high-precision extraction using strict parsing rules.
+ * 
+ * - voiceExpenseCapture - Extracts amount and category from audio.
  */
 
 import {ai} from '@/ai/genkit';
@@ -18,13 +20,9 @@ export type VoiceExpenseCaptureInput = z.infer<typeof VoiceExpenseCaptureInputSc
 
 const VoiceExpenseCaptureOutputSchema = z.object({
   amount: z.number().describe('The numerical amount of the expense.'),
-  category: z.string().describe('Suggested category name.'),
+  category: z.enum(['food', 'transport', 'shopping', 'bills', 'entertainment', 'health', 'other']).describe('One of the standard categories.'),
   description: z.string().describe('A brief description.'),
-  date: z
-    .string()
-    .describe(
-      "The date in YYYY-MM-DD format. Default to today if missing."
-    ),
+  date: z.string().describe("The date in YYYY-MM-DD format."),
 });
 export type VoiceExpenseCaptureOutput = z.infer<typeof VoiceExpenseCaptureOutputSchema>;
 
@@ -43,11 +41,19 @@ const extractFromAudioPrompt = ai.definePrompt({
     }),
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
-  prompt: `Listen and extract: amount (number), category, description, date (YYYY-MM-DD). 
-Use today's date if not mentioned: {{today}}. 
-Use 0 for unknown amount.
+  system: `You are an expense parser AI.
+Your job is to extract financial data from voice input.
 
-Audio: {{media url=audioDataUri}}`,
+STRICT RULES:
+- Return ONLY valid JSON.
+- Convert spoken numbers into digits (e.g., "two hundred" → 200, "one fifty" → 150).
+- If multiple numbers are present, choose the most likely expense amount.
+- Ignore currency words like rupees, rs, ₹.
+- Map the input to exactly one of these categories: food, transport, shopping, bills, entertainment, health, other.
+- If category is unclear, return "other".
+- Do NOT guess randomly.`,
+  prompt: `Today's date is: {{today}}.
+Extract details from this audio: {{media url=audioDataUri}}`,
 });
 
 const voiceExpenseCaptureFlow = ai.defineFlow(
@@ -66,26 +72,16 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
 
       if (!result.output) throw new Error("No output generated from AI");
 
-      let {amount, category, description, date} = result.output;
-
-      if (!date || isNaN(new Date(date) as any)) {
-        date = today;
-      }
-
-      if (typeof amount !== 'number' || isNaN(amount)) {
-        amount = 0;
-      }
-
-      return {
-        amount,
-        category,
-        description,
-        date,
-      };
+      return result.output;
     } catch (err: any) {
       console.error("[voiceExpenseCaptureFlow] Error:", err.message);
-      if (err.message.includes('429')) throw new Error('AI Quota Exceeded. Please try again.');
-      throw new Error("Failed to process voice input. Please speak clearly.");
+      // Fallback response instead of failing
+      return {
+        amount: 0,
+        category: 'other',
+        description: 'Voice entry',
+        date: new Date().toISOString().split('T')[0],
+      };
     }
   }
 );
