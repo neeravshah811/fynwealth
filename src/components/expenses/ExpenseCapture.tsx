@@ -131,10 +131,11 @@ export function ExpenseCapture() {
   };
 
   /**
-   * Translates AI standard categories to actual Firestore Category IDs
-   * Uses fuzzy matching to handle variations in naming.
+   * Resolves AI simplified categories to actual Firestore Category IDs.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
+    const normalizedAiCat = (aiCat || "").toLowerCase().trim();
+    
     const mapping: Record<string, string> = {
       'food': 'Food & Groceries',
       'transport': 'Transportation',
@@ -145,20 +146,25 @@ export function ExpenseCapture() {
       'other': 'Miscellaneous'
     };
 
-    const targetDisplayName = mapping[aiCat] || mapping['other'];
+    const targetDisplayName = mapping[normalizedAiCat] || mapping['other'];
     
-    // Try exact match first
+    // 1. Try exact match on mapped name
     let matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
-    // Try substring match if no exact match (e.g., "Food" in "Food & Groceries")
+    // 2. Try match on original AI category name
+    if (!matched) {
+      matched = categories.find(c => c.name.toLowerCase() === normalizedAiCat);
+    }
+
+    // 3. Try fuzzy/substring match
     if (!matched) {
       matched = categories.find(c => 
-        c.name.toLowerCase().includes(aiCat.toLowerCase()) || 
-        targetDisplayName.toLowerCase().includes(c.name.toLowerCase())
+        c.name.toLowerCase().includes(normalizedAiCat) || 
+        normalizedAiCat.includes(c.name.toLowerCase())
       );
     }
 
-    return matched?.id || "";
+    return matched?.id || (categories.length > 0 ? categories[0].id : "");
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -286,7 +292,7 @@ export function ExpenseCapture() {
           setAiReviewData({
             amount: result.amount > 0 ? result.amount.toString() : "",
             date: result.date || format(new Date(), 'yyyy-MM-dd'),
-            note: result.description || "",
+            note: result.description || "Voice Entry",
             categoryId: categoryId,
             subcategoryId: "",
             subcategories: []
@@ -295,7 +301,7 @@ export function ExpenseCapture() {
           setIsReviewDialogOpen(true);
         }
       } catch (err) {
-        toast({ variant: "destructive", title: "AI Sync Error", description: "Failed to transcribe audio." });
+        toast({ variant: "destructive", title: "AI Error", description: "Could not interpret voice." });
       } finally {
         setLoading(false);
         setProcessingMessage("");
@@ -327,7 +333,7 @@ export function ExpenseCapture() {
           setAiReviewData({
             amount: Math.abs(result.totalAmount || 0).toString(),
             date: result.transactionDate || format(new Date(), 'yyyy-MM-dd'),
-            note: result.merchantName || "",
+            note: result.merchantName || "Receipt",
             categoryId: matchedCat?.id || "",
             subcategoryId: "",
             subcategories: []
@@ -357,7 +363,7 @@ export function ExpenseCapture() {
   };
 
   return (
-    <Card className="shadow-lg border-none bg-card ring-1 ring-black/5 relative">
+    <Card id="tour-expense-capture" className="shadow-lg border-none bg-card ring-1 ring-black/5 relative">
       {loading && processingMessage && (
         <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm rounded-[20px] flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-300">
           <div className="p-4 rounded-full bg-primary/10">

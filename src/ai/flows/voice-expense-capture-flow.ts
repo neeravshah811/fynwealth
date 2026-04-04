@@ -91,7 +91,7 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
       return result.output;
     } catch (err: any) {
       console.error("[voiceExpenseCaptureFlow] Error:", err.message);
-      // Fallback response instead of failing
+      // Fallback response instead of failing to ensure UI doesn't hang
       return {
         amount: 0,
         category: 'other',
