@@ -3,7 +3,7 @@
  * @fileOverview A Genkit flow for capturing expense details from voice input.
  * Optimized for high-precision extraction using strict parsing rules.
  * 
- * - voiceExpenseCapture - Extracts amount and category from audio.
+ * - voiceExpenseCapture - Extracts amount, category, and description from audio.
  */
 
 import {ai} from '@/ai/genkit';
@@ -21,7 +21,7 @@ export type VoiceExpenseCaptureInput = z.infer<typeof VoiceExpenseCaptureInputSc
 const VoiceExpenseCaptureOutputSchema = z.object({
   amount: z.number().describe('The numerical amount of the expense.'),
   category: z.enum(['food', 'transport', 'shopping', 'bills', 'entertainment', 'health', 'other']).describe('One of the standard categories.'),
-  description: z.string().describe('A brief description.'),
+  description: z.string().describe('A brief, concise description of the expense.'),
   date: z.string().describe("The date in YYYY-MM-DD format."),
 });
 export type VoiceExpenseCaptureOutput = z.infer<typeof VoiceExpenseCaptureOutputSchema>;
@@ -42,16 +42,22 @@ const extractFromAudioPrompt = ai.definePrompt({
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
   system: `You are an expense parser AI.
-Your job is to extract financial data from voice input.
+
+Your job is to extract:
+- amount (number only)
+- category (one of: food, transport, shopping, bills, entertainment, health, other)
+- description (concise description of the purchase)
+- date (YYYY-MM-DD format)
 
 STRICT RULES:
-- Return ONLY valid JSON.
+- Return ONLY valid JSON. No text, no explanation.
 - Convert spoken numbers into digits (e.g., "two hundred" → 200, "one fifty" → 150).
 - If multiple numbers are present, choose the most likely expense amount.
 - Ignore currency words like rupees, rs, ₹.
-- Map the input to exactly one of these categories: food, transport, shopping, bills, entertainment, health, other.
+- Map the input to exactly one of the allowed categories.
 - If category is unclear, return "other".
-- Do NOT guess randomly.`,
+- Do NOT guess randomly.
+- Use today's date ({{{today}}}) if no date is mentioned in audio.`,
   prompt: `Today's date is: {{today}}.
 Extract details from this audio: {{media url=audioDataUri}}`,
 });

@@ -91,10 +91,6 @@ export function ExpenseCapture() {
     subcategories: []
   });
 
-  const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-
   async function loadSubcategories(categoryId: string, isReview: boolean = false) {
     if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
       isReview ? setAiReviewData((prev: any) => ({ ...prev, subcategories: [] })) : setSubcategories([]);
@@ -135,7 +131,7 @@ export function ExpenseCapture() {
   };
 
   /**
-   * Translates AI simplified categories to system category IDs
+   * Translates AI standard categories to actual Firestore Category IDs
    */
   const mapAiCategoryToId = (aiCat: string): string => {
     const mapping: Record<string, string> = {
@@ -148,8 +144,8 @@ export function ExpenseCapture() {
       'other': 'Miscellaneous'
     };
 
-    const targetName = mapping[aiCat] || mapping['other'];
-    const matched = categories.find(c => c.name === targetName);
+    const targetDisplayName = mapping[aiCat] || mapping['other'];
+    const matched = categories.find(c => c.name === targetDisplayName);
     return matched?.id || "";
   };
 
@@ -270,9 +266,9 @@ export function ExpenseCapture() {
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
-            amount: result.amount.toString(),
+            amount: result.amount > 0 ? result.amount.toString() : "",
             date: result.date || format(new Date(), 'yyyy-MM-dd'),
-            note: result.description,
+            note: result.description || "",
             categoryId: categoryId,
             subcategoryId: "",
             subcategories: []
@@ -329,6 +325,17 @@ export function ExpenseCapture() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const resetForm = () => {
+    setAmount("");
+    setNote("");
+    setDate(format(new Date(), 'yyyy-MM-dd'));
+    setSelectedCategory("");
+    setSelectedSubcategory("");
+    setAttachmentData(null);
+    setLoading(false);
+    setProcessingMessage("");
   };
 
   return (
@@ -425,7 +432,7 @@ export function ExpenseCapture() {
               </div>
               <h3 className="font-bold text-base mb-2">{isRecording ? "Listening..." : "Voice Capture"}</h3>
               <p className="text-xs text-muted-foreground px-8 mb-8 leading-relaxed max-w-xs">
-                {isRecording ? "Speak your expense clearly..." : "Say: \"spent two hundred fifty on lunch\""}
+                {isRecording ? "Speak your expense clearly..." : "Say: \"spent 250 on lunch\""}
               </p>
               {!isRecording ? (
                 <Button onClick={startRecording} disabled={loading} className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all">
