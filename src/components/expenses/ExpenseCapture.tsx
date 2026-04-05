@@ -131,32 +131,27 @@ export function ExpenseCapture() {
   };
 
   /**
-   * Resolves AI simplified categories to actual Firestore Category IDs.
+   * Resolves AI standard categories to actual Firestore Category IDs.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
     const normalizedAiCat = (aiCat || "").toLowerCase().trim();
     
     const mapping: Record<string, string> = {
       'food': 'Food & Groceries',
+      'groceries': 'Food & Groceries',
+      'travel': 'Transportation',
       'transport': 'Transportation',
       'shopping': 'Shopping',
       'bills': 'Essentials',
       'entertainment': 'Life & Entertainment',
       'health': 'Health & Personal',
+      'personal': 'Health & Personal',
       'other': 'Miscellaneous'
     };
 
     const targetDisplayName = mapping[normalizedAiCat] || mapping['other'];
-    
-    // 1. Try exact match on mapped name
     let matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
-    // 2. Try match on original AI category name
-    if (!matched) {
-      matched = categories.find(c => c.name.toLowerCase() === normalizedAiCat);
-    }
-
-    // 3. Try fuzzy/substring match
     if (!matched) {
       matched = categories.find(c => 
         c.name.toLowerCase().includes(normalizedAiCat) || 
@@ -276,7 +271,7 @@ export function ExpenseCapture() {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setLoading(true);
-      setProcessingMessage("Analyzing your audio...");
+      setProcessingMessage("Extracting expense details...");
     }
   };
 
@@ -290,8 +285,8 @@ export function ExpenseCapture() {
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
-            amount: result.amount > 0 ? result.amount.toString() : "",
-            date: result.date || format(new Date(), 'yyyy-MM-dd'),
+            amount: result.amount !== null ? result.amount.toString() : "",
+            date: format(new Date(), 'yyyy-MM-dd'),
             note: result.description || "Voice Entry",
             categoryId: categoryId,
             subcategoryId: "",
@@ -315,7 +310,7 @@ export function ExpenseCapture() {
     if (!file || !user?.uid) return;
     
     setLoading(true);
-    setProcessingMessage("Extracting receipt data...");
+    setProcessingMessage("Scanning receipt...");
 
     const previewReader = new FileReader();
     previewReader.onloadend = () => { setAttachmentData(previewReader.result as string); };
@@ -327,18 +322,16 @@ export function ExpenseCapture() {
         const base64String = reader.result as string;
         const result = await scanBillExpenseCapture({ billImage: base64String });
         if (result) {
-          const matchedCat = categories.find(c => 
-            c.name.toLowerCase().includes(result.categorySuggestion?.toLowerCase() || "")
-          );
+          const mappedCatId = mapAiCategoryToId(result.categorySuggestion || "");
           setAiReviewData({
-            amount: Math.abs(result.totalAmount || 0).toString(),
+            amount: result.totalAmount ? Math.abs(result.totalAmount).toString() : "",
             date: result.transactionDate || format(new Date(), 'yyyy-MM-dd'),
             note: result.merchantName || "Receipt",
-            categoryId: matchedCat?.id || "",
+            categoryId: mappedCatId,
             subcategoryId: "",
             subcategories: []
           });
-          if (matchedCat) await loadSubcategories(matchedCat.id, true);
+          if (mappedCatId) await loadSubcategories(mappedCatId, true);
           setIsReviewDialogOpen(true);
         }
       } catch (err) {
@@ -456,16 +449,16 @@ export function ExpenseCapture() {
               </div>
               <h3 className="font-bold text-base mb-2">{isRecording ? "Listening..." : "Voice Capture"}</h3>
               <p className="text-xs text-muted-foreground px-8 mb-8 leading-relaxed max-w-xs">
-                {isRecording ? "Speak your expense clearly..." : "Say: \"spent 250 on lunch\""}
+                {isRecording ? "Extracting transaction data..." : "Say: \"spent two thousand on travel\""}
               </p>
               {!isRecording ? (
                 <Button onClick={startRecording} disabled={loading} className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all">
                   {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Mic className="w-5 h-5 mr-2" />}
-                  {loading ? "Processing..." : "Start Recording"}
+                  {loading ? "Analyzing..." : "Start Recording"}
                 </Button>
               ) : (
                 <Button onClick={stopRecording} variant="destructive" className="h-12 px-10 font-bold rounded-xl shadow-lg transition-all">
-                  Process Audio
+                  Stop & Process
                 </Button>
               )}
             </div>
@@ -505,7 +498,7 @@ export function ExpenseCapture() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
-                <Input value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} className="h-11 font-bold rounded-xl" placeholder="0.00" />
+                <Input value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} className="h-11 font-bold rounded-xl" placeholder="Enter amount" />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>
@@ -514,7 +507,7 @@ export function ExpenseCapture() {
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase opacity-70">Description</Label>
-              <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" placeholder="e.g. Lunch at Swiggy" />
+              <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" placeholder="e.g. Lunch at Cafe" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
