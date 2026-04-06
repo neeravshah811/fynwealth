@@ -132,16 +132,15 @@ export function ExpenseCapture() {
 
   /**
    * Resolves AI standard categories to actual Firestore Category IDs.
+   * Maps strictly to the list defined in the AI Flow rules.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
     const normalizedAiCat = (aiCat || "").toLowerCase().trim();
     
-    // Explicit mapping based on user's defined AI categories
     const mapping: Record<string, string> = {
       'food': 'Food & Groceries',
       'groceries': 'Food & Groceries',
       'travel': 'Transportation',
-      'transport': 'Transportation',
       'shopping': 'Shopping',
       'bills': 'Essentials',
       'entertainment': 'Life & Entertainment',
@@ -150,16 +149,8 @@ export function ExpenseCapture() {
     };
 
     const targetDisplayName = mapping[normalizedAiCat] || mapping['other'];
-    let matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
+    const matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
-    if (!matched) {
-      // Fuzzy fallback
-      matched = categories.find(c => 
-        c.name.toLowerCase().includes(normalizedAiCat) || 
-        normalizedAiCat.includes(c.name.toLowerCase())
-      );
-    }
-
     return matched?.id || (categories.length > 0 ? categories[0].id : "");
   };
 
@@ -272,7 +263,7 @@ export function ExpenseCapture() {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setLoading(true);
-      setProcessingMessage("Extracting expense details...");
+      setProcessingMessage("Extracting transaction data...");
     }
   };
 
