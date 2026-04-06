@@ -136,6 +136,7 @@ export function ExpenseCapture() {
   const mapAiCategoryToId = (aiCat: string): string => {
     const normalizedAiCat = (aiCat || "").toLowerCase().trim();
     
+    // Explicit mapping based on user's defined AI categories
     const mapping: Record<string, string> = {
       'food': 'Food & Groceries',
       'groceries': 'Food & Groceries',
@@ -145,7 +146,6 @@ export function ExpenseCapture() {
       'bills': 'Essentials',
       'entertainment': 'Life & Entertainment',
       'health': 'Health & Personal',
-      'personal': 'Health & Personal',
       'other': 'Miscellaneous'
     };
 
@@ -153,6 +153,7 @@ export function ExpenseCapture() {
     let matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
     if (!matched) {
+      // Fuzzy fallback
       matched = categories.find(c => 
         c.name.toLowerCase().includes(normalizedAiCat) || 
         normalizedAiCat.includes(c.name.toLowerCase())
