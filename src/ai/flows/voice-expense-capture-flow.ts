@@ -7,15 +7,21 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const VoiceExpenseCaptureInputSchema = z.object({
+  audioDataUri: z.string().describe("Base64 encoded audio data uri."),
+  today: z.string().describe("Today's date in YYYY-MM-DD format for reference."),
+});
+
 const VoiceExpenseCaptureOutputSchema = z.object({
-  amount: z.number().nullable().describe('The extracted numeric amount. Return null if missing.'),
+  amount: z.number().describe('The extracted numeric amount. Return 0 if missing or unclear.'),
   category: z.enum(["food", "groceries", "travel", "shopping", "bills", "entertainment", "health", "other"]),
   description: z.string().describe('A short meaningful summary (max 5 words).'),
+  date: z.string().describe('The transaction date in YYYY-MM-DD format.'),
 });
 export type VoiceExpenseCaptureOutput = z.infer<typeof VoiceExpenseCaptureOutputSchema>;
 
 export async function voiceExpenseCapture(
-  input: { audioDataUri: string }
+  input: { audioDataUri: string, today: string }
 ): Promise<VoiceExpenseCaptureOutput> {
   return voiceExpenseCaptureFlow(input);
 }
@@ -23,63 +29,35 @@ export async function voiceExpenseCapture(
 const extractFromAudioPrompt = ai.definePrompt({
   name: 'extractFromAudioPrompt',
   input: {
-    schema: z.object({
-      audioDataUri: z.string(),
-    }),
+    schema: VoiceExpenseCaptureInputSchema,
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
-  prompt: `You are a JSON generator. Extract transaction details from the given voice input.
+  prompt: `Listen to the audio and extract transaction details.
 
-Input: {{media url=audioDataUri}}
+Return structured data strictly matching the schema.
 
-Return ONLY a raw JSON object. Do NOT include:
-* markdown
-* code blocks
-* backticks
-* explanations
-* extra text
-
-Output format:
-{
-"amount": number,
-"category": "food | groceries | travel | shopping | bills | entertainment | health | other",
-"description": string
-}
-
-Strict Rules:
-* Output must start with { and end with }
-* No text before or after JSON
-* Amount must be a number only (no symbols, no text)
-* Convert words to numbers (e.g. "two thousand" → 2000)
-* Convert formats like "1k" → 1000, "1.5k" → 1500
+Rules:
+* Extract amount as a number (e.g. "two thousand" → 2000, "1.5k" → 1500)
 * Ignore currency symbols like ₹, $, etc.
-* Category must be EXACTLY one from the list
-* Category must be lowercase
-* Description must be short (max 5 words)
-* If amount is missing, return null
-* If category is unclear, return "other"
+* If amount is unclear, return 0
+* Category must be ONE of: food, groceries, travel, shopping, bills, entertainment, health, other
+* Description should be short (max 5 words)
+* If date is not mentioned, use today's date: {{today}}
 
-Example:
-Input: Spent 1200 on groceries from Dmart
-Output:
-{
-"amount": 1200,
-"category": "groceries",
-"description": "dmart groceries"
-}`,
+Be highly accurate. Do not leave fields empty.
+
+Audio: {{media url=audioDataUri}}`,
 });
 
 const voiceExpenseCaptureFlow = ai.defineFlow(
   {
     name: 'voiceExpenseCaptureFlow',
-    inputSchema: z.object({ audioDataUri: z.string() }),
+    inputSchema: VoiceExpenseCaptureInputSchema,
     outputSchema: VoiceExpenseCaptureOutputSchema,
   },
   async input => {
     try {
-      const result = await extractFromAudioPrompt({
-        audioDataUri: input.audioDataUri,
-      });
+      const result = await extractFromAudioPrompt(input);
 
       if (!result.output) throw new Error("No output generated from AI");
 
@@ -87,9 +65,10 @@ const voiceExpenseCaptureFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("[voiceExpenseCaptureFlow] Error:", err.message);
       return {
-        amount: null,
+        amount: 0,
         category: 'other',
         description: 'Voice entry',
+        date: input.today,
       };
     }
   }

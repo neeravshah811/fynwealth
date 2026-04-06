@@ -132,12 +132,31 @@ export function ExpenseCapture() {
 
   /**
    * Resolves AI standard categories to actual Firestore Category IDs.
-   * Maps strictly to the list defined in the AI Flow rules.
+   * Maps strictly to the list defined in the AI Flow rules and includes user logic.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
-    const normalizedAiCat = (aiCat || "").toLowerCase().trim();
+    const rawCat = (aiCat || "").toLowerCase().trim();
     
-    const mapping: Record<string, string> = {
+    // User-provided category logic
+    const categoryMap: any = {
+      food: "food",
+      dining: "food",
+      restaurant: "food",
+      groceries: "groceries",
+      uber: "travel",
+      petrol: "travel",
+      travel: "travel",
+      shopping: "shopping",
+      bills: "bills",
+      entertainment: "entertainment",
+      health: "health",
+      other: "other"
+    };
+
+    const mappedKey = categoryMap[rawCat] || "other";
+    
+    // Final mapping to actual vault Display Names
+    const vaultMapping: Record<string, string> = {
       'food': 'Food & Groceries',
       'groceries': 'Food & Groceries',
       'travel': 'Transportation',
@@ -148,7 +167,7 @@ export function ExpenseCapture() {
       'other': 'Miscellaneous'
     };
 
-    const targetDisplayName = mapping[normalizedAiCat] || mapping['other'];
+    const targetDisplayName = vaultMapping[mappedKey] || vaultMapping['other'];
     const matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
     return matched?.id || (categories.length > 0 ? categories[0].id : "");
@@ -272,13 +291,15 @@ export function ExpenseCapture() {
     reader.onloadend = async () => {
       try {
         const base64String = reader.result as string;
-        const result = await voiceExpenseCapture({ audioDataUri: base64String });
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const result = await voiceExpenseCapture({ audioDataUri: base64String, today: todayStr });
         
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
-            amount: result.amount !== null ? result.amount.toString() : "",
-            date: format(new Date(), 'yyyy-MM-dd'),
+            // User requirement: setAmount(data.amount === 0 ? "" : data.amount);
+            amount: result.amount === 0 ? "" : result.amount.toString(),
+            date: result.date || todayStr,
             note: result.description || "Voice Entry",
             categoryId: categoryId,
             subcategoryId: "",
