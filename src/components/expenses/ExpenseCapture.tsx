@@ -132,30 +132,12 @@ export function ExpenseCapture() {
 
   /**
    * Resolves AI standard categories to actual Firestore Category IDs.
-   * Maps strictly to the list defined in the AI Flow rules and includes user logic.
+   * Maps AI categories to Vault Display Names.
    */
   const mapAiCategoryToId = (aiCat: string): string => {
     const rawCat = (aiCat || "").toLowerCase().trim();
     
-    // User-provided category logic
-    const categoryMap: any = {
-      food: "food",
-      dining: "food",
-      restaurant: "food",
-      groceries: "groceries",
-      uber: "travel",
-      petrol: "travel",
-      travel: "travel",
-      shopping: "shopping",
-      bills: "bills",
-      entertainment: "entertainment",
-      health: "health",
-      other: "other"
-    };
-
-    const mappedKey = categoryMap[rawCat] || "other";
-    
-    // Final mapping to actual vault Display Names
+    // Mapping from AI bucket to Vault parent category name
     const vaultMapping: Record<string, string> = {
       'food': 'Food & Groceries',
       'groceries': 'Food & Groceries',
@@ -167,7 +149,7 @@ export function ExpenseCapture() {
       'other': 'Miscellaneous'
     };
 
-    const targetDisplayName = vaultMapping[mappedKey] || vaultMapping['other'];
+    const targetDisplayName = vaultMapping[rawCat] || vaultMapping['other'];
     const matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
     
     return matched?.id || (categories.length > 0 ? categories[0].id : "");
@@ -221,7 +203,7 @@ export function ExpenseCapture() {
 
   const handleReviewApproval = async () => {
     if (!db || !user?.uid) return;
-    if (!aiReviewData.amount || isNaN(parseFloat(aiReviewData.amount))) {
+    if (!aiReviewData.amount && aiReviewData.amount !== 0) {
       toast({ variant: "destructive", title: "Amount Required", description: "Please verify the numeric amount." });
       return;
     }
@@ -235,7 +217,7 @@ export function ExpenseCapture() {
 
       addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
         userId: user.uid,
-        amount: Math.abs(parseFloat(aiReviewData.amount)),
+        amount: Math.abs(parseFloat(aiReviewData.amount || "0")),
         categoryId: aiReviewData.categoryId,
         categoryName: categoryObj?.name || "Unknown",
         subcategoryId: aiReviewData.subcategoryId || "",
@@ -297,7 +279,7 @@ export function ExpenseCapture() {
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
-            // User requirement: setAmount(data.amount === 0 ? "" : data.amount);
+            // If amount is 0, set to empty string for easy manual entry
             amount: result.amount === 0 ? "" : result.amount.toString(),
             date: result.date || todayStr,
             note: result.description || "Voice Entry",

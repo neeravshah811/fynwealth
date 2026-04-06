@@ -32,19 +32,39 @@ const extractFromAudioPrompt = ai.definePrompt({
     schema: VoiceExpenseCaptureInputSchema,
   },
   output: {schema: VoiceExpenseCaptureOutputSchema},
-  prompt: `Listen to the audio and extract transaction details.
+  prompt: `Listen carefully to the audio and extract transaction details.
 
-Return structured data strictly matching the schema.
+Return structured output strictly matching schema.
 
 Rules:
-* Extract amount as a number (e.g. "two thousand" → 2000, "1.5k" → 1500)
-* Ignore currency symbols like ₹, $, etc.
-* If amount is unclear, return 0
-* Category must be ONE of: food, groceries, travel, shopping, bills, entertainment, health, other
-* Description should be short (max 5 words)
-* If date is not mentioned, use today's date: {{today}}
 
-Be highly accurate. Do not leave fields empty.
+* Amount:
+  * Must be a NUMBER only
+  * Convert spoken words to numbers (e.g. "two thousand" → 2000)
+  * Convert formats like "1.5k" → 1500
+  * Ignore currency words/symbols like rupees, ₹, dollars, etc.
+  * If amount is unclear, return 0 (do NOT leave empty)
+
+* Category:
+  * Must be EXACTLY one of:
+    food, groceries, travel, shopping, bills, entertainment, health, other
+  * Map common brands/services:
+    zomato, swiggy, restaurant → food
+    uber, ola, petrol → travel
+    amazon, flipkart → shopping
+
+* Description:
+  * Keep short (max 5 words)
+  * Capture main purpose clearly
+
+* Date:
+  * Format: YYYY-MM-DD
+  * If not mentioned, use: {{today}}
+
+Instructions:
+* Do NOT skip any field
+* Do NOT return empty values
+* Be precise and consistent
 
 Audio: {{media url=audioDataUri}}`,
 });
