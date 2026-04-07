@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,13 @@ import {
   PieChart,
   Target,
   Search,
-  AlertCircle
+  AlertCircle,
+  TrendingUp,
+  Zap
 } from "lucide-react";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
-import { formatDistanceToNow, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { formatDistanceToNow, format, startOfMonth, endOfMonth, subMonths, isWeekend } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function InsightsPage() {
@@ -40,8 +43,16 @@ export default function InsightsPage() {
     );
   }, [db, user?.uid]);
 
+  const budgetsQuery = useMemoFirebase(() => {
+    if (!db || !user?.uid) return null;
+    return collection(db, 'users', user.uid, 'budgets');
+  }, [db, user?.uid]);
+
   const { data: expensesData, isLoading: expensesLoading } = useCollection(expensesQuery);
+  const { data: budgetsData } = useCollection(budgetsQuery);
+  
   const expenses = expensesData || [];
+  const budgets = budgetsData || [];
 
   /**
    * Robust numeric parser aligned with dashboard.
@@ -57,6 +68,82 @@ export default function InsightsPage() {
     const n = parseFloat(cleaned);
     return isNaN(n) ? 0 : n;
   };
+
+  const dynamicInsights = useMemo(() => {
+    if (!mounted || expenses.length === 0) return [];
+    
+    const results = [];
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // 1. Today's Spend Insight
+    const todayExpenses = expenses.filter(e => e.date === todayStr && e.status === 'paid');
+    if (todayExpenses.length > 0) {
+      const catTotals: Record<string, number> = {};
+      todayExpenses.forEach(e => {
+        const cat = e.categoryName || e.category || "General";
+        catTotals[cat] = (catTotals[cat] || 0) + toNum(e.amount);
+      });
+      const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
+      results.push({
+        text: `You spent total ${currency.symbol}${topCat[1].toLocaleString()} on ${topCat[0].toLowerCase()} today.`,
+        icon: Zap,
+        color: "text-amber-500"
+      });
+    } else {
+      results.push({
+        text: "You haven't recorded any expenses for today yet.",
+        icon: Clock,
+        color: "text-muted-foreground"
+      });
+    }
+
+    // 2. Budget Utilization Insight
+    const targetDate = new Date(viewYear, viewMonth);
+    const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
+    const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
+    const monthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr && e.status === 'paid');
+    const monthTotal = monthExpenses.reduce((s, e) => s + toNum(e.amount), 0);
+    const totalBudgetLimit = budgets.reduce((s, b) => s + toNum(b.limit), 0);
+    
+    if (totalBudgetLimit > 0) {
+      const percent = Math.min(100, Math.round((monthTotal / totalBudgetLimit) * 100));
+      results.push({
+        text: `You already used ${percent}% of your monthly budget.`,
+        icon: Target,
+        color: percent > 80 ? "text-rose-500" : "text-emerald-500"
+      });
+    }
+
+    // 3. Weekend Trend Insight (Last 30 entries)
+    const weekendSpends: number[] = [];
+    const weekdaySpends: number[] = [];
+    expenses.slice(0, 50).filter(e => e.status === 'paid').forEach(e => {
+      const d = new Date(e.date);
+      if (isWeekend(d)) weekendSpends.push(toNum(e.amount));
+      else weekdaySpends.push(toNum(e.amount));
+    });
+
+    if (weekendSpends.length > 2 && weekdaySpends.length > 2) {
+      const avgWeekend = weekendSpends.reduce((a, b) => a + b, 0) / weekendSpends.length;
+      const avgWeekday = weekdaySpends.reduce((a, b) => a + b, 0) / weekdaySpends.length;
+      
+      if (avgWeekend > avgWeekday * 1.1) {
+        results.push({
+          text: "Weekend spending is higher than weekdays.",
+          icon: TrendingUp,
+          color: "text-primary"
+        });
+      } else {
+        results.push({
+          text: "Your spending remains consistent across the week.",
+          icon: Sparkles,
+          color: "text-accent"
+        });
+      }
+    }
+
+    return results;
+  }, [mounted, expenses, budgets, currency, viewMonth, viewYear]);
 
   const discoveries = useMemo(() => {
     const targetDate = new Date(viewYear, viewMonth);
@@ -192,6 +279,20 @@ export default function InsightsPage() {
             Refresh Report
           </Button>
         </div>
+      </div>
+
+      {/* Dynamic Smart Briefing */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-700">
+        {dynamicInsights.map((insight, idx) => (
+          <Card key={idx} className="border-none bg-primary/5 ring-1 ring-primary/10 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6 flex items-start gap-4">
+              <div className={cn("p-2 rounded-xl bg-white shadow-sm shrink-0", insight.color)}>
+                <insight.icon className="w-5 h-5" />
+              </div>
+              <p className="text-sm font-bold text-foreground leading-snug">{insight.text}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
