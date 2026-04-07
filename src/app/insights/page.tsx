@@ -289,7 +289,7 @@ export default function InsightsPage() {
                 <div className="p-3 rounded-2xl bg-amber-50 text-amber-600">
                   <Search className="w-6 h-6" />
                 </div>
-                <CardTitle className="text-xl font-headline font-bold">1. Spend Discoveries</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">Spend Discoveries</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-8 pt-4 space-y-10">
@@ -361,7 +361,7 @@ export default function InsightsPage() {
                 <div className="p-3 rounded-2xl bg-accent/10 text-accent">
                   <PieChart className="w-6 h-6" />
                 </div>
-                <CardTitle className="text-xl font-headline font-bold">2. Savings Strategies</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">Savings Strategies</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
