@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -54,9 +53,6 @@ export default function InsightsPage() {
   const expenses = expensesData || [];
   const budgets = budgetsData || [];
 
-  /**
-   * Robust numeric parser aligned with dashboard.
-   */
   const toNum = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -89,12 +85,6 @@ export default function InsightsPage() {
         icon: Zap,
         color: "text-amber-500"
       });
-    } else {
-      results.push({
-        text: "You haven't recorded any expenses for today yet.",
-        icon: Clock,
-        color: "text-muted-foreground"
-      });
     }
 
     // 2. Budget Utilization Insight
@@ -114,7 +104,7 @@ export default function InsightsPage() {
       });
     }
 
-    // 3. Weekend Trend Insight (Last 30 entries)
+    // 3. Weekend Trend Insight
     const weekendSpends: number[] = [];
     const weekdaySpends: number[] = [];
     expenses.slice(0, 50).filter(e => e.status === 'paid').forEach(e => {
@@ -132,12 +122,6 @@ export default function InsightsPage() {
           text: "Weekend spending is higher than weekdays.",
           icon: TrendingUp,
           color: "text-primary"
-        });
-      } else {
-        results.push({
-          text: "Your spending remains consistent across the week.",
-          icon: Sparkles,
-          color: "text-accent"
         });
       }
     }
@@ -282,18 +266,20 @@ export default function InsightsPage() {
       </div>
 
       {/* Dynamic Smart Briefing */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-700">
-        {dynamicInsights.map((insight, idx) => (
-          <Card key={idx} className="border-none bg-primary/5 ring-1 ring-primary/10 shadow-sm hover:shadow-md transition-all">
-            <CardContent className="p-6 flex items-start gap-4">
-              <div className={cn("p-2 rounded-xl bg-white shadow-sm shrink-0", insight.color)}>
-                <insight.icon className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-foreground leading-snug">{insight.text}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {dynamicInsights.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-700">
+          {dynamicInsights.map((insight, idx) => (
+            <Card key={idx} className="border-none bg-primary/5 ring-1 ring-primary/10 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6 flex items-start gap-4">
+                <div className={cn("p-2 rounded-xl bg-white shadow-sm shrink-0", insight.color)}>
+                  <insight.icon className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-bold text-foreground leading-snug">{insight.text}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">

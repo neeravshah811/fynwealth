@@ -130,27 +130,27 @@ export function ExpenseCapture() {
     loadSubcategories(categoryId);
   };
 
-  /**
-   * Resolves AI standard categories to actual Firestore Category IDs.
-   * Maps AI categories to Vault Display Names.
-   */
   const mapAiCategoryToId = (aiCat: string): string => {
     const rawCat = (aiCat || "").toLowerCase().trim();
     
-    // Mapping from AI bucket to Vault parent category name
-    const vaultMapping: Record<string, string> = {
-      'food': 'Food & Groceries',
-      'groceries': 'Food & Groceries',
-      'travel': 'Transportation',
-      'shopping': 'Shopping',
-      'bills': 'Essentials',
-      'entertainment': 'Life & Entertainment',
-      'health': 'Health & Personal',
-      'other': 'Miscellaneous'
+    // User provided category keywords
+    const categoryKeywords: Record<string, string> = {
+      food: "Food & Groceries",
+      dining: "Food & Groceries",
+      restaurant: "Food & Groceries",
+      groceries: "Food & Groceries",
+      uber: "Transportation",
+      petrol: "Transportation",
+      travel: "Transportation",
+      shopping: "Shopping",
+      bills: "Essentials",
+      entertainment: "Life & Entertainment",
+      health: "Health & Personal",
+      other: "Miscellaneous"
     };
 
-    const targetDisplayName = vaultMapping[rawCat] || vaultMapping['other'];
-    const matched = categories.find(c => c.name.toLowerCase() === targetDisplayName.toLowerCase());
+    const targetName = categoryKeywords[rawCat] || "Miscellaneous";
+    const matched = categories.find(c => c.name.toLowerCase() === targetName.toLowerCase());
     
     return matched?.id || (categories.length > 0 ? categories[0].id : "");
   };
@@ -279,7 +279,7 @@ export function ExpenseCapture() {
         if (result) {
           const categoryId = mapAiCategoryToId(result.category);
           setAiReviewData({
-            // If amount is 0, set to empty string for easy manual entry
+            // amount === 0 ? "" : data.amount logic
             amount: result.amount === 0 ? "" : result.amount.toString(),
             date: result.date || todayStr,
             note: result.description || "Voice Entry",
