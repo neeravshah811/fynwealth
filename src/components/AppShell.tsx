@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -6,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useFynWealthStore } from '@/lib/store';
-import { SplashScreen } from '@/components/SplashScreen';
 import { TutorialTrigger } from '@/components/TutorialTrigger';
 import { NotificationManager } from '@/components/NotificationManager';
 import { SideDrawer } from "@/components/dashboard/SideDrawer";
@@ -83,7 +81,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!showDashboardShell) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        {user && <SplashScreen />}
         <main className="flex-1 w-full">
           {children}
         </main>
@@ -93,7 +90,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <SplashScreen />
       <DataPrivacyConsent />
       <TutorialTrigger />
       <NotificationManager />

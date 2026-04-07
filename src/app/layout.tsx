@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { AppShell } from '@/components/AppShell';
+import { SplashScreen } from '@/components/SplashScreen';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body className="font-body antialiased bg-background text-foreground" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <FirebaseClientProvider>
+            <SplashScreen />
             <AuthGuard>
               <AppShell>
                 {children}

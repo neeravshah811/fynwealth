@@ -1,10 +1,8 @@
-
 'use client';
 
 import { useUser, useFirestore, useAuth } from '@/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
-import { Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit, doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
@@ -101,17 +99,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [user, isUserLoading, pathname, router, db, auth]);
 
   // Global Loading State - with mounted check to prevent hydration mismatch
+  // We return null here because the SplashScreen in layout.tsx covers the initialization phase.
   if (!mounted || isUserLoading || isVerifyingRole) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-sm font-medium text-muted-foreground animate-pulse" suppressHydrationWarning>
-            Establishing Secure Session...
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Handle standard redirect edge cases

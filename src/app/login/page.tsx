@@ -116,6 +116,10 @@ export default function LoginPage() {
     }
   }, [currentUser, isUserLoading, checkingRedirect, router]);
 
+  if (checkingRedirect || isUserLoading) {
+    return null; // Covered by SplashScreen in RootLayout
+  }
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -181,15 +185,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  if (checkingRedirect || isUserLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-        <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-        <p className="text-sm font-medium text-muted-foreground animate-pulse">Establishing Secure Session...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
