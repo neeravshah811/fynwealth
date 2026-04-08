@@ -21,11 +21,11 @@ export function DataPrivacyConsent() {
 
   useEffect(() => {
     setMounted(true);
-    // Show after splash screen (approx 3.5s delay)
+    // Show after splash screen concludes (3s splash + 0.2s buffer)
     if (!hasAcceptedPrivacy) {
       const timer = setTimeout(() => {
         setIsOpen(true);
-      }, 3500);
+      }, 3200);
       return () => clearTimeout(timer);
     }
   }, [hasAcceptedPrivacy]);
@@ -38,8 +38,16 @@ export function DataPrivacyConsent() {
   if (!mounted) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-[32px]">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // Prevent accidental dismissal via backdrop click
+      if (!open && !hasAcceptedPrivacy) return;
+      setIsOpen(open);
+    }}>
+      <DialogContent 
+        className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-[32px]"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="p-8 bg-primary/5 border-b shrink-0 text-center">
           <div className="w-16 h-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
             <ShieldCheck className="w-8 h-8" />
