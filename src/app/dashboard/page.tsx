@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -31,14 +32,39 @@ const CategoryPieChart = dynamic(() => import("@/components/dashboard/CategoryPi
   loading: () => <Card className="h-[250px] animate-pulse bg-muted/20" />
 });
 
+const DAILY_TIPS = [
+  "Review weekly subscriptions to save on recurring fees.",
+  "Consider generic brands for groceries to reduce your monthly bill.",
+  "Switch off unused appliances to save on electricity costs.",
+  "Plan your meals for the week to avoid impulsive food orders.",
+  "Set up automatic transfers to your savings account on payday.",
+  "Track even the smallest expenses; they add up over time.",
+  "Use cash for personal spending to stay within your budget.",
+  "Compare prices online before making any major purchase.",
+  "Cancel unused memberships or club subscriptions.",
+  "Look for cash-back offers on your regular utility bills.",
+  "Review your insurance policies annually for better rates.",
+  "Limit dining out to once a week to see significant savings."
+];
+
 export default function DashboardPage() {
   const { currency, viewMonth, viewYear, setViewDate, insights } = useFynWealthStore();
   const { user } = useUser();
   const db = useFirestore();
   const [mounted, setMounted] = useState(false);
+  const [dailyTip, setDailyTip] = useState("");
 
   useEffect(() => {
     setMounted(true);
+    
+    // Generate a stable daily tip index based on YYYY-MM-DD
+    const dateStr = format(new Date(), 'yyyy-MM-dd');
+    let hash = 0;
+    for (let i = 0; i < dateStr.length; i++) {
+      hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % DAILY_TIPS.length;
+    setDailyTip(DAILY_TIPS[index]);
   }, []);
 
   const expensesQuery = useMemoFirebase(() => {
@@ -250,7 +276,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="p-4 bg-muted/20 rounded-2xl text-center">
                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-widest mb-1">Daily Tip</p>
-                  <p className="text-xs italic leading-tight">Review weekly subscriptions to save on recurring fees.</p>
+                  <p className="text-xs italic leading-tight">{dailyTip}</p>
                 </div>
               )}
             </div>
