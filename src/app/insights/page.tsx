@@ -76,7 +76,8 @@ export default function InsightsPage() {
     if (todayExpenses.length > 0) {
       const catTotals: Record<string, number> = {};
       todayExpenses.forEach(e => {
-        const cat = e.categoryName || e.category || "General";
+        let cat = e.categoryName || e.category || "General";
+        if (cat === "Financial Commitments") cat = "Financial Commit";
         catTotals[cat] = (catTotals[cat] || 0) + toNum(e.amount);
       });
       const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
@@ -170,7 +171,8 @@ export default function InsightsPage() {
 
     const categoryTotals: Record<string, number> = {};
     currentMonthExpenses.forEach(e => {
-      const cat = e.categoryName || e.category || "General";
+      let cat = e.categoryName || e.category || "General";
+      if (cat === "Financial Commitments") cat = "Financial Commit";
       categoryTotals[cat] = (categoryTotals[cat] || 0) + toNum(e.amount);
     });
 
@@ -235,7 +237,11 @@ export default function InsightsPage() {
     );
   }
 
-  const getDisplayName = (e: any) => e.description || e.note || e.categoryName || e.category || "Expense";
+  const getDisplayName = (e: any) => {
+    let name = e.description || e.note || e.categoryName || e.category || "Expense";
+    if (name === "Financial Commitments") return "Financial Commit";
+    return name;
+  };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-6xl mx-auto pb-24">

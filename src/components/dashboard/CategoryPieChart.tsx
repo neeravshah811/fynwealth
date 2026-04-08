@@ -43,8 +43,8 @@ export function CategoryPieChart() {
       .reduce((acc: any[], curr) => {
         let catName = curr.categoryName || curr.category || "General";
         
-        // Normalization
-        if (catName === "Financial Commit") {
+        // Normalization: Ensure singular naming for consistency
+        if (catName === "Financial Commitments") {
           catName = "Financial Commit";
         }
         
