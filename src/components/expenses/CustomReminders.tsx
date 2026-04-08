@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Bell, Plus, Trash2, CheckCircle2, Calendar, Clock, AlertCircle, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 const REMINDER_FREQUENCIES: Frequency[] = ['Weekly', 'Monthly', 'Quarterly', 'Half-yearly', 'Annually'];
 
@@ -56,15 +56,11 @@ export function CustomReminders() {
       notes: ''
     });
     setShowForm(false);
-    toast({ title: "Reminder Set", description: `We'll remind you about ${formData.name}.` });
+    toast({ title: "Reminder Set" });
   };
 
   const pendingReminders = bills.filter(b => b.status === 'pending');
   const paidReminders = bills.filter(b => b.status === 'paid');
-
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   return (
     <Card className="border-none shadow-sm overflow-hidden ring-1 ring-primary/5 bg-card">
@@ -147,16 +143,14 @@ export function CustomReminders() {
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Description (Optional)</Label>
               <Textarea 
-                placeholder="Account numbers, specific instructions..." 
+                placeholder="Details..." 
                 value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 className="rounded-xl min-h-[80px]"
               />
             </div>
 
-            <Button type="submit" className="w-full h-12 font-bold rounded-xl shadow-lg shadow-primary/10">
-              Set Reminder
-            </Button>
+            <Button type="submit" className="w-full h-12 font-bold rounded-xl shadow-lg">Set Reminder</Button>
           </form>
         )}
 
@@ -172,78 +166,26 @@ export function CustomReminders() {
               const isOverdue = isPast(date) && !isToday(date);
               
               return (
-                <div key={bill.id} className={cn(
-                  "p-5 rounded-2xl border transition-all hover:shadow-md group relative",
-                  isOverdue ? "bg-destructive/5 border-destructive/20" : "bg-card border-muted"
-                )}>
+                <div key={bill.id} className={cn("p-5 rounded-2xl border transition-all", isOverdue ? "bg-destructive/5 border-destructive/20" : "bg-card border-muted")}>
                   <div className="flex justify-between items-start mb-4">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-base">{bill.name}</h4>
-                        {isOverdue && <AlertCircle className="w-4 h-4 text-destructive" />}
-                      </div>
-                      <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-5 border-muted-foreground/20 text-muted-foreground">
-                        {bill.frequency}
-                      </Badge>
+                      <h4 className="font-bold text-base">{bill.name}</h4>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-5 text-muted-foreground">{bill.frequency}</Badge>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-lg text-primary">{currency.symbol}{formatCurrency(bill.amount)}</div>
-                      <div className={cn("text-[11px] font-bold uppercase", isOverdue ? "text-destructive" : "text-muted-foreground")}>
-                        {isOverdue ? "Overdue" : "Due"} {format(date, 'MMM dd')}
-                      </div>
+                      <div className="font-bold text-lg text-primary">{formatCurrency(bill.amount, currency.symbol)}</div>
+                      <div className={cn("text-[11px] font-bold uppercase", isOverdue ? "text-destructive" : "text-muted-foreground")}>{isOverdue ? "Overdue" : "Due"} {format(date, 'MMM dd')}</div>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2">
-                    <Button 
-                      size="sm" 
-                      className="flex-1 rounded-xl h-10 font-bold bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10"
-                      onClick={() => markBillPaid(bill.id)}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Paid
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
-                      onClick={() => deleteBill(bill.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <Button size="sm" className="flex-1 rounded-xl h-10 font-bold bg-emerald-600 hover:bg-emerald-700" onClick={() => markBillPaid(bill.id)}><CheckCircle2 className="w-4 h-4 mr-2" />Paid</Button>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-destructive" onClick={() => deleteBill(bill.id)}><Trash2 className="w-4 h-4" /></Button>
                   </div>
                 </div>
               );
             })}
-            {pendingReminders.length === 0 && (
-              <div className="md:col-span-2 text-center py-12 bg-muted/20 rounded-2xl border border-dashed border-muted text-muted-foreground italic text-sm">
-                No pending reminders.
-              </div>
-            )}
           </div>
         </div>
-
-        {paidReminders.length > 0 && (
-          <div className="mt-10 space-y-6 opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <h3 className="font-headline font-bold text-sm uppercase tracking-widest text-muted-foreground">Recently Settled</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {paidReminders.slice(0, 3).map((bill) => (
-                <div key={bill.id} className="p-4 rounded-xl border border-muted bg-emerald-50/30 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm truncate">{bill.name}</p>
-                    <p className="text-[10px] text-muted-foreground">Paid on {format(new Date(bill.dueDate), 'MMM dd')}</p>
-                  </div>
-                  <div className="font-bold text-sm text-emerald-700 whitespace-nowrap">
-                    {currency.symbol}{formatCurrency(bill.amount)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

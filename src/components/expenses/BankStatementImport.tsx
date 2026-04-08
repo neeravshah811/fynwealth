@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -34,7 +33,7 @@ import {
 import { processBankStatementManual } from "@/ai/flows/bank-statement-import-flow";
 import { toast } from "@/hooks/use-toast";
 import { useFynWealthStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import * as XLSX from 'xlsx';
 import * as pdfjs from 'pdfjs-dist';
@@ -94,10 +93,6 @@ export function BankStatementImport() {
     return dateRegex.test(s);
   };
 
-  /**
-   * Robust Date Normalization
-   * Maps various formats to YYYY-MM-DD
-   */
   const normalizeDate = (dateStr: string): string => {
     const s = dateStr.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
@@ -110,31 +105,21 @@ export function BankStatementImport() {
     const parts = s.split(/[-/.\s,]+/).filter(Boolean);
     if (parts.length === 3) {
       let d = "", m = "", y = "";
-
-      // YYYY-MM-DD
       if (parts[0].length === 4) {
         y = parts[0];
         m = parts[1];
         d = parts[2];
-      } 
-      // DD-MM-YYYY or DD-MM-YY
-      else {
+      } else {
         d = parts[0];
         m = parts[1];
         y = parts[2];
       }
-
-      // Handle Alpha month
       const mLower = m.toLowerCase().substring(0, 3);
-      if (monthMap[mLower]) {
-        m = monthMap[mLower];
-      }
-
+      if (monthMap[mLower]) m = monthMap[mLower];
       const finalD = d.padStart(2, '0').substring(0, 2);
       const finalM = m.padStart(2, '0').substring(0, 2);
       let finalY = y;
       if (finalY.length === 2) finalY = '20' + finalY;
-
       if (/^\d{4}$/.test(finalY) && /^\d{2}$/.test(finalM) && /^\d{2}$/.test(finalD)) {
         return `${finalY}-${finalM}-${finalD}`;
       }
@@ -188,22 +173,17 @@ export function BankStatementImport() {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (row.length < 1 || i <= headerIdx) continue;
-
       const dateColIdx = row.findIndex(c => isDateLike(String(c)));
       if (dateColIdx === -1) continue;
-
       const foundDate = normalizeDate(String(row[dateColIdx]));
       let foundDesc = "";
       let foundAmount = 0;
       let isDebit = false;
-
       const rowString = row.join(' ').toLowerCase();
       const isExplicitCredit = rowString.includes('cr') || rowString.includes('credit') || rowString.includes('deposit');
-
       if (headerIdx !== -1) {
         if (descIdx !== -1 && row[descIdx]) foundDesc = String(row[descIdx]);
         else foundDesc = row.filter((c, idx) => idx !== dateColIdx && idx !== balanceIdx && String(c).length > 5 && isNaN(cleanAmount(c))).sort((a,b) => b.length - a.length)[0] || "Transaction";
-
         if (debitIdx !== -1 && row[debitIdx] && cleanAmount(row[debitIdx]) !== 0) {
           foundAmount = cleanAmount(row[debitIdx]);
           isDebit = true;
@@ -215,15 +195,9 @@ export function BankStatementImport() {
           isDebit = rawAmt < 0 || (!isExplicitCredit && rawAmt !== 0);
         }
       }
-
       const hasIncomeKeyword = incomeKeywords.some(k => foundDesc.toLowerCase().includes(k));
       if (foundDate && foundAmount > 0 && isDebit && !hasIncomeKeyword && !isExplicitCredit) {
-        results.push({
-          date: foundDate,
-          description: foundDesc.trim(),
-          amount: Math.abs(foundAmount),
-          type: 'debit'
-        });
+        results.push({ date: foundDate, description: foundDesc.trim(), amount: Math.abs(foundAmount), type: 'debit' });
       }
     }
     return results;
@@ -261,14 +235,11 @@ export function BankStatementImport() {
 
   const runImport = async (file: File, password?: string) => {
     if (!user?.uid || !db) return;
-    
     setLoading(true);
     setPasswordError(false);
-    
     try {
       const extension = file.name.split('.').pop()?.toLowerCase();
       let parsedData: any[] = [];
-      
       if (extension === 'pdf') {
         try {
           parsedData = await parsePdfManual(file, password);
@@ -276,7 +247,7 @@ export function BankStatementImport() {
           if (err.message === 'PASSWORD_REQUIRED') {
             if (password) {
               setPasswordError(true);
-              toast({ variant: "destructive", title: "Incorrect Password", description: "The password provided is invalid for this PDF." });
+              toast({ variant: "destructive", title: "Incorrect Password" });
             } else {
               setPendingFile(file);
               setIsPasswordDialogOpen(true);
@@ -292,24 +263,21 @@ export function BankStatementImport() {
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
         parsedData = extractTransactionsFromRows(json as any[][]);
       } else {
-        toast({ variant: "destructive", title: "Invalid Format", description: "Only PDF and Excel formats are supported." });
+        toast({ variant: "destructive", title: "Invalid Format" });
         setLoading(false);
         return;
       }
-
       if (parsedData.length === 0) {
-        toast({ variant: "destructive", title: "No Transactions", description: "No readable debit entries found in the statement." });
+        toast({ variant: "destructive", title: "No Transactions Found" });
         setLoading(false);
         return;
       }
-
       await handleParsedData(parsedData);
-      
       setIsPasswordDialogOpen(false);
       setPdfPassword("");
       setPendingFile(null);
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Import Failed", description: err.message || "Failed to process statement." });
+      toast({ variant: "destructive", title: "Import Failed" });
     } finally {
       setLoading(false);
     }
@@ -321,64 +289,40 @@ export function BankStatementImport() {
     await runImport(file);
   };
 
-  /**
-   * Enhanced Deduplication Logic
-   * Creates unique fingerprints for every recorded expense to prevent overlap.
-   */
   const handleParsedData = async (parsedData: any[]) => {
     if (!user?.uid || !db) return;
-
-    // Filter out invalid dates before processing
     const validParsed = parsedData.filter(t => t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date));
-    
     if (validParsed.length === 0) {
-      toast({ variant: "destructive", title: "Format Error", description: "Could not identify valid dates in statement." });
+      toast({ variant: "destructive", title: "Format Error" });
       reset();
       return;
     }
-
     const dates = validParsed.map(t => t.date).sort();
     const minDate = dates[0];
     const maxDate = dates[dates.length - 1];
-
-    // 1. Fetch existing expenses in the statement's date range
     const existingExpensesRef = collection(db, 'users', user!.uid, 'expenses');
     const q = query(existingExpensesRef, where('date', '>=', minDate), where('date', '<=', maxDate));
     const snapshot = await getDocs(q);
-
-    // 2. Helper to sanitize description for comparison
     const sanitize = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-
-    // 3. Create fingerprints for existing records
     const existingFingerprints = new Set(snapshot.docs.map(doc => {
       const d = doc.data();
-      const amt = Number(d.amount).toFixed(2);
-      const desc = sanitize(d.description || d.note || "");
-      return `${d.date}_${amt}_${desc}`;
+      return `${d.date}_${Number(d.amount).toFixed(2)}_${sanitize(d.description || d.note || "")}`;
     }));
-
-    // 4. Filter statement data against existing fingerprints
     const uniqueParsed = validParsed.filter(t => {
-      const amt = Number(t.amount).toFixed(2);
-      const desc = sanitize(t.description);
-      const fingerprint = `${t.date}_${amt}_${desc}`;
+      const fingerprint = `${t.date}_${Number(t.amount).toFixed(2)}_${sanitize(t.description)}`;
       return !existingFingerprints.has(fingerprint);
     });
-
     if (uniqueParsed.length === 0) {
-      toast({ title: "Up to Date", description: "All transactions in this statement are already in your vault." });
+      toast({ title: "Up to Date", description: "No new transactions found." });
       reset();
       return;
     }
-
-    // 5. Pass only truly new entries to AI for categorization
     const result = await processBankStatementManual({ userId: user!.uid, transactions: uniqueParsed });
     if (result && result.transactions && result.transactions.length > 0) {
       setTransactions(result.transactions);
       setReviewMode(true);
-      toast({ title: "Scanning Complete", description: `Found ${result.transactions.length} new entries.` });
     } else {
-      toast({ title: "No New Data", description: "All readable debit entries are already recorded." });
+      toast({ title: "No New Data" });
       reset();
     }
   };
@@ -396,8 +340,7 @@ export function BankStatementImport() {
   };
 
   const handleConfirmImport = async () => {
-    if (!user?.uid || !db) return;
-    if (approvedTxns.length === 0) return;
+    if (!user?.uid || !db || approvedTxns.length === 0) return;
     setLoading(true);
     try {
       approvedTxns.forEach(t => {
@@ -418,7 +361,7 @@ export function BankStatementImport() {
       setIsOpen(false);
       reset();
     } catch (err) {
-      toast({ variant: "destructive", title: "Save Error", description: "Could not write to cloud storage." });
+      toast({ variant: "destructive", title: "Save Error" });
     } finally {
       setLoading(false);
     }
@@ -436,12 +379,7 @@ export function BankStatementImport() {
 
   return (
     <>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={() => setIsOpen(true)}
-        className="h-9 rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5 shadow-sm"
-      >
+      <Button variant="outline" size="sm" onClick={() => setIsOpen(true)} className="h-9 rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5">
         <FileUp className="w-4 h-4 mr-2" />
         Import Statement
       </Button>
@@ -449,30 +387,19 @@ export function BankStatementImport() {
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) reset(); setIsOpen(open); }}>
         <DialogContent className="sm:max-w-[750px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
-            <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3">
-              <FileText className="w-6 h-6" />
-              Statement Import
-            </DialogTitle>
-            <DialogDescription className="text-sm font-medium mt-1">
-              Upload PDF or Excel statements. We'll automatically filter out duplicates.
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3"><FileText className="w-6 h-6" /> Statement Import</DialogTitle>
+            <DialogDescription className="text-sm font-medium mt-1">Upload PDF or Excel statements to sync with your vault.</DialogDescription>
           </DialogHeader>
 
           {!reviewMode ? (
             <div className="p-12 flex flex-col items-center justify-center text-center space-y-6">
-              <div className={cn("p-10 rounded-full transition-all duration-500", loading ? 'bg-primary/10 animate-pulse' : 'bg-muted/30')}>
+              <div className={cn("p-10 rounded-full transition-all", loading ? 'bg-primary/10 animate-pulse' : 'bg-muted/30')}>
                 {loading ? <Loader2 className="w-16 h-16 text-primary animate-spin" /> : <FileUp className="w-16 h-16 text-muted-foreground opacity-40" />}
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-bold text-lg">{loading ? "Analyzing Data..." : "Choose File"}</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Support for PDF, XLSX, and XLS formats. Existing records are skipped automatically.
-                </p>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls,.pdf" onChange={handleFileChange} />
               <Button onClick={() => fileInputRef.current?.click()} disabled={loading} className="h-14 px-10 rounded-xl font-bold text-base shadow-lg">
                 {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
-                {loading ? "Processing..." : "Select File"}
+                {loading ? "Analyzing..." : "Select File"}
               </Button>
             </div>
           ) : (
@@ -485,33 +412,23 @@ export function BankStatementImport() {
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] font-bold uppercase text-muted-foreground">New Volume</p>
-                    <p className="text-lg font-bold text-foreground">{currency.symbol}{summary.totalExpense.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-foreground">{formatCurrency(summary.totalExpense, currency.symbol)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50">
-                    Approve All
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={handleBulkApprove} className="h-8 text-[10px] font-bold uppercase border-emerald-200 text-emerald-600">Approve All</Button>
               </div>
-
               <div className="flex-1 overflow-hidden p-6">
                 <ScrollArea className="h-full pr-4 border rounded-2xl bg-muted/5">
                   <div className="p-4 space-y-3">
                     {transactions.filter(t => t.status !== 'rejected').map((t) => (
-                      <div key={t.id} className={cn(
-                        "flex flex-col gap-4 p-4 rounded-xl border transition-all",
-                        t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100 shadow-sm" : "bg-card border-muted"
-                      )}>
+                      <div key={t.id} className={cn("flex flex-col gap-4 p-4 rounded-xl border transition-all", t.status === 'approved' ? "bg-emerald-50/30 border-emerald-100 shadow-sm" : "bg-card border-muted")}>
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex flex-col min-w-0 flex-1 space-y-3">
                             <div className="flex items-center gap-3">
                               <span className="text-[10px] font-bold text-muted-foreground bg-muted/50 px-2 py-0.5 rounded uppercase">{t.date}</span>
-                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0.5 px-2 h-auto border-none font-bold uppercase">
-                                {t.category}
-                              </Badge>
+                              <Badge variant="secondary" className="bg-primary/5 text-primary text-[9px] py-0.5 px-2 h-auto border-none font-bold uppercase">{t.category}</Badge>
                             </div>
-                            <p className="font-bold text-sm text-foreground leading-relaxed break-words">{t.description}</p>
+                            <p className="font-bold text-sm text-foreground truncate">{t.description}</p>
                             <Select value={t.category} onValueChange={(v) => updateCategory(t.id, v)}>
                               <SelectTrigger className="h-8 w-48 text-[10px] font-bold uppercase bg-background border-muted rounded-lg px-2"><SelectValue /></SelectTrigger>
                               <SelectContent className="rounded-xl max-h-[300px]">
@@ -520,14 +437,14 @@ export function BankStatementImport() {
                             </Select>
                           </div>
                           <div className="flex flex-col items-end gap-4 shrink-0">
-                            <span className="font-bold text-base text-foreground">{currency.symbol}{t.amount.toLocaleString()}</span>
+                            <span className="font-bold text-base text-foreground">{formatCurrency(t.amount, currency.symbol)}</span>
                             <div className="flex items-center gap-2">
                               {t.status === 'approved' ? (
                                 <Button size="sm" variant="ghost" onClick={() => updateStatus(t.id, 'pending')} className="h-9 px-3 rounded-lg text-emerald-600 bg-emerald-50 font-bold text-[10px] uppercase"><CheckCircle2 className="w-4 h-4 mr-2" />Approved</Button>
                               ) : (
                                 <Button size="sm" variant="outline" onClick={() => updateStatus(t.id, 'approved')} className="h-9 px-3 rounded-lg text-muted-foreground hover:text-emerald-600 font-bold text-[10px] uppercase"><ThumbsUp className="w-4 h-4 mr-2" />Approve</Button>
                               )}
-                              <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'rejected')} className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5"><X className="w-4 h-4" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => updateStatus(t.id, 'rejected')} className="h-9 w-9 rounded-lg hover:text-destructive"><X className="w-4 h-4" /></Button>
                             </div>
                           </div>
                         </div>
@@ -538,10 +455,7 @@ export function BankStatementImport() {
               </div>
               <DialogFooter className="p-6 bg-muted/20 border-t flex items-center gap-4">
                 <Button variant="ghost" onClick={reset} className="font-bold rounded-xl h-12 flex-1">Cancel</Button>
-                <Button onClick={handleConfirmImport} disabled={loading || approvedTxns.length === 0} className="font-bold rounded-xl h-12 flex-[2] shadow-lg">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ThumbsUp className="w-4 h-4 mr-2" />}
-                  Save {approvedTxns.length} New Expenses
-                </Button>
+                <Button onClick={handleConfirmImport} disabled={loading || approvedTxns.length === 0} className="font-bold rounded-xl h-12 flex-[2] shadow-lg">Save {approvedTxns.length} New Expenses</Button>
               </DialogFooter>
             </div>
           )}
@@ -557,25 +471,10 @@ export function BankStatementImport() {
           </DialogHeader>
           <div className="py-6 space-y-2">
             <Label htmlFor="pdf-password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Password</Label>
-            <Input 
-              id="pdf-password" 
-              type="password" 
-              placeholder="••••••••" 
-              value={pdfPassword} 
-              onChange={(e) => setPdfPassword(e.target.value)} 
-              className={cn("h-12 rounded-xl bg-muted/30 border-none shadow-inner px-4 font-bold transition-all focus:ring-2", passwordError ? "ring-2 ring-destructive" : "focus:ring-primary")} 
-              autoFocus 
-            />
+            <Input id="pdf-password" type="password" placeholder="••••••••" value={pdfPassword} onChange={(e) => setPdfPassword(e.target.value)} className={cn("h-12 rounded-xl bg-muted/30 border-none px-4 font-bold", passwordError && "ring-2 ring-destructive")} autoFocus />
           </div>
           <DialogFooter>
-            <Button 
-              className="w-full h-14 font-bold rounded-xl shadow-lg" 
-              onClick={() => runImport(pendingFile!, pdfPassword)} 
-              disabled={loading || !pdfPassword}
-            >
-              {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Unlock className="w-5 h-5 mr-2" />}
-              Unlock & Process
-            </Button>
+            <Button className="w-full h-14 font-bold rounded-xl shadow-lg" onClick={() => runImport(pendingFile!, pdfPassword)} disabled={loading || !pdfPassword}>Unlock & Process</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
