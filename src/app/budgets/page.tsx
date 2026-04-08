@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -110,10 +110,6 @@ export default function BudgetsPage() {
         (e.status === 'paid' || !e.status)
       )
       .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  };
-
-  const formatAmount = (amount: number, decimals: number = 2) => {
-    return amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
 
   const handleOpenDialog = (categoryId?: string) => {
@@ -232,7 +228,7 @@ export default function BudgetsPage() {
                 </div>
               </div>
             ))}
-            {categories.length === 0 && (
+            {categories.length === 0)$ (
               <p className="text-center py-12 text-muted-foreground text-sm italic font-medium">No categories defined in registry.</p>
             )}
           </div>
@@ -263,7 +259,7 @@ export default function BudgetsPage() {
               </div>
               <span className="text-[11px] font-bold font-headline uppercase tracking-widest text-muted-foreground">Total Spent</span>
             </div>
-            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{currency.symbol}{formatAmount(budgetStats.totalSpent)}</div>
+            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{formatCurrency(budgetStats.totalSpent, currency.symbol, true)}</div>
             <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Usage for {format(new Date(viewYear, viewMonth), 'MMM')}</p>
           </CardContent>
         </Card>
@@ -275,7 +271,7 @@ export default function BudgetsPage() {
               </div>
               <span className="text-[11px] font-bold font-headline uppercase tracking-widest text-muted-foreground">Budget Limit</span>
             </div>
-            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{currency.symbol}{formatAmount(budgetStats.totalBudget)}</div>
+            <div className="text-3xl font-bold font-headline mb-1 tracking-tight">{formatCurrency(budgetStats.totalBudget, currency.symbol, true)}</div>
             <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Global Monthly Target</p>
           </CardContent>
         </Card>
@@ -308,9 +304,9 @@ export default function BudgetsPage() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <div className="text-right shrink-0">
-                      <span className="text-sm font-bold text-foreground">{currency.symbol}{formatAmount(spent)}</span>
+                      <span className="text-sm font-bold text-foreground">{formatCurrency(spent, currency.symbol)}</span>
                       <span className="text-muted-foreground mx-2 text-[10px] opacity-50">/</span>
-                      <span className="text-xs font-bold text-muted-foreground">{currency.symbol}{formatAmount(limit, 0)}</span>
+                      <span className="text-xs font-bold text-muted-foreground">{formatCurrency(limit, currency.symbol, true)}</span>
                     </div>
                   </div>
                 </div>
@@ -322,7 +318,7 @@ export default function BudgetsPage() {
                   <div className="flex items-center gap-2">
                     {limit > 0 ? (
                        <span className={cn("px-2.5 py-1 rounded-lg border font-bold", isOver ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100')}>
-                       {isOver ? `${currency.symbol}${formatAmount(spent - limit)} over` : `${currency.symbol}${formatAmount(limit - spent)} left`}
+                       {isOver ? `${formatCurrency(spent - limit, currency.symbol)} over` : `${formatCurrency(limit - spent, currency.symbol)} left`}
                      </span>
                     ) : (
                       <span className="text-muted-foreground/40 italic font-medium">No limit set</span>

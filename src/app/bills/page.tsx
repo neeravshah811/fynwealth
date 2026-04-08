@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export default function BillsPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -461,7 +461,7 @@ export default function BillsPage() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-bold text-2xl text-primary tracking-tighter mb-1">{currency.symbol}{bill.amount.toLocaleString()}</div>
+                      <div className="font-bold text-2xl text-primary tracking-tighter mb-1">{formatCurrency(bill.amount, currency.symbol)}</div>
                       <div className={cn("text-[10px] font-bold uppercase tracking-widest", isOverdue ? "text-destructive" : "text-muted-foreground")}>
                         {isOverdue ? "Overdue" : "Due"} {format(date, 'MMM dd')}
                       </div>
@@ -508,7 +508,7 @@ export default function BillsPage() {
                       <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Paid {format(new Date(bill.dueDate), 'MMM dd')}</span>
                     </div>
                   </div>
-                  <span className="font-bold text-base text-foreground shrink-0 tracking-tight">{currency.symbol}{bill.amount.toLocaleString()}</span>
+                  <span className="font-bold text-base text-foreground shrink-0 tracking-tight">{formatCurrency(bill.amount, currency.symbol)}</span>
                 </CardContent>
               </Card>
             ))}

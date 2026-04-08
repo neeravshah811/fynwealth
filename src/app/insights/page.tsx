@@ -22,7 +22,7 @@ import {
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format, startOfMonth, endOfMonth, subMonths, isWeekend } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export default function InsightsPage() {
   const { currency, insights, setInsights, viewMonth, viewYear } = useFynWealthStore();
@@ -81,7 +81,7 @@ export default function InsightsPage() {
       });
       const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
       results.push({
-        text: `You spent total ${currency.symbol}${topCat[1].toLocaleString()} on ${topCat[0].toLowerCase()} today.`,
+        text: `You spent total ${formatCurrency(topCat[1], currency.symbol, true)} on ${topCat[0].toLowerCase()} today.`,
         icon: Zap,
         color: "text-amber-500"
       });
@@ -224,8 +224,6 @@ export default function InsightsPage() {
     </div>
   );
 
-  const formatAmount = (amount: number) => amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   if (loading && !insights.unnecessary) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-10">
@@ -301,7 +299,7 @@ export default function InsightsPage() {
                     {discoveries.current.highest.length > 0 ? discoveries.current.highest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold text-rose-700">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
+                        <span className="text-xs font-bold text-rose-700">{formatCurrency(toNum(e.amount), currency.symbol)}</span>
                       </div>
                     )) : (
                       <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No records identified.</div>
@@ -312,7 +310,7 @@ export default function InsightsPage() {
                     {discoveries.current.lowest.length > 0 ? discoveries.current.lowest.map((e) => (
                       <div key={e.id} className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 flex items-center justify-between">
                         <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                        <span className="text-xs font-bold text-emerald-700">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
+                        <span className="text-xs font-bold text-emerald-700">{formatCurrency(toNum(e.amount), currency.symbol)}</span>
                       </div>
                     )) : (
                       <div className="p-4 text-xs italic text-muted-foreground border border-dashed rounded-xl">No records identified.</div>
@@ -334,7 +332,7 @@ export default function InsightsPage() {
                       {discoveries.last.highest.map((e) => (
                         <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
                           <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
+                          <span className="text-xs font-bold">{formatCurrency(toNum(e.amount), currency.symbol)}</span>
                         </div>
                       ))}
                     </div>
@@ -343,7 +341,7 @@ export default function InsightsPage() {
                       {discoveries.last.lowest.map((e) => (
                         <div key={e.id} className="p-4 rounded-xl bg-muted/10 border border-muted/20 flex items-center justify-between opacity-70">
                           <span className="text-xs font-bold truncate max-w-[150px]">{getDisplayName(e)}</span>
-                          <span className="text-xs font-bold">{currency.symbol}{formatAmount(toNum(e.amount))}</span>
+                          <span className="text-xs font-bold">{formatCurrency(toNum(e.amount), currency.symbol)}</span>
                         </div>
                       ))}
                     </div>
@@ -372,7 +370,7 @@ export default function InsightsPage() {
                     <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-bold text-sm text-foreground truncate">{localCat.categoryName}</span>
-                        <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{currency.symbol}{formatAmount(localCat.totalSpent)}</p>
+                        <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{formatCurrency(localCat.totalSpent, currency.symbol, true)}</p>
                       </div>
                       <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
                         <div className="flex items-center gap-2 mb-2">

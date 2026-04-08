@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo } from "react";
@@ -16,6 +15,7 @@ import {
   Tooltip, 
   Legend
 } from 'recharts';
+import { formatCurrency } from "@/lib/utils";
 
 export function CategoryPieChart() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -43,8 +43,8 @@ export function CategoryPieChart() {
       .reduce((acc: any[], curr) => {
         let catName = curr.categoryName || curr.category || "General";
         
-        // Normalization: Ensure naming consistency for graphs
-        if (catName === "Financial Commitments" || catName === "Financial Commit") {
+        // Normalization
+        if (catName === "Financial Commit") {
           catName = "Financial Commit";
         }
         
@@ -101,7 +101,7 @@ export function CategoryPieChart() {
                   padding: '8px 10px'
                 }}
                 formatter={(value: number) => [
-                  <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
+                  <span className="font-bold text-foreground" key="val">{formatCurrency(value, currency.symbol)}</span>,
                   null
                 ]}
               />

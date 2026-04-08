@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFynWealthStore } from "@/lib/store";
@@ -48,6 +47,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { addDocumentNonBlocking, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { formatCurrency } from "@/lib/utils";
 
 export default function ExpensesPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -342,10 +342,6 @@ export default function ExpensesPage() {
     reader.readAsText(file);
   };
 
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-7xl mx-auto pb-24">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
@@ -485,7 +481,7 @@ export default function ExpensesPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-bold text-sm text-foreground">
-                            {currency.symbol}{formatAmount(expense.amount)}
+                            {formatCurrency(expense.amount, currency.symbol)}
                           </TableCell>
                           <TableCell className="text-right pr-6">
                             <div className="flex justify-end gap-2 transition-all">

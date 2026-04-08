@@ -42,6 +42,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 export default function DocumentsPage() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -96,10 +97,6 @@ export default function DocumentsPage() {
       f.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [folders, searchTerm, currentFolderId]);
-
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
 
   const getDocType = (dataUri: string) => {
     if (dataUri.startsWith('data:application/pdf')) return 'pdf';
@@ -306,7 +303,7 @@ export default function DocumentsPage() {
                       <div className="space-y-3">
                         <div className="flex justify-between items-start gap-3">
                           <h4 className="font-bold text-sm truncate leading-tight text-foreground flex-1" title={displayDescription}>{displayDescription}</h4>
-                          <span className="font-bold text-sm text-primary tracking-tight">{currency.symbol}{formatAmount(expense.amount)}</span>
+                          <span className="font-bold text-sm text-primary tracking-tight">{formatCurrency(expense.amount, currency.symbol)}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">

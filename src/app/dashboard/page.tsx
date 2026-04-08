@@ -21,6 +21,7 @@ import {
   Tag
 } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 
 const SpendingChart = dynamic(() => import("@/components/dashboard/SpendingChart").then(mod => mod.SpendingChart), {
   loading: () => <Card className="h-[250px] animate-pulse bg-muted/20" />
@@ -75,10 +76,6 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   const ExpenseRow = ({ expense }: { expense: any }) => {
     const displayDescription = expense.description || expense.note || (
       expense.subcategoryName && expense.subcategoryName !== 'Others' 
@@ -106,7 +103,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="text-sm font-bold text-foreground shrink-0 whitespace-nowrap ml-4">
-          {currency.symbol}{formatAmount(expense.amount)}
+          {formatCurrency(expense.amount, currency.symbol)}
         </div>
       </div>
     );

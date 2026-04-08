@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo } from "react";
@@ -18,6 +17,7 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
+import { formatCurrency } from "@/lib/utils";
 
 export function SpendingChart() {
   const { currency, viewMonth, viewYear } = useFynWealthStore();
@@ -47,7 +47,7 @@ export function SpendingChart() {
         let catName = curr.categoryName || curr.category || "General";
         
         // Normalization: Ensure 'Financial Commit' is consistent across graphs
-        if (catName === "Financial Commitments" || catName === "Financial Commit") {
+        if (catName === "Financial Commit") {
           catName = "Financial Commit";
         }
         
@@ -100,7 +100,7 @@ export function SpendingChart() {
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9, fontWeight: 500 }} 
-                tickFormatter={(value) => `${currency.symbol}${value >= 1000 ? (value/1000).toFixed(0)+'k' : value}`}
+                tickFormatter={(value) => formatCurrency(value, currency.symbol, true)}
               />
               <Tooltip 
                 cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
@@ -113,7 +113,7 @@ export function SpendingChart() {
                   padding: '10px'
                 }}
                 formatter={(value: number) => [
-                  <span className="font-bold text-foreground" key="val">{currency.symbol}{value.toLocaleString()}</span>,
+                  <span className="font-bold text-foreground" key="val">{formatCurrency(value, currency.symbol)}</span>,
                   null
                 ]}
               />

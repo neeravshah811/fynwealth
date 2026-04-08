@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { SUPPORTED_CURRENCIES } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
 
 export default function UserDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const resolvedParams = use(params);
@@ -108,7 +109,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" className="rounded-xl border-black/5 shadow-sm" asChild>
           <Link href="/admin-dashboard/users"><ChevronLeft className="w-5 h-5" /></Link>
@@ -186,7 +187,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-800">Total Volume</span>
                 </div>
-                <p className="text-base font-bold text-emerald-700">{currencySymbol}{totalSpent.toLocaleString()}</p>
+                <p className="text-base font-bold text-emerald-700">{formatCurrency(totalSpent, currencySymbol, true)}</p>
               </div>
             </CardContent>
           </Card>
@@ -236,7 +237,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ uid: stri
                             {displayDescription}
                           </TableCell>
                           <TableCell className="text-right pr-6 font-bold text-sm">
-                            {currencySymbol}{exp.amount?.toLocaleString()}
+                            {formatCurrency(exp.amount, currencySymbol)}
                           </TableCell>
                         </TableRow>
                       );

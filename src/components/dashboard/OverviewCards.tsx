@@ -6,7 +6,7 @@ import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebas
 import { collection, query, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReceiptText, Target, Timer, Wallet } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 
 export function OverviewCards() {
@@ -81,12 +81,7 @@ export function OverviewCards() {
     );
   }
 
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
   const MetricCard = ({ title, amount, icon: Icon, colorClass, subtext }: any) => {
-    const isNegative = amount < 0;
     return (
       <Card className="border-none bg-card shadow-sm transition-all hover:shadow-md ring-1 ring-black/5">
         <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
@@ -96,8 +91,8 @@ export function OverviewCards() {
           </div>
         </CardHeader>
         <CardContent className="px-5 pb-5">
-          <div className={cn("text-2xl font-bold font-headline truncate tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
-            {isNegative && "-"}{currency.symbol}{formatAmount(amount)}
+          <div className={cn("text-2xl font-bold font-headline tracking-tight mb-1", privacyMode && "blur-md select-none", colorClass)}>
+            {formatCurrency(amount, currency.symbol, true)}
           </div>
           <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-70">
             {subtext}
