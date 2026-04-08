@@ -98,10 +98,14 @@ export default function ExpensesPage() {
     if (!categoriesData) return [];
     const catMap = new Map();
     categoriesData.forEach(cat => {
-      const normalized = cat.name?.trim().toLowerCase();
+      let name = cat.name?.trim();
+      // Normalize legacy naming
+      if (name === "Financial Commitments") name = "Financial Commit";
+      
+      const normalized = name.toLowerCase();
       if (!normalized) return;
       if (!catMap.has(normalized) || cat.userId === user?.uid) {
-        catMap.set(normalized, cat);
+        catMap.set(normalized, { ...cat, name });
       }
     });
     return Array.from(catMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));

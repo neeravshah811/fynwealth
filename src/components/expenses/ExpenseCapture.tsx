@@ -63,6 +63,9 @@ export function ExpenseCapture() {
     const catMap = new Map();
     categoriesRaw.forEach(cat => {
       let name = cat.name?.trim();
+      // Normalize legacy naming
+      if (name === "Financial Commitments") name = "Financial Commit";
+      
       const normalized = name.toLowerCase();
       if (!normalized) return;
       if (!catMap.has(normalized) || cat.userId === user?.uid) {

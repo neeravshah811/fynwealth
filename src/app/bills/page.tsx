@@ -66,11 +66,15 @@ export default function BillsPage() {
       
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        const normalized = data.name?.trim().toLowerCase();
+        let name = data.name?.trim();
+        // Normalize legacy naming
+        if (name === "Financial Commitments") name = "Financial Commit";
+        
+        const normalized = name.toLowerCase();
         if (!normalized) return;
         
         if (!catMap.has(normalized) || data.userId === user?.uid) {
-          catMap.set(normalized, { id: doc.id, ...data });
+          catMap.set(normalized, { id: doc.id, ...data, name });
         }
       });
       
