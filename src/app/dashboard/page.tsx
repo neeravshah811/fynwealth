@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -35,7 +34,7 @@ const CategoryPieChart = dynamic(() => import("@/components/dashboard/CategoryPi
 const DAILY_TIPS = [
   "Review weekly subscriptions to save on recurring fees.",
   "Consider generic brands for groceries to reduce your monthly bill.",
-  "Switch off unused appliances to save on electricity costs.",
+  "Audit your recurring bank charges to find hidden fees.",
   "Plan your meals for the week to avoid impulsive food orders.",
   "Set up automatic transfers to your savings account on payday.",
   "Track even the smallest expenses; they add up over time.",
@@ -247,7 +246,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-5">
             <div className="space-y-4">
-              {insights.predictions?.predictions?.[0] ? (
+              {insights.predictions?.predictions?.[0] && (
                 <div className="p-4 bg-card rounded-2xl border border-primary/5 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4 text-primary" />
@@ -256,10 +255,6 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Expect heavy spend in {insights.predictions.predictions[0].month} due to {insights.predictions.predictions[0].reason}.
                   </p>
-                </div>
-              ) : (
-                <div className="text-xs text-center text-muted-foreground py-4 italic">
-                  Add more data for predictions.
                 </div>
               )}
               
