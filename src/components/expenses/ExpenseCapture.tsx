@@ -94,6 +94,12 @@ export function ExpenseCapture() {
     subcategories: []
   });
 
+  const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   async function loadSubcategories(categoryId: string, isReview: boolean = false) {
     if (!db || !categoryId || categoryId === 'empty' || categoryId === 'loading') {
       isReview ? setAiReviewData((prev: any) => ({ ...prev, subcategories: [] })) : setSubcategories([]);
@@ -306,7 +312,7 @@ export function ExpenseCapture() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount</Label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">{currency.symbol}</span>
-                    <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required className="flex h-12 w-full rounded-xl border border-input bg-background pl-9 pr-4 text-sm font-bold focus:ring-2 focus:ring-primary" />
+                    <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={blockInvalidChar} required className="flex h-12 w-full rounded-xl border border-input bg-background pl-9 pr-4 text-sm font-bold focus:ring-2 focus:ring-primary" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -374,7 +380,7 @@ export function ExpenseCapture() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
-                <Input value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} className="h-11 font-bold rounded-xl" />
+                <Input type="number" value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} onKeyDown={blockInvalidChar} className="h-11 font-bold rounded-xl" />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>

@@ -41,6 +41,12 @@ export default function BudgetsPage() {
   const [mounted, setMounted] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
 
+  const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   useEffect(() => {
     async function loadCategories() {
       if (!firestore) return;
@@ -224,6 +230,7 @@ export default function BudgetsPage() {
                   <input 
                     id={cat.id} 
                     type="number" 
+                    onKeyDown={blockInvalidChar}
                     className="flex h-11 w-full rounded-xl border border-input bg-muted/30 py-2 pl-9 pr-4 text-sm font-bold shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all" 
                     placeholder="0.00"
                     value={editedLimits[cat.id] ?? ""} 

@@ -58,6 +58,12 @@ export default function BillsPage() {
     note: ''
   });
 
+  const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const loadCategories = async () => {
     if (!db) return;
     try {
@@ -311,6 +317,7 @@ export default function BillsPage() {
                       type="number" 
                       value={formData.amount} 
                       onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                      onKeyDown={blockInvalidChar}
                       required 
                       className="flex h-12 w-full rounded-xl border border-input bg-background py-2 pl-9 pr-4 text-sm font-bold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all"
                     />

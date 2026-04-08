@@ -160,6 +160,12 @@ export default function ExpensesPage() {
     updateDocumentNonBlocking(docRef, { status: currentStatus === 'paid' ? 'unpaid' : 'paid' });
   };
 
+  const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingExpense || !db || !user?.uid) return;
@@ -542,6 +548,7 @@ export default function ExpensesPage() {
                     <input 
                       type="number" 
                       step="0.01"
+                      onKeyDown={blockInvalidChar}
                       className="flex h-12 w-full rounded-xl bg-muted/30 border-none shadow-inner px-4 text-xl font-bold transition-all focus:ring-2 focus:ring-primary" 
                       value={editingExpense.amount} 
                       onChange={(e) => setEditingExpense({...editingExpense, amount: e.target.value})} 
