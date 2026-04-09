@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useMemo } from "react";
@@ -12,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Camera, 
   Mic, 
@@ -232,8 +232,7 @@ export function ExpenseCapture() {
           frequency: aiReviewData.frequency,
           categoryId: aiReviewData.categoryId,
           categoryName: categoryObj?.name || "Unknown",
-          subcategoryId: aiReviewData.subcategoryId || "",
-          subcategoryName: subcategoryObj?.name || "Others",
+          subcategoryId: aiReviewData.subcategoryId || "", subcategoryName: subcategoryObj?.name || "Others",
           attachmentData: attachmentData,
           note: aiReviewData.note.trim(),
           userId: user.uid,
@@ -492,7 +491,7 @@ export function ExpenseCapture() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
-                  <Input type="number" value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} onKeyDown={blockInvalidChar} className="h-11 font-bold rounded-xl" />
+                  <input type="number" value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} onKeyDown={blockInvalidChar} className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>
