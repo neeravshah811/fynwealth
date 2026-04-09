@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useRef, useMemo } from "react";
-import { useFynWealthStore } from "@/lib/store";
+import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, serverTimestamp, getDocs, query, where, doc, increment } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { 
   Camera, 
   Mic, 
@@ -20,7 +22,9 @@ import {
   Tag,
   X,
   ThumbsUp,
-  Sparkles
+  Sparkles,
+  Repeat,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import {
   Dialog,
@@ -36,7 +40,7 @@ import { BankStatementImport } from "./BankStatementImport";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function ExpenseCapture() {
   const { currency } = useFynWealthStore();
@@ -63,7 +67,6 @@ export function ExpenseCapture() {
     const catMap = new Map();
     categoriesRaw.forEach(cat => {
       let name = cat.name?.trim();
-      // Normalize legacy naming
       if (name === "Financial Commitments") name = "Financial Commit";
       
       const normalized = name.toLowerCase();
@@ -84,6 +87,11 @@ export function ExpenseCapture() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
 
+  // Recurring states
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<Frequency>("Monthly");
+  const [reminderDate, setReminderDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [aiReviewData, setAiReviewData] = useState<any>({
     amount: "",
@@ -91,7 +99,10 @@ export function ExpenseCapture() {
     note: "",
     categoryId: "",
     subcategoryId: "",
-    subcategories: []
+    subcategories: [],
+    isRecurring: false,
+    frequency: "Monthly" as Frequency,
+    reminderDate: format(new Date(), 'yyyy-MM-dd')
   });
 
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -150,6 +161,8 @@ export function ExpenseCapture() {
     try {
       const categoryObj = categories.find(c => c.id === selectedCategory);
       const subcategoryObj = selectedSubcategory ? subcategories.find(s => s.id === selectedSubcategory) : null;
+      
+      // 1. Save Expense
       addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
         userId: user.uid, amount: Math.abs(parseFloat(amount)), categoryId: selectedCategory,
         categoryName: categoryObj?.name || "Unknown", subcategoryId: selectedSubcategory || "",
@@ -157,10 +170,33 @@ export function ExpenseCapture() {
         billImageData: attachmentData, status: date > format(new Date(), 'yyyy-MM-dd') ? 'unpaid' : 'paid',
         createdAt: serverTimestamp()
       });
+      
+      // 2. Save Reminder if recurring
+      if (isRecurring) {
+        addDocumentNonBlocking(collection(db, 'users', user.uid, 'bills'), {
+          name: note.trim() || categoryObj?.name || "Recurring Expense",
+          amount: Math.abs(parseFloat(amount)),
+          dueDate: reminderDate,
+          dueTime: '09:00',
+          frequency: frequency,
+          categoryId: selectedCategory,
+          categoryName: categoryObj?.name || "Unknown",
+          subcategoryId: selectedSubcategory || "",
+          subcategoryName: subcategoryObj?.name || "Others",
+          attachmentData: attachmentData,
+          note: note.trim(),
+          userId: user.uid,
+          status: 'pending',
+          notified: false,
+          createdAt: serverTimestamp()
+        });
+        updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalReminders': increment(1) });
+      }
+
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(1) });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      toast({ title: "Expense Recorded" });
+      toast({ title: isRecurring ? "Expense & Reminder Set" : "Expense Recorded" });
       resetForm();
     } catch (err) {
       setLoading(false);
@@ -173,18 +209,45 @@ export function ExpenseCapture() {
     try {
       const categoryObj = categories.find(c => c.id === aiReviewData.categoryId);
       const subcategoryObj = aiReviewData.subcategories?.find((s: any) => s.id === aiReviewData.subcategoryId);
+      
+      const parsedAmount = Math.abs(parseFloat(aiReviewData.amount || "0"));
+
+      // 1. Save Expense
       addDocumentNonBlocking(collection(db, 'users', user.uid, 'expenses'), {
-        userId: user.uid, amount: Math.abs(parseFloat(aiReviewData.amount || "0")),
+        userId: user.uid, amount: parsedAmount,
         categoryId: aiReviewData.categoryId, categoryName: categoryObj?.name || "Unknown",
         subcategoryId: aiReviewData.subcategoryId || "", subcategoryName: subcategoryObj?.name || "Others",
         note: aiReviewData.note.trim(), date: aiReviewData.date, billImageData: attachmentData,
         status: aiReviewData.date > format(new Date(), 'yyyy-MM-dd') ? 'unpaid' : 'paid',
         createdAt: serverTimestamp()
       });
+
+      // 2. Save Reminder if recurring
+      if (aiReviewData.isRecurring) {
+        addDocumentNonBlocking(collection(db, 'users', user.uid, 'bills'), {
+          name: aiReviewData.note.trim() || categoryObj?.name || "Recurring Expense",
+          amount: parsedAmount,
+          dueDate: aiReviewData.reminderDate,
+          dueTime: '09:00',
+          frequency: aiReviewData.frequency,
+          categoryId: aiReviewData.categoryId,
+          categoryName: categoryObj?.name || "Unknown",
+          subcategoryId: aiReviewData.subcategoryId || "",
+          subcategoryName: subcategoryObj?.name || "Others",
+          attachmentData: attachmentData,
+          note: aiReviewData.note.trim(),
+          userId: user.uid,
+          status: 'pending',
+          notified: false,
+          createdAt: serverTimestamp()
+        });
+        updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalReminders': increment(1) });
+      }
+
       updateDocumentNonBlocking(doc(db, 'users', user.uid), { 'stats.totalExpenses': increment(1) });
       setIsReviewDialogOpen(false);
       resetForm();
-      toast({ title: "Approved & Recorded" });
+      toast({ title: aiReviewData.isRecurring ? "Expense & Reminder Set" : "Approved & Recorded" });
     } catch (err) {
       setLoading(false);
     }
@@ -229,7 +292,12 @@ export function ExpenseCapture() {
             amount: result.amount === 0 ? "" : result.amount.toString(),
             date: result.date || format(new Date(), 'yyyy-MM-dd'),
             note: result.description || "Voice Entry",
-            categoryId: categoryId, subcategoryId: "", subcategories: []
+            categoryId: categoryId, 
+            subcategoryId: "", 
+            subcategories: [],
+            isRecurring: false,
+            frequency: "Monthly",
+            reminderDate: format(new Date(), 'yyyy-MM-dd')
           });
           if (categoryId) await loadSubcategories(categoryId, true);
           setIsReviewDialogOpen(true);
@@ -262,7 +330,12 @@ export function ExpenseCapture() {
             amount: result.totalAmount ? Math.abs(result.totalAmount).toString() : "",
             date: result.transactionDate || format(new Date(), 'yyyy-MM-dd'),
             note: result.merchantName || "Receipt",
-            categoryId: mappedCatId, subcategoryId: "", subcategories: []
+            categoryId: mappedCatId, 
+            subcategoryId: "", 
+            subcategories: [],
+            isRecurring: false,
+            frequency: "Monthly",
+            reminderDate: format(new Date(), 'yyyy-MM-dd')
           });
           if (mappedCatId) await loadSubcategories(mappedCatId, true);
           setIsReviewDialogOpen(true);
@@ -280,8 +353,11 @@ export function ExpenseCapture() {
   const resetForm = () => {
     setAmount(""); setNote(""); setDate(format(new Date(), 'yyyy-MM-dd'));
     setSelectedCategory(""); setSelectedSubcategory(""); setAttachmentData(null);
+    setIsRecurring(false); setFrequency("Monthly"); setReminderDate(format(new Date(), 'yyyy-MM-dd'));
     setLoading(false); setProcessingMessage("");
   };
+
+  const frequencyOptions = ["Weekly", "Monthly", "Bi-monthly", "Quarterly", "Yearly"];
 
   return (
     <Card id="tour-expense-capture" className="shadow-lg border-none bg-card ring-1 ring-black/5 relative">
@@ -305,6 +381,7 @@ export function ExpenseCapture() {
             <TabsTrigger value="voice" className="text-[10px] md:text-xs font-bold uppercase">Voice</TabsTrigger>
             <TabsTrigger value="scan" className="text-[10px] md:text-xs font-bold uppercase">Scan</TabsTrigger>
           </TabsList>
+          
           <TabsContent value="manual">
             <form onSubmit={handleManualSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -345,9 +422,42 @@ export function ExpenseCapture() {
                   <Input placeholder="e.g. Weekly Groceries" value={note} onChange={(e) => setNote(e.target.value)} className="pl-11 pr-4 h-12 rounded-xl" />
                 </div>
               </div>
+
+              <div className="pt-2 border-t border-muted/50 space-y-4">
+                <div className="flex items-center justify-between p-4 bg-muted/20 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Repeat className={cn("w-5 h-5", isRecurring ? "text-primary" : "text-muted-foreground")} />
+                    <div>
+                      <Label className="text-xs font-bold block">Recurring Expense</Label>
+                      <p className="text-[10px] text-muted-foreground font-medium">Add to Reminders</p>
+                    </div>
+                  </div>
+                  <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
+                </div>
+
+                {isRecurring && (
+                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                      <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
+                        <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Next Due Date</Label>
+                      <Input type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-11 rounded-xl text-xs font-bold" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" disabled={loading} className="w-full h-12 font-bold rounded-xl shadow-lg mt-4">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Add Expense</Button>
             </form>
           </TabsContent>
+          
           <TabsContent value="voice">
             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-muted rounded-[20px] bg-muted/10">
               <div className={`p-8 rounded-full mb-6 transition-all ${isRecording ? 'bg-destructive/20 animate-pulse scale-110' : 'bg-primary/10'}`}>
@@ -358,6 +468,7 @@ export function ExpenseCapture() {
               {!isRecording ? <Button onClick={startRecording} disabled={loading} className="h-12 px-10 font-bold rounded-xl shadow-lg">Start Recording</Button> : <Button onClick={stopRecording} variant="destructive" className="h-12 px-10 font-bold rounded-xl shadow-lg">Stop & Process</Button>}
             </div>
           </TabsContent>
+          
           <TabsContent value="scan">
             <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-muted rounded-[20px] bg-muted/10">
               <div className="p-8 rounded-full bg-primary/10 mb-6"><Camera className="w-14 h-14 text-primary opacity-60" /></div>
@@ -371,43 +482,73 @@ export function ExpenseCapture() {
       </CardContent>
 
       <Dialog open={isReviewDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsReviewDialogOpen(open); }}>
-        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-none shadow-2xl rounded-[24px]">
           <DialogHeader className="p-8 bg-primary/5 border-b border-muted/50">
             <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-3"><Sparkles className="w-6 h-6 text-accent" /> AI Suggestion</DialogTitle>
             <DialogDescription className="text-sm font-medium mt-1">Review and categorize the details extracted by AI.</DialogDescription>
           </DialogHeader>
-          <div className="p-8 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
-                <Input type="number" value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} onKeyDown={blockInvalidChar} className="h-11 font-bold rounded-xl" />
+          <ScrollArea className="max-h-[60vh]">
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase opacity-70">Amount ({currency.symbol})</Label>
+                  <Input type="number" value={aiReviewData.amount} onChange={(e) => setAiReviewData({...aiReviewData, amount: e.target.value})} onKeyDown={blockInvalidChar} className="h-11 font-bold rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>
+                  <Input type="date" value={aiReviewData.date} onChange={(e) => setAiReviewData({...aiReviewData, date: e.target.value})} className="h-11 rounded-xl" />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase opacity-70">Date</Label>
-                <Input type="date" value={aiReviewData.date} onChange={(e) => setAiReviewData({...aiReviewData, date: e.target.value})} className="h-11 rounded-xl" />
+                <Label className="text-[10px] font-bold uppercase opacity-70">Description</Label>
+                <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase opacity-70">Category</Label>
+                  <Select value={aiReviewData.categoryId} onValueChange={(v) => { setAiReviewData({...aiReviewData, categoryId: v}); loadSubcategories(v, true); }}>
+                    <SelectTrigger className="h-11 rounded-xl font-bold"><SelectValue placeholder="Pick One" /></SelectTrigger>
+                    <SelectContent className="max-h-[300px] rounded-xl">{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase opacity-70">Subcategory</Label>
+                  <Select value={aiReviewData.subcategoryId} onValueChange={(v) => setAiReviewData({...aiReviewData, subcategoryId: v})} disabled={!aiReviewData.categoryId}>
+                    <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectContent className="max-h-[250px] rounded-xl">{aiReviewData.subcategories?.map((sub: any) => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-muted/50 space-y-4">
+                <div className="flex items-center justify-between p-4 bg-muted/20 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Repeat className={cn("w-5 h-5", aiReviewData.isRecurring ? "text-primary" : "text-muted-foreground")} />
+                    <Label className="text-xs font-bold cursor-pointer" htmlFor="ai-recurring">Recurring Expense</Label>
+                  </div>
+                  <Switch id="ai-recurring" checked={aiReviewData.isRecurring} onCheckedChange={(v) => setAiReviewData({...aiReviewData, isRecurring: v})} />
+                </div>
+
+                {aiReviewData.isRecurring && (
+                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Frequency</Label>
+                      <Select value={aiReviewData.frequency} onValueChange={(v) => setAiReviewData({...aiReviewData, frequency: v as Frequency})}>
+                        <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Reminder Date</Label>
+                      <Input type="date" value={aiReviewData.reminderDate} onChange={(e) => setAiReviewData({...aiReviewData, reminderDate: e.target.value})} className="h-11 rounded-xl text-xs font-bold" />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase opacity-70">Description</Label>
-              <Input value={aiReviewData.note} onChange={(e) => setAiReviewData({...aiReviewData, note: e.target.value})} className="h-11 rounded-xl" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase opacity-70">Category</Label>
-                <Select value={aiReviewData.categoryId} onValueChange={(v) => { setAiReviewData({...aiReviewData, categoryId: v}); loadSubcategories(v, true); }}>
-                  <SelectTrigger className="h-11 rounded-xl font-bold"><SelectValue placeholder="Pick One" /></SelectTrigger>
-                  <SelectContent className="max-h-[300px] rounded-xl">{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase opacity-70">Subcategory</Label>
-                <Select value={aiReviewData.subcategoryId} onValueChange={(v) => setAiReviewData({...aiReviewData, subcategoryId: v})} disabled={!aiReviewData.categoryId}>
-                  <SelectTrigger className="h-11 rounded-xl font-medium"><SelectValue placeholder="Optional" /></SelectTrigger>
-                  <SelectContent className="max-h-[250px] rounded-xl">{aiReviewData.subcategories?.map((sub: any) => <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
+          </ScrollArea>
           <DialogFooter className="p-6 bg-muted/20 border-t flex gap-3">
             <Button variant="ghost" onClick={() => setIsReviewDialogOpen(false)} className="flex-1 font-bold h-12">Discard</Button>
             <Button onClick={handleReviewApproval} disabled={loading || !aiReviewData.categoryId} className="flex-[2] font-bold h-12 shadow-lg">Approve & Save</Button>

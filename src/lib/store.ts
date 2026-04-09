@@ -7,7 +7,7 @@ import { SUPPORTED_CURRENCIES } from "./constants";
 
 export { SUPPORTED_CURRENCIES, SYSTEM_CATEGORIES } from "./constants";
 
-export type Frequency = 'One-time' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Annually';
+export type Frequency = 'One-time' | 'Weekly' | 'Monthly' | 'Bi-monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly' | 'Annually';
 
 export type Currency = {
   code: string;

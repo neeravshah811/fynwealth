@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -279,6 +280,8 @@ export default function BillsPage() {
   const pendingReminders = (bills || []).filter(b => b.status === 'pending');
   const paidReminders = (bills || []).filter(b => b.status === 'paid');
 
+  const frequencyOptions = ["One-time", "Weekly", "Monthly", "Bi-monthly", "Quarterly", "Yearly"];
+
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 px-1">
@@ -335,7 +338,7 @@ export default function BillsPage() {
                   <Select value={formData.frequency} onValueChange={(v) => setFormData({...formData, frequency: v as Frequency})}>
                     <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4"><SelectValue /></SelectTrigger>
                     <SelectContent className="z-[100] rounded-xl">
-                      {['One-time', 'Weekly', 'Monthly', 'Quarterly', 'Annually'].map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                      {frequencyOptions.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -374,7 +377,7 @@ export default function BillsPage() {
                     onValueChange={setSelectedSubcategory}
                     disabled={!selectedCategory || isSubLoading}
                   >
-                    <SelectTrigger className="h-12 rounded-xl shadow-sm px-4"><SelectValue placeholder={isSubLoading ? "Loading..." : "Select Subcategory (Optional)"} /></SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-xl shadow-sm px-4"><SelectValue placeholder={isSubLoading ? "..." : "Select Subcategory (Optional)"} /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[250px] rounded-xl">
                       {isSubLoading ? (
                         <SelectItem value="loading" disabled>
