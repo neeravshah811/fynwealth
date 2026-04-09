@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -25,6 +24,14 @@ import {
   FileText,
   MessageSquare
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { format, isPast, isToday } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -44,8 +51,10 @@ export default function BillsPage() {
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [isSubLoading, setIsSubLoading] = useState(false);
 
+  // Custom Category State
   const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -145,7 +154,7 @@ export default function BillsPage() {
       });
 
       await addDoc(collection(db, "subcategories"), {
-        name: "Others",
+        name: newSubcategoryName.trim() || "Others",
         categoryId: categoryRef.id,
         userId: user.uid,
         createdAt: serverTimestamp()
@@ -153,6 +162,7 @@ export default function BillsPage() {
 
       toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
       setNewCategoryName("");
+      setNewSubcategoryName("");
       setIsCustomCategoryOpen(false);
       
       await loadCategories();
@@ -302,7 +312,7 @@ export default function BillsPage() {
         <Card className="border-none shadow-2xl overflow-hidden animate-in slide-in-from-top-8 rounded-[20px]">
           <CardHeader className="bg-primary/5 border-b border-muted/50 p-8">
             <CardTitle className="text-xl font-headline flex items-center gap-4 font-bold text-primary">
-              <CreditCard className="w-6 h-6" /> Configure Reminder
+              <Plus className="w-6 h-6" /> Configure Reminder
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8">
@@ -534,6 +544,46 @@ export default function BillsPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Category Dialog */}
+      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-[24px] border-none shadow-2xl">
+          <DialogHeader className="pb-4 border-b border-muted/50 mb-6">
+            <DialogTitle className="text-xl font-headline font-bold text-primary">New Category</DialogTitle>
+            <DialogDescription className="text-xs">Add a custom category and its first subcategory to your registry.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Category Name</Label>
+              <Input 
+                placeholder="e.g. Pet Care" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Primary Subcategory</Label>
+              <Input 
+                placeholder="e.g. Vet Visits (Default: Others)" 
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95" 
+              onClick={handleAddCustomCategory}
+              disabled={isCreatingCategory || !newCategoryName.trim()}
+            >
+              {isCreatingCategory ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useFynWealthStore } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy, where, serverTimestamp, getDocs, increment } from "firebase/firestore";
+import { collection, doc, query, orderBy, where, serverTimestamp, getDocs, increment, addDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,8 @@ import {
   Tag, 
   Repeat, 
   Paperclip, 
-  X 
+  X,
+  Plus
 } from "lucide-react";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { ExpenseCapture } from "@/components/expenses/ExpenseCapture";
@@ -28,6 +29,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -62,6 +65,12 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Custom Category State for Edit Dialog
+  const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   // Edit form taxonomy state
   const [editSubcategories, setEditSubcategories] = useState<any[]>([]);
@@ -193,6 +202,39 @@ export default function ExpensesPage() {
       toast({ variant: "destructive", title: "Update Failed", description: "Could not save changes." });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    setIsCreatingCategory(true);
+    try {
+      const categoryRef = await addDoc(collection(db, "categories"), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, "subcategories"), {
+        name: newSubcategoryName.trim() || "Others",
+        categoryId: categoryRef.id,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
+      setNewCategoryName("");
+      setNewSubcategoryName("");
+      setIsCustomCategoryOpen(false);
+      
+      if (editingExpense) {
+        setEditingExpense((prev: any) => ({ ...prev, categoryId: categoryRef.id }));
+        loadEditSubcategories(categoryRef.id);
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create custom category." });
+    } finally {
+      setIsCreatingCategory(false);
     }
   };
 
@@ -569,7 +611,16 @@ export default function ExpensesPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1 tracking-widest">Category</Label>
+                    <div className="flex items-center justify-between px-1 h-5 mb-1">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Category</Label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsCustomCategoryOpen(true)}
+                        className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
                     <Select 
                       value={editingExpense.categoryId || ""} 
                       onValueChange={(v) => setEditingExpense({...editingExpense, categoryId: v, subcategoryId: ""})}
@@ -717,6 +768,46 @@ export default function ExpensesPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Custom Category Dialog */}
+      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-[24px] border-none shadow-2xl">
+          <DialogHeader className="pb-4 border-b border-muted/50 mb-6">
+            <DialogTitle className="text-xl font-headline font-bold text-primary">New Category</DialogTitle>
+            <DialogDescription className="text-xs">Add a custom category and its first subcategory to your registry.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Category Name</Label>
+              <Input 
+                placeholder="e.g. Pet Care" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Primary Subcategory</Label>
+              <Input 
+                placeholder="e.g. Vet Visits (Default: Others)" 
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95" 
+              onClick={handleAddCustomCategory}
+              disabled={isCreatingCategory || !newCategoryName.trim()}
+            >
+              {isCreatingCategory ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

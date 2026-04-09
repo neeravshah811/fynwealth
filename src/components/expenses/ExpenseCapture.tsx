@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useFynWealthStore, Frequency } from "@/lib/store";
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, serverTimestamp, getDocs, query, where, doc, increment } from "firebase/firestore";
+import { collection, serverTimestamp, getDocs, query, where, doc, increment, addDoc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -88,6 +88,12 @@ export function ExpenseCapture() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
 
+  // Custom Category State
+  const [isCustomCategoryOpen, setIsCustomCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
   // Recurring states
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>("Monthly");
@@ -143,6 +149,42 @@ export function ExpenseCapture() {
     setSelectedCategory(categoryId);
     setSelectedSubcategory("");
     loadSubcategories(categoryId);
+  };
+
+  const handleAddCustomCategory = async () => {
+    if (!newCategoryName.trim() || !db || !user?.uid) return;
+    setIsCreatingCategory(true);
+    try {
+      const categoryRef = await addDoc(collection(db, "categories"), {
+        name: newCategoryName.trim(),
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, "subcategories"), {
+        name: newSubcategoryName.trim() || "Others",
+        categoryId: categoryRef.id,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: "Category Added", description: `"${newCategoryName}" is now available.` });
+      setNewCategoryName("");
+      setNewSubcategoryName("");
+      setIsCustomCategoryOpen(false);
+      
+      // Update context and select the new category
+      if (isReviewDialogOpen) {
+        setAiReviewData((prev: any) => ({ ...prev, categoryId: categoryRef.id }));
+        await loadSubcategories(categoryRef.id, true);
+      } else {
+        handleCategoryChange(categoryRef.id);
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to create custom category." });
+    } finally {
+      setIsCreatingCategory(false);
+    }
   };
 
   const mapAiCategoryToId = (aiCat: string): string => {
@@ -404,7 +446,16 @@ export function ExpenseCapture() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Category</Label>
+                  <div className="flex items-center justify-between px-1 h-5 mb-1">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCustomCategoryOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                   <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="h-12 rounded-xl font-bold shadow-sm px-4"><SelectValue placeholder="Select Category" /></SelectTrigger>
                     <SelectContent className="z-[100] max-h-[300px] rounded-xl">
@@ -519,7 +570,16 @@ export function ExpenseCapture() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase opacity-70">Category</Label>
+                  <div className="flex items-center justify-between px-1 h-5 mb-1">
+                    <Label className="text-[10px] font-bold uppercase opacity-70">Category</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCustomCategoryOpen(true)}
+                      className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                   <Select value={aiReviewData.categoryId} onValueChange={(v) => { setAiReviewData({...aiReviewData, categoryId: v}); loadSubcategories(v, true); }}>
                     <SelectTrigger className="h-11 rounded-xl font-bold"><SelectValue placeholder="Pick One" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] rounded-xl">{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}</SelectContent>
@@ -575,6 +635,46 @@ export function ExpenseCapture() {
           <DialogFooter className="p-6 bg-muted/20 border-t flex gap-3">
             <Button variant="ghost" onClick={() => setIsReviewDialogOpen(false)} className="flex-1 font-bold h-12">Discard</Button>
             <Button onClick={handleReviewApproval} disabled={loading || !aiReviewData.categoryId} className="flex-[2] font-bold h-12 shadow-lg">Approve & Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Category Dialog */}
+      <Dialog open={isCustomCategoryOpen} onOpenChange={setIsCustomCategoryOpen}>
+        <DialogContent className="sm:max-w-[400px] p-8 rounded-[24px] border-none shadow-2xl">
+          <DialogHeader className="pb-4 border-b border-muted/50 mb-6">
+            <DialogTitle className="text-xl font-headline font-bold text-primary">New Category</DialogTitle>
+            <DialogDescription className="text-xs">Add a custom category and its first subcategory to your registry.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Category Name</Label>
+              <Input 
+                placeholder="e.g. Pet Care" 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Primary Subcategory</Label>
+              <Input 
+                placeholder="e.g. Vet Visits (Default: Others)" 
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                className="h-12 rounded-xl text-sm font-bold shadow-inner"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full h-14 font-bold rounded-xl shadow-lg transition-all active:scale-95" 
+              onClick={handleAddCustomCategory}
+              disabled={isCreatingCategory || !newCategoryName.trim()}
+            >
+              {isCreatingCategory ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create Category
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
