@@ -24,7 +24,8 @@ import {
   ThumbsUp,
   Sparkles,
   Repeat,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Clock
 } from "lucide-react";
 import {
   Dialog,
@@ -91,6 +92,7 @@ export function ExpenseCapture() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>("Monthly");
   const [reminderDate, setReminderDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [reminderTime, setReminderTime] = useState("09:00");
 
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [aiReviewData, setAiReviewData] = useState<any>({
@@ -102,7 +104,8 @@ export function ExpenseCapture() {
     subcategories: [],
     isRecurring: false,
     frequency: "Monthly" as Frequency,
-    reminderDate: format(new Date(), 'yyyy-MM-dd')
+    reminderDate: format(new Date(), 'yyyy-MM-dd'),
+    reminderTime: "09:00"
   });
 
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -177,7 +180,7 @@ export function ExpenseCapture() {
           name: note.trim() || categoryObj?.name || "Recurring Expense",
           amount: Math.abs(parseFloat(amount)),
           dueDate: reminderDate,
-          dueTime: '09:00',
+          dueTime: reminderTime,
           frequency: frequency,
           categoryId: selectedCategory,
           categoryName: categoryObj?.name || "Unknown",
@@ -228,7 +231,7 @@ export function ExpenseCapture() {
           name: aiReviewData.note.trim() || categoryObj?.name || "Recurring Expense",
           amount: parsedAmount,
           dueDate: aiReviewData.reminderDate,
-          dueTime: '09:00',
+          dueTime: aiReviewData.reminderTime,
           frequency: aiReviewData.frequency,
           categoryId: aiReviewData.categoryId,
           categoryName: categoryObj?.name || "Unknown",
@@ -296,7 +299,8 @@ export function ExpenseCapture() {
             subcategories: [],
             isRecurring: false,
             frequency: "Monthly",
-            reminderDate: format(new Date(), 'yyyy-MM-dd')
+            reminderDate: format(new Date(), 'yyyy-MM-dd'),
+            reminderTime: "09:00"
           });
           if (categoryId) await loadSubcategories(categoryId, true);
           setIsReviewDialogOpen(true);
@@ -334,7 +338,8 @@ export function ExpenseCapture() {
             subcategories: [],
             isRecurring: false,
             frequency: "Monthly",
-            reminderDate: format(new Date(), 'yyyy-MM-dd')
+            reminderDate: format(new Date(), 'yyyy-MM-dd'),
+            reminderTime: "09:00"
           });
           if (mappedCatId) await loadSubcategories(mappedCatId, true);
           setIsReviewDialogOpen(true);
@@ -353,6 +358,7 @@ export function ExpenseCapture() {
     setAmount(""); setNote(""); setDate(format(new Date(), 'yyyy-MM-dd'));
     setSelectedCategory(""); setSelectedSubcategory(""); setAttachmentData(null);
     setIsRecurring(false); setFrequency("Monthly"); setReminderDate(format(new Date(), 'yyyy-MM-dd'));
+    setReminderTime("09:00");
     setLoading(false); setProcessingMessage("");
   };
 
@@ -435,19 +441,28 @@ export function ExpenseCapture() {
                 </div>
 
                 {isRecurring && (
-                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
-                      <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
-                        <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Frequency</Label>
+                        <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
+                          <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Remind me on</Label>
+                        <Input type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-11 rounded-xl text-xs font-bold" />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Next Due Date</Label>
-                      <Input type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} className="h-11 rounded-xl text-xs font-bold" />
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Reminder Time</Label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input type="time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} className="h-11 pl-10 rounded-xl text-xs font-bold" />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -529,19 +544,28 @@ export function ExpenseCapture() {
                 </div>
 
                 {aiReviewData.isRecurring && (
-                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Frequency</Label>
-                      <Select value={aiReviewData.frequency} onValueChange={(v) => setAiReviewData({...aiReviewData, frequency: v as Frequency})}>
-                        <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Frequency</Label>
+                        <Select value={aiReviewData.frequency} onValueChange={(v) => setAiReviewData({...aiReviewData, frequency: v as Frequency})}>
+                          <SelectTrigger className="h-11 rounded-xl text-xs font-bold"><SelectValue /></SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {frequencyOptions.map(f => <SelectItem key={f} value={f} className="text-xs font-bold">{f}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Remind me on</Label>
+                        <Input type="date" value={aiReviewData.reminderDate} onChange={(e) => setAiReviewData({...aiReviewData, reminderDate: e.target.value})} className="h-11 rounded-xl text-xs font-bold" />
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Reminder Date</Label>
-                      <Input type="date" value={aiReviewData.reminderDate} onChange={(e) => setAiReviewData({...aiReviewData, reminderDate: e.target.value})} className="h-11 rounded-xl text-xs font-bold" />
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Reminder Time</Label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input type="time" value={aiReviewData.reminderTime} onChange={(e) => setAiReviewData({...aiReviewData, reminderTime: e.target.value})} className="h-11 pl-10 rounded-xl text-xs font-bold" />
+                      </div>
                     </div>
                   </div>
                 )}
