@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow to extract expense details from a scanned bill or invoice.
- * Optimized for maximum extraction speed.
+ * Optimized for maximum extraction speed using Gemini 2.5 Flash.
  */
 
 import { ai } from '@/ai/genkit';
@@ -31,6 +31,7 @@ export async function scanBillExpenseCapture(input: ScanBillExpenseCaptureInput)
 
 const prompt = ai.definePrompt({
   name: 'scanBillExpensePrompt',
+  model: 'googleai/gemini-2.5-flash',
   input: { schema: ScanBillExpenseCaptureInputSchema },
   output: { schema: ScanBillExpenseCaptureOutputSchema },
   prompt: `Extract: merchantName, totalAmount (number), transactionDate (YYYY-MM-DD), currency, categorySuggestion.

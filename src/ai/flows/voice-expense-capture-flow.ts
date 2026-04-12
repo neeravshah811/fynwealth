@@ -28,6 +28,7 @@ export async function voiceExpenseCapture(
 
 const extractFromAudioPrompt = ai.definePrompt({
   name: 'extractFromAudioPrompt',
+  model: 'googleai/gemini-2.5-flash',
   input: {
     schema: VoiceExpenseCaptureInputSchema,
   },
