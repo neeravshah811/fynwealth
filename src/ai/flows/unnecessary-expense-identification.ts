@@ -1,30 +1,27 @@
 'use server';
 /**
- * @fileOverview An AI agent that generates concise saving tips for high-spend categories.
- * Optimized for rapid response by processing pre-calculated totals.
+ * @fileOverview An AI agent that generates behavioral savings tips.
+ * Focuses on 5 core pillars: Unplanned Spending, Small Expenses, Impulse Shopping, Subscriptions, and Saving Habits.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const CategoryInputSchema = z.object({
-  categoryName: z.string().describe('The name of the high-spend category.'),
-  totalSpent: z.number().describe('Total amount spent in this category for the month.'),
-});
-
 const IdentifyUnnecessaryExpensesInputSchema = z.object({
-  categories: z.array(CategoryInputSchema).max(4).describe('Top 4 highest spending categories.'),
+  userId: z.string().optional(),
+  month: z.string().optional(),
 });
 export type IdentifyUnnecessaryExpensesInput = z.infer<typeof IdentifyUnnecessaryExpensesInputSchema>;
 
-const IdentifiedCategorySchema = z.object({
-  categoryName: z.string().describe('The name of the category.'),
-  totalSpent: z.number().describe('The amount passed in.'),
-  savingTip: z.string().describe('Exactly 1 concise, actionable tip for this category.'),
+const BehavioralTipSchema = z.object({
+  title: z.string().describe('The name of the behavioral pattern (e.g., Spending Without Planning).'),
+  description: z.string().describe('Explanation of why this behavior happens.'),
+  examples: z.string().optional().describe('Specific examples like coffee, online orders, or sales.'),
+  solution: z.string().describe('Actionable step to fix the behavior.'),
 });
 
 const IdentifyUnnecessaryExpensesOutputSchema = z.object({
-  highSpendCategories: z.array(IdentifiedCategorySchema).max(4).describe('Top 4 spending categories with specific tips.'),
+  behavioralTips: z.array(BehavioralTipSchema).max(3).describe('Top 3 relevant behavioral savings tips.'),
 });
 export type IdentifyUnnecessaryExpensesOutput = z.infer<typeof IdentifyUnnecessaryExpensesOutputSchema>;
 
@@ -34,25 +31,36 @@ export async function identifyUnnecessaryExpenses(input: IdentifyUnnecessaryExpe
 
 const unnecessaryExpenseIdentificationPrompt = ai.definePrompt({
   name: 'unnecessaryExpenseIdentificationPrompt',
+  model: 'googleai/gemini-2.5-flash',
   input: {schema: IdentifyUnnecessaryExpensesInputSchema},
   output: {schema: IdentifyUnnecessaryExpensesOutputSchema},
-  prompt: `You are a precise financial auditor for FynWealth.
-Provide exactly 1 concise, actionable savings tip for each category based on the volume spent.
+  prompt: `You are a behavioral finance coach for FynWealth. 
+Your goal is to select and explain 3 random behavioral savings tips from the 5 core themes below. 
+Do not use conversational filler. Be direct and actionable.
 
-Requirements:
-1. For each category, provide 1 tip specific to that spending behavior.
-2. If Subscriptions are high, suggest plan optimization. If Food is high, suggest meal prep.
-3. Keep tips very short (max 10 words).
-4. Use the EXACT totalSpent provided in the input for your reasoning. Do not perform your own math.
+THEMES:
+1. Spending Without Planning
+   Context: Random spending on online shopping, eating out, and small desires.
+   Solution: Create a proper fixed budget every month.
 
-Categories:
-{{#each categories}}
-- Category: {{{categoryName}}}, Total: {{{totalSpent}}}
-{{/each}}
+2. Ignoring Small Expenses
+   Context: Frequent small amounts (e.g., ₹100, ₹200) like coffee, tea, or online food delivery.
+   Examples: Coffee outside, Swiggy/Zomato, unplanned snacks.
+   Solution: Track even the smallest spends; they turn into thousands per month.
 
-Rules:
-- No conversational filler.
-- Be actionable and data-driven.`,
+3. Emotional or Impulse Shopping
+   Context: Buying things based on emotions or "Sale/Discount" offers rather than need.
+   Solution: Understand the difference between needs and wants.
+
+4. Subscriptions and Auto Payments
+   Context: Automatic charges for OTT, app memberships, or online services that go unused.
+   Solution: Regularly review and cancel unused automated payments.
+
+5. No Habit of Saving and Investing
+   Context: Spending everything first and only saving what is left.
+   Solution: Follow the "Pay Yourself First" rule — save/invest immediately upon receiving income.
+
+Return 3 of these themes in a structured format.`,
 });
 
 const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
@@ -64,22 +72,30 @@ const unnecessaryExpenseIdentificationFlow = ai.defineFlow(
   async (input) => {
     try {
       const {output} = await unnecessaryExpenseIdentificationPrompt(input);
-      if (!output) {
-        return {
-          highSpendCategories: input.categories.map(c => ({
-            ...c,
-            savingTip: "Review your transaction history to identify potential savings."
-          }))
-        };
+      if (!output || !output.behavioralTips) {
+        throw new Error("No output generated");
       }
       return output;
     } catch (err: any) {
       console.error("[unnecessaryExpenseIdentificationFlow] Error:", err.message);
       return {
-        highSpendCategories: input.categories.map(c => ({
-          ...c,
-          savingTip: "Audit this category for recurring or non-essential items."
-        }))
+        behavioralTips: [
+          {
+            title: "Spending Without Planning",
+            description: "Random spending on online shopping or eating out adds up quickly.",
+            solution: "Create a fixed monthly budget to gain control."
+          },
+          {
+            title: "Ignoring Small Expenses",
+            description: "Frequent small purchases like coffee or food delivery turn into major monthly losses.",
+            solution: "Track every small transaction to stop the leak."
+          },
+          {
+            title: "Pay Yourself First",
+            description: "Waiting to save what is 'left over' often results in zero savings.",
+            solution: "Invest a portion of your income as soon as it arrives."
+          }
+        ]
       };
     }
   }

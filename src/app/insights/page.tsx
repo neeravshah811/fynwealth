@@ -17,7 +17,8 @@ import {
   Search,
   AlertCircle,
   TrendingUp,
-  Zap
+  Zap,
+  ArrowRight
 } from "lucide-react";
 import { identifyUnnecessaryExpenses } from "@/ai/flows/unnecessary-expense-identification";
 import { toast } from "@/hooks/use-toast";
@@ -162,26 +163,6 @@ export default function InsightsPage() {
     };
   }, [expenses, viewMonth, viewYear]);
 
-  const accurateTopCategories = useMemo(() => {
-    const targetDate = new Date(viewYear, viewMonth);
-    const startStr = format(startOfMonth(targetDate), 'yyyy-MM-dd');
-    const endStr = format(endOfMonth(targetDate), 'yyyy-MM-dd');
-    
-    const currentMonthExpenses = expenses.filter(e => e.date >= startStr && e.date <= endStr && e.status === 'paid');
-
-    const categoryTotals: Record<string, number> = {};
-    currentMonthExpenses.forEach(e => {
-      let cat = e.categoryName || e.category || "General";
-      if (cat === "Financial Commitments") cat = "Financial Commit";
-      categoryTotals[cat] = (categoryTotals[cat] || 0) + toNum(e.amount);
-    });
-
-    return Object.entries(categoryTotals)
-      .map(([name, total]) => ({ categoryName: name, totalSpent: total }))
-      .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 4);
-  }, [expenses, viewMonth, viewYear]);
-
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -194,14 +175,14 @@ export default function InsightsPage() {
     fetchingRef.current = true;
 
     try {
-      const uResult = await identifyUnnecessaryExpenses({ categories: accurateTopCategories });
+      const uResult = await identifyUnnecessaryExpenses({ userId: user?.uid });
 
       setInsights({
         unnecessary: uResult
       });
       
       lastAnalyzedPeriod.current = `${viewYear}-${viewMonth}`;
-      if (isManual) toast({ title: "Report Ready", description: "Updated with latest vault data." });
+      if (isManual) toast({ title: "Strategies Refreshed", description: "Behavioral audit updated." });
     } catch (err: any) {
       console.error("Failed to load insights", err);
       setError("AI analysis paused. Ensure vault data is available.");
@@ -209,33 +190,22 @@ export default function InsightsPage() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [accurateTopCategories, setInsights, viewMonth, viewYear]);
+  }, [setInsights, viewMonth, viewYear, user?.uid]);
 
   useEffect(() => {
-    if (mounted && expenses.length > 0 && !expensesLoading && !error && !loading) {
+    if (mounted && !error && !loading) {
       const currentPeriod = `${viewYear}-${viewMonth}`;
       if (!insights.unnecessary || lastAnalyzedPeriod.current !== currentPeriod) {
         loadInsights();
       }
     }
-  }, [mounted, expenses.length, expensesLoading, loadInsights, insights.unnecessary, error, loading, viewMonth, viewYear]);
+  }, [mounted, loadInsights, insights.unnecessary, error, loading, viewMonth, viewYear]);
 
   if (!mounted) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Loader2 className="w-10 h-10 text-primary/30 animate-spin" />
     </div>
   );
-
-  if (loading && !insights.unnecessary) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-10">
-        <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center border border-primary/10 shadow-inner">
-          <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        </div>
-        <p className="text-xl font-headline font-bold text-primary animate-pulse">Analyzing Vault Patterns...</p>
-      </div>
-    );
-  }
 
   const getDisplayName = (e: any) => {
     let name = e.description || e.note || e.categoryName || e.category || "Expense";
@@ -369,33 +339,49 @@ export default function InsightsPage() {
               </div>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
-              <div className="space-y-5">
-                {accurateTopCategories.map((localCat, i) => {
-                  const aiCat = insights.unnecessary?.highSpendCategories?.find((c: any) => c.categoryName === localCat.categoryName);
-                  return (
-                    <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Auditing Habits...</p>
+                </div>
+              ) : insights.unnecessary?.behavioralTips ? (
+                <div className="space-y-8">
+                  {insights.unnecessary.behavioralTips.map((tip: any, i: number) => (
+                    <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all hover:bg-accent/10">
                       <div className="flex items-center justify-between gap-4">
-                        <span className="font-bold text-sm text-foreground truncate">{localCat.categoryName}</span>
-                        <p className="font-bold text-sm text-foreground tracking-tight whitespace-nowrap">{formatCurrency(localCat.totalSpent, currency.symbol, true)}</p>
+                        <span className="font-bold text-sm text-foreground truncate">{tip.title}</span>
+                        <Badge variant="secondary" className="bg-accent/10 text-accent text-[8px] font-bold uppercase px-2 py-0.5 border-none">Behavioral Pattern</Badge>
                       </div>
-                      <div className="p-4 bg-card rounded-2xl border border-accent/10 shadow-sm">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="w-3.5 h-3.5 text-accent" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-accent">AI TIP</span>
+                      
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {tip.description}
+                      </p>
+
+                      {tip.examples && (
+                        <div className="p-3 bg-muted/20 rounded-xl space-y-2">
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Examples</p>
+                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">{tip.examples}</p>
                         </div>
-                        <p className="text-sm font-bold text-foreground leading-snug">
-                          {aiCat?.savingTip || "Analyze your usage patterns to find potential savings in this category."}
+                      )}
+
+                      <div className="pt-2">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Target className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Solution</span>
+                        </div>
+                        <p className="text-xs font-bold text-foreground leading-relaxed">
+                          {tip.solution}
                         </p>
                       </div>
                     </div>
-                  );
-                })}
-                {accurateTopCategories.length === 0 && (
-                  <div className="text-center py-20 text-muted-foreground font-medium italic text-sm">
-                    No high spending identified.
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 text-muted-foreground font-medium italic text-sm flex flex-col items-center gap-4">
+                  <AlertCircle className="w-10 h-10 opacity-20" />
+                  <p>AI savings audit will appear here as you log expenses.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

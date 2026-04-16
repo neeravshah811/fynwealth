@@ -18,7 +18,8 @@ import {
   Sparkles,
   TrendingUp,
   AlertCircle,
-  Tag
+  Tag,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
@@ -241,32 +242,25 @@ export default function DashboardPage() {
               <CardTitle className="text-xs md:text-sm font-headline font-bold uppercase tracking-widest text-primary">AI Insights</CardTitle>
             </div>
             <Link href="/insights" className="text-xs font-bold text-primary hover:underline uppercase tracking-tight">
-              More
+              View All
             </Link>
           </CardHeader>
           <CardContent className="p-5">
             <div className="space-y-4">
-              {insights.predictions?.predictions?.[0] && (
-                <div className="p-4 bg-card rounded-2xl border border-primary/5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
+              {insights.unnecessary?.behavioralTips?.[0] ? (
+                <div className="p-5 bg-card rounded-2xl border border-primary/5 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-bold text-primary uppercase tracking-tight">Forecast</span>
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-tight">Behavioral Insight</span>
                   </div>
+                  <h4 className="text-xs font-bold text-foreground">{insights.unnecessary.behavioralTips[0].title}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Expect heavy spend in {insights.predictions.predictions[0].month} due to {insights.predictions.predictions[0].reason}.
+                    {insights.unnecessary.behavioralTips[0].description}
                   </p>
-                </div>
-              )}
-              
-              {insights.unnecessary?.unnecessaryExpenses?.[0] ? (
-                <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-4 h-4 text-accent" />
-                    <span className="text-xs font-bold text-accent uppercase tracking-tight">Saving Tip</span>
+                  <div className="pt-2 border-t border-muted/50">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Solution</p>
+                    <p className="text-xs font-medium text-foreground">{insights.unnecessary.behavioralTips[0].solution}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Review {(insights.unnecessary.unnecessaryExpenses[0].description || insights.unnecessary.unnecessaryExpenses[0].note)}: {insights.unnecessary.unnecessaryExpenses[0].reason}
-                  </p>
                 </div>
               ) : (
                 <div className="p-4 bg-muted/20 rounded-2xl text-center">
