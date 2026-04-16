@@ -182,7 +182,7 @@ export default function InsightsPage() {
       });
       
       lastAnalyzedPeriod.current = `${viewYear}-${viewMonth}`;
-      if (isManual) toast({ title: "Strategies Refreshed", description: "Behavioral audit updated." });
+      if (isManual) toast({ title: "Strategies Refreshed", description: "Behavioral strategies updated." });
     } catch (err: any) {
       console.error("Failed to load insights", err);
       setError("AI analysis paused. Ensure vault data is available.");
@@ -342,7 +342,7 @@ export default function InsightsPage() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Auditing Habits...</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Randomizing Strategies...</p>
                 </div>
               ) : insights.unnecessary?.behavioralTips ? (
                 <div className="space-y-8">
@@ -350,19 +350,12 @@ export default function InsightsPage() {
                     <div key={i} className="p-6 rounded-[24px] border border-accent/10 bg-accent/5 space-y-4 transition-all hover:bg-accent/10">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-bold text-sm text-foreground truncate">{tip.title}</span>
-                        <Badge variant="secondary" className="bg-accent/10 text-accent text-[8px] font-bold uppercase px-2 py-0.5 border-none">Behavioral Pattern</Badge>
+                        <Badge variant="secondary" className="bg-accent/10 text-accent text-[8px] font-bold uppercase px-2 py-0.5 border-none">Daily Strategy</Badge>
                       </div>
                       
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {tip.description}
                       </p>
-
-                      {tip.examples && (
-                        <div className="p-3 bg-muted/20 rounded-xl space-y-2">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Examples</p>
-                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">{tip.examples}</p>
-                        </div>
-                      )}
 
                       <div className="pt-2">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -379,7 +372,7 @@ export default function InsightsPage() {
               ) : (
                 <div className="text-center py-20 text-muted-foreground font-medium italic text-sm flex flex-col items-center gap-4">
                   <AlertCircle className="w-10 h-10 opacity-20" />
-                  <p>AI savings audit will appear here as you log expenses.</p>
+                  <p>Daily behavioral strategies will appear here.</p>
                 </div>
               )}
             </CardContent>
